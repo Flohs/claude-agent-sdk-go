@@ -11,8 +11,9 @@ go get github.com/Flohs/claude-agent-sdk-go
 **Prerequisites:**
 
 - Go 1.23+
-- Claude Code CLI installed: `npm install -g @anthropic-ai/claude-code`
+- Claude Code CLI (>= 2.0.0) installed: `npm install -g @anthropic-ai/claude-code`
   - Or specify a custom path: `Options{CLIPath: "/path/to/claude"}`
+  - The SDK uses the bidirectional JSON streaming protocol (`--output-format stream-json`), which requires CLI version 2.0.0 or later. A version check runs automatically on connect and warns if the CLI is too old.
 
 ## Quick Start
 
