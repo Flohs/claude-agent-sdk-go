@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.2.0] - 2026-03-04
 
 ### Fixed
 
@@ -14,3 +14,7 @@
 - `TypedHookInput` marker interface implemented by all typed hook input structs.
 - `ParseHookInput` function to convert a raw `HookInput` map into the appropriate typed struct.
 - No breaking changes: `HookInput` (`map[string]any`) and `HookCallback` signature remain unchanged.
+
+### Documentation
+
+- Document minimum CLI version requirement (>= 2.0.0) in README. ([#3](https://github.com/Flohs/claude-agent-sdk-go/issues/3))
