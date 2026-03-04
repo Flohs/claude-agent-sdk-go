@@ -28,14 +28,23 @@ func displayMessage(msg claude.Message) {
 }
 
 // checkBashCommand blocks commands containing forbidden patterns.
+// Demonstrates ParseHookInput for type-safe access to hook fields.
 func checkBashCommand(ctx context.Context, input claude.HookInput, toolUseID string, hookCtx claude.HookContext) (claude.HookJSONOutput, error) {
-	toolName, _ := input["tool_name"].(string)
-	if toolName != "Bash" {
+	typed, err := claude.ParseHookInput(input)
+	if err != nil {
+		return claude.HookJSONOutput{}, err
+	}
+	preToolUse, ok := typed.(*claude.PreToolUseHookInput)
+	if !ok || preToolUse.ToolName != "Bash" {
 		return claude.HookJSONOutput{}, nil
 	}
 
-	toolInput, _ := input["tool_input"].(map[string]any)
-	command, _ := toolInput["command"].(string)
+	// Log sub-agent context if present (useful when multiple agents run in parallel).
+	if preToolUse.AgentID != "" {
+		fmt.Printf("  [Hook] Tool call from sub-agent %s (%s)\n", preToolUse.AgentID, preToolUse.AgentType)
+	}
+
+	command, _ := preToolUse.ToolInput["command"].(string)
 
 	blockPatterns := []string{"foo.sh", "rm -rf"}
 	for _, pattern := range blockPatterns {
