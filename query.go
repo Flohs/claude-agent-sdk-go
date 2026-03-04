@@ -549,7 +549,13 @@ func (q *query) streamInput(inputCh <-chan map[string]any) {
 		_ = q.transport.Write(string(data) + "\n")
 	}
 
-	// If we have SDK MCP servers or hooks, wait for first result before closing
+	q.waitForResultAndEndInput()
+}
+
+// waitForResultAndEndInput waits for the first result before closing stdin
+// when SDK MCP servers or hooks are configured. This prevents closing stdin
+// before the CLI completes the MCP initialization handshake.
+func (q *query) waitForResultAndEndInput() {
 	hasHooks := len(q.hooks) > 0
 	hasMcpServers := len(q.mcpRouter.servers) > 0
 
