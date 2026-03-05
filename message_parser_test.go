@@ -219,6 +219,71 @@ func TestParseMessage_ResultMessage(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_StopReasonPresent(t *testing.T) {
+	data := map[string]any{
+		"type":        "result",
+		"subtype":     "success",
+		"duration_ms": float64(500),
+		"is_error":    false,
+		"num_turns":   float64(1),
+		"session_id":  "sess-1",
+		"stop_reason": "end_turn",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	result := msg.(*ResultMessage)
+	if result.StopReason != "end_turn" {
+		t.Errorf("StopReason = %q, want %q", result.StopReason, "end_turn")
+	}
+}
+
+func TestParseMessage_ResultMessage_StopReasonNull(t *testing.T) {
+	data := map[string]any{
+		"type":        "result",
+		"subtype":     "success",
+		"duration_ms": float64(500),
+		"is_error":    false,
+		"num_turns":   float64(1),
+		"session_id":  "sess-1",
+		"stop_reason": nil,
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	result := msg.(*ResultMessage)
+	if result.StopReason != "" {
+		t.Errorf("StopReason = %q, want empty string for nil", result.StopReason)
+	}
+}
+
+func TestParseMessage_ResultMessage_StopReasonAbsent(t *testing.T) {
+	data := map[string]any{
+		"type":        "result",
+		"subtype":     "success",
+		"duration_ms": float64(500),
+		"is_error":    false,
+		"num_turns":   float64(1),
+		"session_id":  "sess-1",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	result := msg.(*ResultMessage)
+	if result.StopReason != "" {
+		t.Errorf("StopReason = %q, want empty string for absent field", result.StopReason)
+	}
+}
+
 func TestParseMessage_StreamEvent(t *testing.T) {
 	data := map[string]any{
 		"type":       "stream_event",
