@@ -1,5 +1,9 @@
 # Claude Agent SDK for Go
 
+[![CI](https://github.com/Flohs/claude-agent-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/Flohs/claude-agent-sdk-go/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Flohs/claude-agent-sdk-go.svg)](https://pkg.go.dev/github.com/Flohs/claude-agent-sdk-go)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Go SDK for Claude Agent. Communicates with the [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) via subprocess stdio using a JSON-based bidirectional control protocol.
 
 ## Installation
