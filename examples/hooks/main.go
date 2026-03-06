@@ -107,7 +107,7 @@ func preToolUseExample(ctx context.Context) {
 	if err := client.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Test 1: Command with forbidden pattern (blocked)
 	fmt.Println("Test 1: Trying a command that should be blocked...")
@@ -148,7 +148,7 @@ func userPromptSubmitExample(ctx context.Context) {
 	if err := client.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	fmt.Println("User: What's my favorite color?")
 	if err := client.SendQuery(ctx, "What's my favorite color?"); err != nil {
@@ -176,7 +176,7 @@ func postToolUseExample(ctx context.Context) {
 	if err := client.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	fmt.Println("User: Run a command that will produce an error: ls /nonexistent_directory")
 	if err := client.SendQuery(ctx, "Run this command: ls /nonexistent_directory"); err != nil {
