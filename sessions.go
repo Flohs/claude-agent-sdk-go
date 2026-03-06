@@ -207,7 +207,7 @@ func readSessionLite(filePath string) *liteSessionFile {
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	info, err := f.Stat()
 	if err != nil {
@@ -218,8 +218,8 @@ func readSessionLite(filePath string) *liteSessionFile {
 	mtime := info.ModTime().UnixMilli()
 
 	headBuf := make([]byte, liteReadBufSize)
-	n, _ := f.Read(headBuf)
-	if n == 0 {
+	n, err := f.Read(headBuf)
+	if n == 0 || err != nil {
 		return nil
 	}
 	head := string(headBuf[:n])

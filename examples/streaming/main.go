@@ -40,7 +40,7 @@ func basicStreaming(ctx context.Context) {
 	if err := client.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	fmt.Println("User: What is 2+2?")
 	if err := client.SendQuery(ctx, "What is 2+2?"); err != nil {
@@ -60,7 +60,7 @@ func multiTurnConversation(ctx context.Context) {
 	if err := client.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// First turn
 	fmt.Println("User: What's the capital of France?")
@@ -91,7 +91,7 @@ func bashCommandExample(ctx context.Context) {
 	if err := client.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	fmt.Println("User: Run a bash echo command")
 	if err := client.SendQuery(ctx, "Run a bash echo command that says 'Hello from Go SDK!'"); err != nil {

@@ -243,7 +243,7 @@ func (t *SubprocessTransport) Close() error {
 	t.ready = false
 
 	if t.stdin != nil && !t.stdinClosed {
-		t.stdin.Close()
+		_ = t.stdin.Close()
 		t.stdinClosed = true
 	}
 

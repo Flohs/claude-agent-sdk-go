@@ -63,7 +63,7 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			opts = &Options{}
 		}
 
-		os.Setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-go")
+		_ = os.Setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-go")
 
 		// Configure permission settings
 		configuredOpts := *opts
@@ -104,7 +104,7 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 		// Initialize
 		if _, err := q.initialize(); err != nil {
 			errs <- err
-			q.close()
+			_ = q.close()
 			return
 		}
 
@@ -118,7 +118,7 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 		data, _ := json.Marshal(userMessage)
 		if err := transport.Write(string(data) + "\n"); err != nil {
 			errs <- err
-			q.close()
+			_ = q.close()
 			return
 		}
 		q.waitForResultAndEndInput()
@@ -133,13 +133,13 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 				select {
 				case messages <- parsed:
 				case <-ctx.Done():
-					q.close()
+					_ = q.close()
 					return
 				}
 			}
 		}
 
-		q.close()
+		_ = q.close()
 	}()
 
 	return messages, errs

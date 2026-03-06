@@ -29,7 +29,7 @@ func NewClient(opts *Options) *Client {
 // Connect establishes the connection to Claude Code.
 // An optional initial prompt can be provided.
 func (c *Client) Connect(ctx context.Context, prompt ...string) error {
-	os.Setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-go-client")
+	_ = os.Setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-go-client")
 
 	// Configure permission settings
 	configuredOpts := *c.options
@@ -67,7 +67,7 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 
 	// Initialize
 	if _, err := c.q.initialize(); err != nil {
-		c.Close()
+		_ = c.Close()
 		return err
 	}
 
