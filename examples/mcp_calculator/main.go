@@ -127,7 +127,7 @@ func main() {
 	if err := client.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	fmt.Println("User: What is (3 + 4) * 5, and what's the square root of the result?")
 	if err := client.SendQuery(ctx, "What is (3 + 4) * 5, and what's the square root of the result? Use the calculator tools."); err != nil {

@@ -67,7 +67,7 @@ func basicPermissions(ctx context.Context) {
 	if err := client.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Test: safe command
 	fmt.Println("User: Run echo 'hello world'")
