@@ -384,7 +384,7 @@ func (q *query) initialize() (map[string]any, error) {
 func (q *query) sendControlRequest(request map[string]any, timeout time.Duration) (map[string]any, error) {
 	q.requestCounter++
 	randBytes := make([]byte, 4)
-	rand.Read(randBytes)
+	_, _ = rand.Read(randBytes)
 	requestID := fmt.Sprintf("req_%d_%s", q.requestCounter, hex.EncodeToString(randBytes))
 
 	// Create event channel

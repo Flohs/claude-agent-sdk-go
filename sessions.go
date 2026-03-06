@@ -218,7 +218,7 @@ func readSessionLite(filePath string) *liteSessionFile {
 	mtime := info.ModTime().UnixMilli()
 
 	headBuf := make([]byte, liteReadBufSize)
-	n, err := f.Read(headBuf)
+	n, _ := f.Read(headBuf)
 	if n == 0 {
 		return nil
 	}
@@ -229,7 +229,7 @@ func readSessionLite(filePath string) *liteSessionFile {
 	if tailOffset <= 0 {
 		tail = head
 	} else {
-		f.Seek(tailOffset, 0)
+		_, _ = f.Seek(tailOffset, 0)
 		tailBuf := make([]byte, liteReadBufSize)
 		n, _ := f.Read(tailBuf)
 		tail = string(tailBuf[:n])

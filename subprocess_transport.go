@@ -248,14 +248,14 @@ func (t *SubprocessTransport) Close() error {
 	}
 
 	if t.cmd != nil && t.cmd.Process != nil {
-		t.cmd.Process.Signal(os.Interrupt)
+		_ = t.cmd.Process.Signal(os.Interrupt)
 		// Give it a moment to exit gracefully
 		done := make(chan error, 1)
 		go func() { done <- t.cmd.Wait() }()
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
-			t.cmd.Process.Kill()
+			_ = t.cmd.Process.Kill()
 		}
 	}
 

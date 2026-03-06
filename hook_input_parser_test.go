@@ -531,7 +531,9 @@ func TestPreToolUseHookInput_JSONRoundTrip(t *testing.T) {
 		t.Fatalf("marshal error: %v", err)
 	}
 	var m map[string]any
-	json.Unmarshal(out, &m)
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
 	for _, key := range []string{"session_id", "tool_name", "tool_use_id", "agent_id", "agent_type", "hook_event_name"} {
 		if _, ok := m[key]; !ok {
 			t.Errorf("marshaled JSON missing expected key %q", key)
@@ -569,7 +571,9 @@ func TestPreToolUseHookInput_JSONRoundTrip_NoAgent(t *testing.T) {
 		t.Fatalf("marshal error: %v", err)
 	}
 	var m map[string]any
-	json.Unmarshal(out, &m)
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
 	if _, ok := m["agent_id"]; ok {
 		t.Error("agent_id should be omitted when empty")
 	}
