@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1] - 2026-03-09
+
+### Fixed
+
+- Inject `CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING=1` into the CLI subprocess environment when `IncludePartialMessages` is enabled. Without this, tool input parameters are buffered instead of streamed on CLI versions >= v2.1.40. Uses setdefault semantics so user-provided values take precedence. ([#13](https://github.com/Flohs/claude-agent-sdk-go/issues/13))
+
 ## [0.2.0] - 2026-03-04
 
 ### Fixed
