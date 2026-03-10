@@ -230,24 +230,17 @@ func makeAssistantLine(uuid, parentUUID, content string, extra ...map[string]any
 // setupTestProjectDir creates a mock Claude config directory structure and
 // sets CLAUDE_CONFIG_DIR so the code under test uses it. Returns a cleanup
 // function that restores the env var.
-func setupTestProjectDir(t *testing.T, projectPath string) (projectDir string, cleanup func()) {
+func setupTestProjectDir(t *testing.T, projectPath string) string {
 	t.Helper()
 	tmpDir := t.TempDir()
-	old := os.Getenv("CLAUDE_CONFIG_DIR")
-	os.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
+	t.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
 
 	sanitized := sanitizePath(projectPath)
 	projDir := filepath.Join(tmpDir, "projects", sanitized)
 	if err := os.MkdirAll(projDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return projDir, func() {
-		if old == "" {
-			os.Unsetenv("CLAUDE_CONFIG_DIR")
-		} else {
-			os.Setenv("CLAUDE_CONFIG_DIR", old)
-		}
-	}
+	return projDir
 }
 
 // writeSessionFile writes content to a session JSONL file and returns its path.
@@ -275,8 +268,8 @@ const (
 // ---------------------------------------------------------------------------
 
 func TestListSessions_BasicProjectDirectory(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/project")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/project")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Hello Claude"),
@@ -303,8 +296,8 @@ func TestListSessions_BasicProjectDirectory(t *testing.T) {
 }
 
 func TestListSessions_MultipleSessions(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/multi")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/multi")
+
 
 	for i, uuid := range []string{testUUID1, testUUID2, testUUID3} {
 		content := strings.Join([]string{
@@ -314,7 +307,9 @@ func TestListSessions_MultipleSessions(t *testing.T) {
 		p := writeSessionFile(t, projDir, uuid, content)
 		// Set different mod times so ordering is deterministic.
 		modTime := time.Now().Add(time.Duration(i) * time.Second)
-		os.Chtimes(p, modTime, modTime)
+		if err := os.Chtimes(p, modTime, modTime); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	sessions, err := ListSessions(ListSessionsOptions{
@@ -336,8 +331,8 @@ func TestListSessions_MultipleSessions(t *testing.T) {
 }
 
 func TestListSessions_LimitParameter(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/limited")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/limited")
+
 
 	for i, uuid := range []string{testUUID1, testUUID2, testUUID3, testUUID4, testUUID5} {
 		content := strings.Join([]string{
@@ -346,7 +341,9 @@ func TestListSessions_LimitParameter(t *testing.T) {
 		}, "\n") + "\n"
 		p := writeSessionFile(t, projDir, uuid, content)
 		modTime := time.Now().Add(time.Duration(i) * time.Second)
-		os.Chtimes(p, modTime, modTime)
+		if err := os.Chtimes(p, modTime, modTime); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	tests := []struct {
@@ -379,8 +376,8 @@ func TestListSessions_LimitParameter(t *testing.T) {
 }
 
 func TestListSessions_EmptyDirectory(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/empty")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/empty")
+
 	_ = projDir
 
 	sessions, err := ListSessions(ListSessionsOptions{
@@ -397,15 +394,7 @@ func TestListSessions_EmptyDirectory(t *testing.T) {
 
 func TestListSessions_NonexistentDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
-	old := os.Getenv("CLAUDE_CONFIG_DIR")
-	os.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
-	defer func() {
-		if old == "" {
-			os.Unsetenv("CLAUDE_CONFIG_DIR")
-		} else {
-			os.Setenv("CLAUDE_CONFIG_DIR", old)
-		}
-	}()
+	t.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
 
 	sessions, err := ListSessions(ListSessionsOptions{
 		Directory:        "/nonexistent/path/that/does/not/exist",
@@ -414,40 +403,38 @@ func TestListSessions_NonexistentDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sessions != nil && len(sessions) != 0 {
-		t.Errorf("expected nil or empty sessions, got %d", len(sessions))
+	if len(sessions) != 0 {
+		t.Errorf("expected empty sessions, got %d", len(sessions))
 	}
 }
 
 func TestListSessions_AllProjects(t *testing.T) {
 	tmpDir := t.TempDir()
-	old := os.Getenv("CLAUDE_CONFIG_DIR")
-	os.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
-	defer func() {
-		if old == "" {
-			os.Unsetenv("CLAUDE_CONFIG_DIR")
-		} else {
-			os.Setenv("CLAUDE_CONFIG_DIR", old)
-		}
-	}()
+	t.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
 
 	// Create two project directories.
 	for _, proj := range []string{"-proj-a", "-proj-b"} {
 		projDir := filepath.Join(tmpDir, "projects", proj)
-		os.MkdirAll(projDir, 0o755)
+		if err := os.MkdirAll(projDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	content1 := strings.Join([]string{
 		makeUserLine("u1", "", "Hello from A"),
 		makeAssistantLine("a1", "u1", "Reply A"),
 	}, "\n") + "\n"
-	os.WriteFile(filepath.Join(tmpDir, "projects", "-proj-a", testUUID1+".jsonl"), []byte(content1), 0o644)
+	if err := os.WriteFile(filepath.Join(tmpDir, "projects", "-proj-a", testUUID1+".jsonl"), []byte(content1), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	content2 := strings.Join([]string{
 		makeUserLine("u2", "", "Hello from B"),
 		makeAssistantLine("a2", "u2", "Reply B"),
 	}, "\n") + "\n"
-	os.WriteFile(filepath.Join(tmpDir, "projects", "-proj-b", testUUID2+".jsonl"), []byte(content2), 0o644)
+	if err := os.WriteFile(filepath.Join(tmpDir, "projects", "-proj-b", testUUID2+".jsonl"), []byte(content2), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	sessions, err := ListSessions(ListSessionsOptions{})
 	if err != nil {
@@ -463,8 +450,8 @@ func TestListSessions_AllProjects(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListSessions_FiltersSidechainSessions(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/sidechain")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/sidechain")
+
 
 	// Normal session.
 	normalContent := strings.Join([]string{
@@ -501,8 +488,8 @@ func TestListSessions_FiltersSidechainSessions(t *testing.T) {
 }
 
 func TestListSessions_FiltersSidechainWithSpaces(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/sidechain-spaces")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/sidechain-spaces")
+
 
 	// Sidechain with space in JSON: "isSidechain": true
 	sidechainContent := strings.Join([]string{
@@ -533,8 +520,8 @@ func TestListSessions_FiltersSidechainWithSpaces(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListSessions_FiltersMetadataOnlySessions(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/metadata-only")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/metadata-only")
+
 
 	// A session with only system/meta entries and no user prompt.
 	metaOnlyContent := strings.Join([]string{
@@ -584,8 +571,8 @@ func TestListSessions_FiltersMetadataOnlySessions(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListSessions_EmptyFile(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/empty-file")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/empty-file")
+
 
 	writeSessionFile(t, projDir, testUUID1, "")
 
@@ -602,8 +589,8 @@ func TestListSessions_EmptyFile(t *testing.T) {
 }
 
 func TestListSessions_FileWithOnlyNewlines(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/newlines-only")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/newlines-only")
+
 
 	writeSessionFile(t, projDir, testUUID1, "\n\n\n\n")
 
@@ -620,8 +607,8 @@ func TestListSessions_FileWithOnlyNewlines(t *testing.T) {
 }
 
 func TestListSessions_MalformedJSONLines(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/malformed")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/malformed")
+
 
 	// Mix of malformed and valid lines.
 	content := strings.Join([]string{
@@ -650,8 +637,8 @@ func TestListSessions_MalformedJSONLines(t *testing.T) {
 }
 
 func TestListSessions_TruncatedJSONL(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/truncated")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/truncated")
+
 
 	// A file where the last line is truncated mid-JSON.
 	content := makeUserLine("u1", "", "Working question") + "\n" +
@@ -676,17 +663,19 @@ func TestListSessions_TruncatedJSONL(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListSessions_IgnoresNonJSONLFiles(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/non-jsonl")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/non-jsonl")
+
 
 	// Create non-JSONL files.
-	os.WriteFile(filepath.Join(projDir, "notes.txt"), []byte("some notes"), 0o644)
-	os.WriteFile(filepath.Join(projDir, "config.json"), []byte("{}"), 0o644)
-
-	// Create a JSONL file with non-UUID name.
-	os.WriteFile(filepath.Join(projDir, "not-a-uuid.jsonl"), []byte(
-		makeUserLine("u1", "", "question")+"\n",
-	), 0o644)
+	for _, f := range []struct{ name, content string }{
+		{"notes.txt", "some notes"},
+		{"config.json", "{}"},
+		{"not-a-uuid.jsonl", makeUserLine("u1", "", "question") + "\n"},
+	} {
+		if err := os.WriteFile(filepath.Join(projDir, f.name), []byte(f.content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	// Create a valid session.
 	content := makeUserLine("u1", "", "Real question") + "\n" +
@@ -710,8 +699,8 @@ func TestListSessions_IgnoresNonJSONLFiles(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListSessions_CustomTitlePriority(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/title-priority")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/title-priority")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Initial question"),
@@ -751,8 +740,8 @@ func TestListSessions_CustomTitlePriority(t *testing.T) {
 }
 
 func TestListSessions_FallsBackToSummaryField(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/summary-fallback")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/summary-fallback")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Question"),
@@ -782,8 +771,8 @@ func TestListSessions_FallsBackToSummaryField(t *testing.T) {
 }
 
 func TestListSessions_FallsBackToFirstPrompt(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/prompt-fallback")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/prompt-fallback")
+
 
 	// No summary or customTitle, just user messages.
 	content := strings.Join([]string{
@@ -812,8 +801,8 @@ func TestListSessions_FallsBackToFirstPrompt(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListSessions_GitBranchExtraction(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/gitbranch")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/gitbranch")
+
 
 	content := strings.Join([]string{
 		makeSessionLine(map[string]any{
@@ -854,8 +843,8 @@ func TestListSessions_GitBranchExtraction(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListSessions_LargeFileHeadTailSplit(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/large-file")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/large-file")
+
 
 	// Build a file where:
 	// - head contains the first user prompt and cwd
@@ -942,8 +931,8 @@ func TestListSessions_LargeFileHeadTailSplit(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestGetSessionMessages_Basic(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/messages")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/messages")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "First question"),
@@ -985,16 +974,10 @@ func TestGetSessionMessages_InvalidUUID(t *testing.T) {
 
 func TestGetSessionMessages_NonexistentSession(t *testing.T) {
 	tmpDir := t.TempDir()
-	old := os.Getenv("CLAUDE_CONFIG_DIR")
-	os.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
-	defer func() {
-		if old == "" {
-			os.Unsetenv("CLAUDE_CONFIG_DIR")
-		} else {
-			os.Setenv("CLAUDE_CONFIG_DIR", old)
-		}
-	}()
-	os.MkdirAll(filepath.Join(tmpDir, "projects"), 0o755)
+	t.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
+	if err := os.MkdirAll(filepath.Join(tmpDir, "projects"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	messages, err := GetSessionMessages(testUUID1, GetSessionMessagesOptions{})
 	if err != nil {
@@ -1006,8 +989,8 @@ func TestGetSessionMessages_NonexistentSession(t *testing.T) {
 }
 
 func TestGetSessionMessages_WithOffset(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/offset")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/offset")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Q1"),
@@ -1035,8 +1018,8 @@ func TestGetSessionMessages_WithOffset(t *testing.T) {
 }
 
 func TestGetSessionMessages_WithLimit(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/msg-limit")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/msg-limit")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Q1"),
@@ -1059,8 +1042,8 @@ func TestGetSessionMessages_WithLimit(t *testing.T) {
 }
 
 func TestGetSessionMessages_WithOffsetAndLimit(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/off-lim")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/off-lim")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Q1"),
@@ -1089,8 +1072,8 @@ func TestGetSessionMessages_WithOffsetAndLimit(t *testing.T) {
 }
 
 func TestGetSessionMessages_OffsetBeyondLength(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/off-beyond")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/off-beyond")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Q1"),
@@ -1111,8 +1094,8 @@ func TestGetSessionMessages_OffsetBeyondLength(t *testing.T) {
 }
 
 func TestGetSessionMessages_FiltersSidechainMessages(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/msg-sidechain")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/msg-sidechain")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Main question"),
@@ -1151,8 +1134,8 @@ func TestGetSessionMessages_FiltersSidechainMessages(t *testing.T) {
 }
 
 func TestGetSessionMessages_FiltersMetaMessages(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/msg-meta")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/msg-meta")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Hello"),
@@ -1183,8 +1166,8 @@ func TestGetSessionMessages_FiltersMetaMessages(t *testing.T) {
 }
 
 func TestGetSessionMessages_FiltersTeamMessages(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/msg-team")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/msg-team")
+
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Hello"),
@@ -1219,8 +1202,8 @@ func TestGetSessionMessages_FiltersTeamMessages(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestGetSessionMessages_MalformedLines(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/msg-malformed")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/msg-malformed")
+
 
 	content := strings.Join([]string{
 		`not json at all`,
@@ -1243,8 +1226,8 @@ func TestGetSessionMessages_MalformedLines(t *testing.T) {
 }
 
 func TestGetSessionMessages_EmptyFile(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/msg-empty")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/msg-empty")
+
 
 	writeSessionFile(t, projDir, testUUID1, "")
 
@@ -1265,8 +1248,8 @@ func TestGetSessionMessages_EmptyFile(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestGetSessionMessages_BranchedConversation(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/branched")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/branched")
+
 
 	// Create a branched conversation where u2 and u3 both descend from a1.
 	// The chain builder should pick the branch with the latest entry.
@@ -1297,8 +1280,8 @@ func TestGetSessionMessages_BranchedConversation(t *testing.T) {
 }
 
 func TestGetSessionMessages_OnlyProgressEntries(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/progress-only")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/progress-only")
+
 
 	// Progress entries are valid transcript entries but not visible.
 	content := strings.Join([]string{
@@ -1329,7 +1312,9 @@ func TestReadSessionLite_SmallFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	content := makeUserLine("u1", "", "Hello") + "\n"
 	path := filepath.Join(tmpDir, "test.jsonl")
-	os.WriteFile(path, []byte(content), 0o644)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	lite := readSessionLite(path)
 	if lite == nil {
@@ -1360,7 +1345,9 @@ func TestReadSessionLite_LargeFile(t *testing.T) {
 	}
 
 	path := filepath.Join(tmpDir, "large.jsonl")
-	os.WriteFile(path, []byte(content), 0o644)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	lite := readSessionLite(path)
 	if lite == nil {
@@ -1377,7 +1364,9 @@ func TestReadSessionLite_LargeFile(t *testing.T) {
 func TestReadSessionLite_EmptyFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "empty.jsonl")
-	os.WriteFile(path, []byte(""), 0o644)
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	lite := readSessionLite(path)
 	if lite != nil {
@@ -1757,8 +1746,8 @@ func TestExtractLastJSONStringField_NoMatch(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListSessions_CwdExtraction(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/cwd")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/cwd")
+
 
 	content := strings.Join([]string{
 		makeSessionLine(map[string]any{
@@ -1787,8 +1776,8 @@ func TestListSessions_CwdExtraction(t *testing.T) {
 }
 
 func TestListSessions_CwdFallsBackToProjectPath(t *testing.T) {
-	projDir, cleanup := setupTestProjectDir(t, "/test/cwd-fallback")
-	defer cleanup()
+	projDir := setupTestProjectDir(t, "/test/cwd-fallback")
+
 
 	// No cwd field in the session.
 	content := strings.Join([]string{
