@@ -19,6 +19,13 @@ go get github.com/Flohs/claude-agent-sdk-go
   - Or specify a custom path: `Options{CLIPath: "/path/to/claude"}`
   - The SDK uses the bidirectional JSON streaming protocol (`--output-format stream-json`), which requires CLI version 2.0.0 or later. A version check runs automatically on connect and warns if the CLI is too old.
 
+**Version Compatibility:**
+
+| Feature | Minimum CLI Version |
+|---------|-------------------|
+| Base functionality (streaming JSON protocol) | >= 2.0.0 |
+| Fine-grained tool streaming (`IncludePartialMessages`) | >= 2.1.40 |
+
 ## Quick Start
 
 ```go
