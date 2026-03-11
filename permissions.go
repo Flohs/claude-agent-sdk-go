@@ -114,4 +114,5 @@ type ToolPermissionContext struct {
 }
 
 // CanUseToolFunc is the callback type for tool permission decisions.
+// It is invoked for tools not matched by AllowedTools or DisallowedTools.
 type CanUseToolFunc func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error)

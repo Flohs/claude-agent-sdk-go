@@ -125,13 +125,17 @@ type SandboxSettings struct {
 type Options struct {
 	// Tools is the base set of tools. Use []string for explicit list or *ToolsPreset for preset.
 	Tools any // []string | *ToolsPreset | nil
-	// AllowedTools lists additional tools to allow.
+	// AllowedTools is a permission allowlist that auto-approves the listed tools
+	// without invoking the CanUseTool callback. Tools not in this list fall through
+	// to PermissionMode + CanUseTool evaluation. This is NOT an availability filter —
+	// it does not restrict which tools are available, only which are pre-approved.
 	AllowedTools []string
 	// SystemPrompt configures the system prompt. Use StringPrompt or PresetPrompt.
 	SystemPrompt SystemPrompt
 	// McpServers maps server names to their config. Use map[string]McpServerConfig or a string/path.
 	McpServers any // map[string]McpServerConfig | string | nil
-	// PermissionMode controls tool execution permissions.
+	// PermissionMode controls tool execution permissions. Used as the fallback
+	// for tools not matched by AllowedTools or DisallowedTools.
 	PermissionMode PermissionMode
 	// ContinueConversation continues the most recent conversation.
 	ContinueConversation bool
@@ -141,7 +145,8 @@ type Options struct {
 	MaxTurns *int
 	// MaxBudgetUSD limits the total cost.
 	MaxBudgetUSD *float64
-	// DisallowedTools lists tools to disallow.
+	// DisallowedTools lists tools to explicitly deny. Takes precedence over
+	// AllowedTools — a tool in both lists will be denied.
 	DisallowedTools []string
 	// Model specifies the AI model to use.
 	Model string
@@ -167,7 +172,8 @@ type Options struct {
 	MaxBufferSize *int
 	// Stderr is a callback for stderr output from the CLI.
 	Stderr func(string)
-	// CanUseTool is a callback for tool permission requests.
+	// CanUseTool is a callback invoked for tool permission decisions when a tool
+	// is not matched by AllowedTools or DisallowedTools.
 	CanUseTool CanUseToolFunc
 	// Hooks configures hook callbacks.
 	Hooks map[HookEvent][]HookMatcher

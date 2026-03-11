@@ -156,7 +156,7 @@ type HookContext struct {
 }
 
 // HookJSONOutput represents the output of a hook callback.
-// See https://docs.anthropic.com/en/docs/claude-code/hooks#advanced%3A-json-output
+// See https://code.claude.com/docs/en/hooks#advanced%3A-json-output
 type HookJSONOutput map[string]any
 
 // HookCallback is the function type for hook callbacks.
