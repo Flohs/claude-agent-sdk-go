@@ -93,9 +93,6 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	if t.options.EnableFileCheckpointing {
 		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
 	}
-	if t.options.IncludePartialMessages {
-		env = envSetDefault(env, "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING", "1")
-	}
 	if t.cwd != "" {
 		env = append(env, "PWD="+t.cwd)
 	}

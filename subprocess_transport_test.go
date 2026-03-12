@@ -147,36 +147,14 @@ func TestBuildCommand_ExtraArgs(t *testing.T) {
 }
 
 func TestConnectEnv_IncludePartialMessages(t *testing.T) {
-	t.Run("sets CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING when true", func(t *testing.T) {
+	t.Run("does not set CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING even when true", func(t *testing.T) {
 		env := buildTestEnv(&Options{IncludePartialMessages: true})
-		assertEnvContains(t, env, "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING=1")
+		assertEnvNotContainsKey(t, env, "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING")
 	})
 
 	t.Run("does not set CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING when false", func(t *testing.T) {
 		env := buildTestEnv(&Options{IncludePartialMessages: false})
 		assertEnvNotContainsKey(t, env, "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING")
-	})
-
-	t.Run("respects user-provided value (setdefault semantics)", func(t *testing.T) {
-		env := buildTestEnv(&Options{
-			IncludePartialMessages: true,
-			Env: map[string]string{
-				"CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING": "0",
-			},
-		})
-		// User's explicit value "0" should win over the default "1"
-		count := 0
-		for _, e := range env {
-			if strings.HasPrefix(e, "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING=") {
-				count++
-				if e != "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING=0" {
-					t.Errorf("expected user value '0', got %s", e)
-				}
-			}
-		}
-		if count != 1 {
-			t.Errorf("expected exactly 1 occurrence, got %d", count)
-		}
 	})
 }
 
@@ -192,9 +170,6 @@ func buildTestEnv(opts *Options) []string {
 	)
 	if opts.EnableFileCheckpointing {
 		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
-	}
-	if opts.IncludePartialMessages {
-		env = envSetDefault(env, "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING", "1")
 	}
 	return env
 }
