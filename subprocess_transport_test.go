@@ -174,16 +174,6 @@ func buildTestEnv(opts *Options) []string {
 	return env
 }
 
-func assertEnvContains(t *testing.T, env []string, entry string) {
-	t.Helper()
-	for _, e := range env {
-		if e == entry {
-			return
-		}
-	}
-	t.Errorf("env does not contain %q", entry)
-}
-
 func assertEnvNotContainsKey(t *testing.T, env []string, key string) {
 	t.Helper()
 	prefix := key + "="

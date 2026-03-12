@@ -571,17 +571,6 @@ func findCLI() (string, error) {
 	}
 }
 
-// envSetDefault appends key=value to env only if key is not already present.
-func envSetDefault(env []string, key, value string) []string {
-	prefix := key + "="
-	for _, e := range env {
-		if strings.HasPrefix(e, prefix) {
-			return env
-		}
-	}
-	return append(env, key+"="+value)
-}
-
 var versionRegexp = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+)`)
 
 func checkClaudeVersion(cliPath string) {
