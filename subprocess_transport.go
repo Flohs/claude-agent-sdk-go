@@ -93,9 +93,6 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	if t.options.EnableFileCheckpointing {
 		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
 	}
-	if t.options.IncludePartialMessages {
-		env = envSetDefault(env, "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING", "1")
-	}
 	if t.cwd != "" {
 		env = append(env, "PWD="+t.cwd)
 	}
@@ -572,17 +569,6 @@ func findCLI() (string, error) {
 					"  Options{CLIPath: \"/path/to/%s\"}", cliName),
 		}},
 	}
-}
-
-// envSetDefault appends key=value to env only if key is not already present.
-func envSetDefault(env []string, key, value string) []string {
-	prefix := key + "="
-	for _, e := range env {
-		if strings.HasPrefix(e, prefix) {
-			return env
-		}
-	}
-	return append(env, key+"="+value)
 }
 
 var versionRegexp = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+)`)
