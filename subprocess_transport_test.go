@@ -158,16 +158,59 @@ func TestConnectEnv_IncludePartialMessages(t *testing.T) {
 	})
 }
 
+func TestConnectEnv_EntrypointDefaultIfAbsent(t *testing.T) {
+	t.Run("sets entrypoint when not in env", func(t *testing.T) {
+		env := buildTestEnv(&Options{})
+		found := false
+		for _, e := range env {
+			if e == "CLAUDE_CODE_ENTRYPOINT=sdk-go" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected CLAUDE_CODE_ENTRYPOINT=sdk-go in env")
+		}
+	})
+
+	t.Run("does not override existing entrypoint", func(t *testing.T) {
+		env := buildTestEnv(&Options{
+			Env: map[string]string{
+				"CLAUDE_CODE_ENTRYPOINT": "custom-value",
+			},
+		})
+		count := 0
+		for _, e := range env {
+			if strings.HasPrefix(e, "CLAUDE_CODE_ENTRYPOINT=") {
+				count++
+				if e != "CLAUDE_CODE_ENTRYPOINT=custom-value" {
+					t.Errorf("expected custom-value, got %s", e)
+				}
+			}
+		}
+		if count != 1 {
+			t.Errorf("expected exactly 1 CLAUDE_CODE_ENTRYPOINT entry, got %d", count)
+		}
+	})
+}
+
 // buildTestEnv simulates the env-building logic from Connect without starting a process.
 func buildTestEnv(opts *Options) []string {
 	env := []string{} // start clean to avoid os.Environ() noise
 	for k, v := range opts.Env {
 		env = append(env, k+"="+v)
 	}
-	env = append(env,
-		"CLAUDE_CODE_ENTRYPOINT=sdk-go",
-		"CLAUDE_AGENT_SDK_VERSION="+sdkVersion,
-	)
+	entrypointSet := false
+	for _, e := range env {
+		if strings.HasPrefix(e, "CLAUDE_CODE_ENTRYPOINT=") {
+			entrypointSet = true
+			break
+		}
+	}
+	if !entrypointSet {
+		env = append(env, "CLAUDE_CODE_ENTRYPOINT=sdk-go")
+	}
+	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+sdkVersion)
 	if opts.EnableFileCheckpointing {
 		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
 	}

@@ -63,7 +63,9 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			opts = &Options{}
 		}
 
-		_ = os.Setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-go")
+		if os.Getenv("CLAUDE_CODE_ENTRYPOINT") == "" {
+			_ = os.Setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-go")
+		}
 
 		// Configure permission settings
 		configuredOpts := *opts

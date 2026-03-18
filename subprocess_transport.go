@@ -86,10 +86,18 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	for k, v := range t.options.Env {
 		env = append(env, k+"="+v)
 	}
-	env = append(env,
-		"CLAUDE_CODE_ENTRYPOINT=sdk-go",
-		"CLAUDE_AGENT_SDK_VERSION="+sdkVersion,
-	)
+	// Only set CLAUDE_CODE_ENTRYPOINT if not already in the environment
+	entrypointSet := false
+	for _, e := range env {
+		if strings.HasPrefix(e, "CLAUDE_CODE_ENTRYPOINT=") {
+			entrypointSet = true
+			break
+		}
+	}
+	if !entrypointSet {
+		env = append(env, "CLAUDE_CODE_ENTRYPOINT=sdk-go")
+	}
+	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+sdkVersion)
 	if t.options.EnableFileCheckpointing {
 		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
 	}
