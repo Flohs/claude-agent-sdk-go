@@ -439,7 +439,7 @@ func TestParseMessage_RateLimitEvent_ImplementsMessage(t *testing.T) {
 	}
 
 	// Verify it can be used as a Message interface
-	var m Message = msg
+	m := Message(msg)
 	if m == nil {
 		t.Fatal("expected non-nil Message")
 	}
