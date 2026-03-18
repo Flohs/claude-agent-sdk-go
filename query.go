@@ -127,6 +127,15 @@ func newQuery(cfg queryConfig) *query {
 			if def.Model != "" {
 				m["model"] = def.Model
 			}
+			if len(def.Skills) > 0 {
+				m["skills"] = def.Skills
+			}
+			if def.Memory != "" {
+				m["memory"] = def.Memory
+			}
+			if len(def.MCPServers) > 0 {
+				m["mcpServers"] = def.MCPServers
+			}
 			q.agents[name] = m
 		}
 	}
