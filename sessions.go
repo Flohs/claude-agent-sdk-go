@@ -95,6 +95,32 @@ func GetSessionMessages(sessionID string, opts GetSessionMessagesOptions) ([]Ses
 	return messages, nil
 }
 
+// RenameSession sets a custom title for a session by appending a custom-title
+// entry to the session's JSONL transcript file.
+func RenameSession(sessionID, title string, directory *string) error {
+	if !isValidUUID(sessionID) {
+		return fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+
+	dir := ""
+	if directory != nil {
+		dir = *directory
+	}
+
+	filePath := findSessionFilePath(sessionID, dir)
+	if filePath == "" {
+		return fmt.Errorf("session file not found for session %s", sessionID)
+	}
+
+	entry := map[string]any{
+		"type":        "custom-title",
+		"customTitle": title,
+		"sessionId":   sessionID,
+	}
+
+	return appendJSONLEntry(filePath, entry)
+}
+
 // Internal types and functions
 
 type transcriptEntry = map[string]any
@@ -828,4 +854,69 @@ func toSessionMessage(entry transcriptEntry) SessionMessage {
 		SessionID: sessionID,
 		Message:   entry["message"],
 	}
+}
+
+// findSessionFilePath locates the JSONL file for a given session ID.
+func findSessionFilePath(sessionID string, directory string) string {
+	fileName := sessionID + ".jsonl"
+
+	if directory != "" {
+		canonicalDir := canonicalizePath(directory)
+
+		projectDir := findProjectDir(canonicalDir)
+		if projectDir != "" {
+			path := filepath.Join(projectDir, fileName)
+			if _, err := os.Stat(path); err == nil {
+				return path
+			}
+		}
+
+		for _, wt := range getWorktreePaths(canonicalDir) {
+			if wt == canonicalDir {
+				continue
+			}
+			wtProjectDir := findProjectDir(wt)
+			if wtProjectDir != "" {
+				path := filepath.Join(wtProjectDir, fileName)
+				if _, err := os.Stat(path); err == nil {
+					return path
+				}
+			}
+		}
+		return ""
+	}
+
+	// Search all project directories
+	projectsDir := getProjectsDir()
+	entries, err := os.ReadDir(projectsDir)
+	if err != nil {
+		return ""
+	}
+	for _, entry := range entries {
+		path := filepath.Join(projectsDir, entry.Name(), fileName)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return ""
+}
+
+// appendJSONLEntry appends a JSON object as a new line to a JSONL file.
+func appendJSONLEntry(filePath string, entry map[string]any) error {
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("failed to marshal entry: %w", err)
+	}
+
+	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open session file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	_, err = f.Write(append([]byte("\n"), append(data, '\n')...))
+	if err != nil {
+		return fmt.Errorf("failed to write to session file: %w", err)
+	}
+	return nil
 }

@@ -1839,3 +1839,133 @@ func TestCanonicalizePath_NonexistentPath(t *testing.T) {
 		t.Error("expected non-empty result even for nonexistent path")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// RenameSession tests
+// ---------------------------------------------------------------------------
+
+func TestRenameSession(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+
+	// Use setupTestProjectDir with a stable fake path (avoids symlink issues with real tmpDir)
+	projectDir := setupTestProjectDir(t, "/test/rename")
+
+	// Write initial session file
+	sessionFile := filepath.Join(projectDir, sessionID+".jsonl")
+	initial := `{"type":"user","uuid":"u1","sessionId":"` + sessionID + `","message":{"role":"user","content":"hello"}}` + "\n"
+	if err := os.WriteFile(sessionFile, []byte(initial), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := "/test/rename"
+	err := RenameSession(sessionID, "My Custom Title", &dir)
+	if err != nil {
+		t.Fatalf("RenameSession failed: %v", err)
+	}
+
+	// Read the file and check for the custom-title entry
+	content, err := os.ReadFile(sessionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(content), `"custom-title"`) {
+		t.Error("expected custom-title entry in session file")
+	}
+	if !strings.Contains(string(content), `"My Custom Title"`) {
+		t.Error("expected title in session file")
+	}
+}
+
+func TestRenameSession_InvalidUUID(t *testing.T) {
+	err := RenameSession("not-a-uuid", "title", nil)
+	if err == nil {
+		t.Error("expected error for invalid UUID")
+	}
+}
+
+func TestRenameSession_SessionNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
+
+	sessionID := "12345678-1234-1234-1234-123456789012"
+	dir := tmpDir
+	err := RenameSession(sessionID, "title", &dir)
+	if err == nil {
+		t.Fatal("expected error for missing session file")
+	}
+	if !strings.Contains(err.Error(), "session file not found") {
+		t.Errorf("expected 'session file not found' error, got: %v", err)
+	}
+}
+
+func TestRenameSession_NilDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
+
+	sessionID := "12345678-1234-1234-1234-123456789012"
+
+	// Create a project dir with a session file in the global search path
+	projectDir := filepath.Join(tmpDir, "projects", "test-project")
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	sessionFile := filepath.Join(projectDir, sessionID+".jsonl")
+	initial := `{"type":"user","uuid":"u1","sessionId":"` + sessionID + `","message":{"role":"user","content":"hello"}}` + "\n"
+	if err := os.WriteFile(sessionFile, []byte(initial), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := RenameSession(sessionID, "New Title", nil)
+	if err != nil {
+		t.Fatalf("RenameSession with nil directory failed: %v", err)
+	}
+
+	content, err := os.ReadFile(sessionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "New Title") {
+		t.Error("expected title in session file")
+	}
+}
+
+func TestRenameSession_JSONLFormat(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+	projectDir := setupTestProjectDir(t, "/test/jsonl-format")
+
+	sessionFile := filepath.Join(projectDir, sessionID+".jsonl")
+	initial := `{"type":"user","uuid":"u1","sessionId":"` + sessionID + `","message":{"role":"user","content":"hello"}}` + "\n"
+	if err := os.WriteFile(sessionFile, []byte(initial), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := "/test/jsonl-format"
+	if err := RenameSession(sessionID, "Test Title", &dir); err != nil {
+		t.Fatalf("RenameSession failed: %v", err)
+	}
+
+	content, err := os.ReadFile(sessionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Find the last non-empty line (the appended entry)
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	lastLine := lines[len(lines)-1]
+
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(lastLine), &entry); err != nil {
+		t.Fatalf("appended entry is not valid JSON: %v\nline: %s", err, lastLine)
+	}
+
+	if entry["type"] != "custom-title" {
+		t.Errorf("expected type 'custom-title', got %v", entry["type"])
+	}
+	if entry["customTitle"] != "Test Title" {
+		t.Errorf("expected customTitle 'Test Title', got %v", entry["customTitle"])
+	}
+	if entry["sessionId"] != sessionID {
+		t.Errorf("expected sessionId %q, got %v", sessionID, entry["sessionId"])
+	}
+}
