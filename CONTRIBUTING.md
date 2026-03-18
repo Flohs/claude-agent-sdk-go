@@ -12,7 +12,7 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ## Prerequisites
 
-- Go 1.23+
+- Go 1.26+
 - Claude Code CLI (`npm install -g @anthropic-ai/claude-code`) for running integration tests
 
 ## Development
