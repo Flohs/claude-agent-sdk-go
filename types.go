@@ -71,6 +71,7 @@ type AssistantMessage struct {
 	Model           string                `json:"model"`
 	ParentToolUseID string                `json:"parent_tool_use_id,omitempty"`
 	Error           AssistantMessageError `json:"error,omitempty"`
+	Usage           map[string]any        `json:"usage,omitempty"`
 }
 
 func (AssistantMessage) messageMarker() {}
