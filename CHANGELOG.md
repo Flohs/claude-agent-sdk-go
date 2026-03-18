@@ -12,6 +12,8 @@
 ### Fixed
 
 - `CLAUDE_CODE_ENTRYPOINT` is now only set when not already present, allowing callers to provide custom entrypoint values. ([#29](https://github.com/Flohs/claude-agent-sdk-go/issues/29))
+- New examples: `include_partial_messages`, `tools_option`, `setting_sources`, `stderr_callback`, `plugins`, and `filesystem_agents`.
+- Extended `streaming` example with interrupt, server info, and timeout sub-examples.
 
 ## [0.2.1] - 2026-03-09
 
