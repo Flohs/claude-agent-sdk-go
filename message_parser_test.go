@@ -383,6 +383,29 @@ func TestParseMessage_ResultMessage_StopReasonAbsent(t *testing.T) {
 	}
 }
 
+func TestParseMessage_RateLimitEvent(t *testing.T) {
+	data := map[string]any{
+		"type":        "rate_limit_event",
+		"retry_after": float64(30),
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	event, ok := msg.(*RateLimitEvent)
+	if !ok {
+		t.Fatalf("expected *RateLimitEvent, got %T", msg)
+	}
+	if event.Type != "rate_limit_event" {
+		t.Errorf("expected type 'rate_limit_event', got %s", event.Type)
+	}
+	if event.Data["retry_after"] != float64(30) {
+		t.Errorf("expected retry_after=30, got %v", event.Data["retry_after"])
+	}
+}
+
 func TestParseMessage_StreamEvent(t *testing.T) {
 	data := map[string]any{
 		"type":       "stream_event",

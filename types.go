@@ -163,6 +163,14 @@ type StreamEvent struct {
 
 func (StreamEvent) messageMarker() {}
 
+// RateLimitEvent represents a rate limit status change from the CLI.
+type RateLimitEvent struct {
+	Type string         `json:"type"`
+	Data map[string]any `json:"data,omitempty"`
+}
+
+func (RateLimitEvent) messageMarker() {}
+
 // SDKSessionInfo contains session metadata returned by ListSessions.
 type SDKSessionInfo struct {
 	SessionID    string `json:"session_id"`
