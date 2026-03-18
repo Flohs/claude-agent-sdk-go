@@ -194,6 +194,25 @@ func TestConnectEnv_EntrypointDefaultIfAbsent(t *testing.T) {
 	})
 }
 
+func TestConnectEnv_EntrypointEmptyStringIsRespected(t *testing.T) {
+	env := buildTestEnv(&Options{
+		Env: map[string]string{
+			"CLAUDE_CODE_ENTRYPOINT": "",
+		},
+	})
+
+	// An explicit empty string should still count as "set" and prevent the default
+	count := 0
+	for _, e := range env {
+		if strings.HasPrefix(e, "CLAUDE_CODE_ENTRYPOINT=") {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected exactly 1 CLAUDE_CODE_ENTRYPOINT entry, got %d", count)
+	}
+}
+
 // buildTestEnv simulates the env-building logic from Connect without starting a process.
 func buildTestEnv(opts *Options) []string {
 	env := []string{} // start clean to avoid os.Environ() noise
