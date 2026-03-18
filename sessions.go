@@ -95,9 +95,10 @@ func GetSessionMessages(sessionID string, opts GetSessionMessagesOptions) ([]Ses
 	return messages, nil
 }
 
-// RenameSession sets a custom title for a session by appending a custom-title
-// entry to the session's JSONL transcript file.
-func RenameSession(sessionID, title string, directory *string) error {
+// TagSession adds a tag to a session by appending a tag entry to the session's
+// JSONL transcript file. The tag is sanitized to remove potentially problematic
+// Unicode characters and normalized using NFKC.
+func TagSession(sessionID string, tag *string, directory *string) error {
 	if !isValidUUID(sessionID) {
 		return fmt.Errorf("invalid session ID: %s", sessionID)
 	}
@@ -112,13 +113,46 @@ func RenameSession(sessionID, title string, directory *string) error {
 		return fmt.Errorf("session file not found for session %s", sessionID)
 	}
 
+	sanitizedTag := ""
+	if tag != nil {
+		sanitizedTag = sanitizeTag(*tag)
+	}
+
 	entry := map[string]any{
-		"type":        "custom-title",
-		"customTitle": title,
-		"sessionId":   sessionID,
+		"type":      "tag",
+		"tag":       sanitizedTag,
+		"sessionId": sessionID,
 	}
 
 	return appendJSONLEntry(filePath, entry)
+}
+
+// sanitizeTag removes potentially problematic Unicode characters and normalizes using NFKC.
+func sanitizeTag(s string) string {
+	// Apply NFKC normalization
+	s = norm.NFKC.String(s)
+
+	// Remove zero-width characters, directionality markers, and private-use characters
+	s = strings.Map(func(r rune) rune {
+		// Zero-width characters
+		if r == '\u200B' || r == '\u200C' || r == '\u200D' || r == '\uFEFF' {
+			return -1
+		}
+		// Directionality markers
+		if r == '\u200E' || r == '\u200F' || (r >= '\u202A' && r <= '\u202E') ||
+			(r >= '\u2066' && r <= '\u2069') {
+			return -1
+		}
+		// Private-use characters
+		if (r >= '\uE000' && r <= '\uF8FF') ||
+			(r >= 0xF0000 && r <= 0xFFFFF) ||
+			(r >= 0x100000 && r <= 0x10FFFF) {
+			return -1
+		}
+		return r
+	}, s)
+
+	return strings.TrimSpace(s)
 }
 
 // Internal types and functions
