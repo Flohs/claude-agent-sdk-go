@@ -65,6 +65,9 @@ type AgentDefinition struct {
 	Prompt      string   `json:"prompt"`
 	Tools       []string `json:"tools,omitempty"`
 	Model       string   `json:"model,omitempty"` // "sonnet", "opus", "haiku", "inherit"
+	Skills      []string `json:"skills,omitempty"`
+	Memory      string   `json:"memory,omitempty"` // "user" | "project" | "local"
+	MCPServers  []any    `json:"mcpServers,omitempty"`
 }
 
 // ThinkingConfig is the interface for thinking configuration.

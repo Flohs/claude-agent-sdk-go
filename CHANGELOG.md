@@ -5,6 +5,7 @@
 ### Added
 
 - Per-turn `Usage` field on `AssistantMessage` to expose token usage per conversation turn. ([#24](https://github.com/Flohs/claude-agent-sdk-go/issues/24))
+- `Skills`, `Memory`, and `MCPServers` fields on `AgentDefinition` for per-agent skill, memory, and MCP server configuration. ([#25](https://github.com/Flohs/claude-agent-sdk-go/issues/25))
 
 ## [0.2.1] - 2026-03-09
 
