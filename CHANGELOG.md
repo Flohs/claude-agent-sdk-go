@@ -8,6 +8,7 @@
 - `Skills`, `Memory`, and `MCPServers` fields on `AgentDefinition` for per-agent skill, memory, and MCP server configuration. ([#25](https://github.com/Flohs/claude-agent-sdk-go/issues/25))
 - Typed `RateLimitEvent` message type for handling rate limit status changes from the CLI. ([#26](https://github.com/Flohs/claude-agent-sdk-go/issues/26))
 - `RenameSession` function to assign a custom title to a session transcript. ([#27](https://github.com/Flohs/claude-agent-sdk-go/issues/27))
+- `TagSession` function with Unicode sanitization to add tags to session transcripts. ([#28](https://github.com/Flohs/claude-agent-sdk-go/issues/28))
 
 ## [0.2.1] - 2026-03-09
 
