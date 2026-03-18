@@ -1319,6 +1319,7 @@ func TestReadSessionLite_SmallFile(t *testing.T) {
 	lite := readSessionLite(path)
 	if lite == nil {
 		t.Fatal("expected non-nil lite session")
+		return
 	}
 	if lite.head != lite.tail {
 		t.Error("for small files, head and tail should be identical")
@@ -1352,6 +1353,7 @@ func TestReadSessionLite_LargeFile(t *testing.T) {
 	lite := readSessionLite(path)
 	if lite == nil {
 		t.Fatal("expected non-nil lite session")
+		return
 	}
 	if lite.head == lite.tail {
 		t.Error("for large files, head and tail should differ")
