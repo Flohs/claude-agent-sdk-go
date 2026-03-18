@@ -1906,3 +1906,111 @@ func TestTagSession_InvalidUUID(t *testing.T) {
 		t.Error("expected error for invalid UUID")
 	}
 }
+
+func TestSanitizeTag_CombinedProblematicChars(t *testing.T) {
+	// Mix of zero-width, directionality, and private-use characters
+	input := "he\u200B\u200Ell\uE000o"
+	got := sanitizeTag(input)
+	if got != "hello" {
+		t.Errorf("sanitizeTag(%q) = %q, want %q", input, got, "hello")
+	}
+}
+
+func TestSanitizeTag_EmptyAfterSanitization(t *testing.T) {
+	// All characters are stripped
+	input := "\u200B\u200E\uE000"
+	got := sanitizeTag(input)
+	if got != "" {
+		t.Errorf("sanitizeTag(%q) = %q, want empty string", input, got)
+	}
+}
+
+func TestSanitizeTag_EmptyString(t *testing.T) {
+	got := sanitizeTag("")
+	if got != "" {
+		t.Errorf("sanitizeTag(%q) = %q, want empty string", "", got)
+	}
+}
+
+func TestTagSession_NilTag(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+	projDir := setupTestProjectDir(t, "/test/nil-tag")
+
+	sessionFile := writeSessionFile(t, projDir, sessionID,
+		`{"type":"user","uuid":"u1","sessionId":"`+sessionID+`","message":{"role":"user","content":"hello"}}`+"\n")
+
+	dir := "/test/nil-tag"
+	err := TagSession(sessionID, nil, &dir)
+	if err != nil {
+		t.Fatalf("TagSession with nil tag failed: %v", err)
+	}
+
+	content, err := os.ReadFile(sessionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Parse the appended line and verify empty tag
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	lastLine := lines[len(lines)-1]
+
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(lastLine), &entry); err != nil {
+		t.Fatalf("appended entry is not valid JSON: %v", err)
+	}
+	if entry["tag"] != "" {
+		t.Errorf("expected empty tag for nil input, got %v", entry["tag"])
+	}
+}
+
+func TestTagSession_SessionNotFound(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+
+	sessionID := "12345678-1234-1234-1234-123456789012"
+	tag := "my-tag"
+	dir := "/test/nonexistent-project"
+	err := TagSession(sessionID, &tag, &dir)
+	if err == nil {
+		t.Fatal("expected error for missing session file")
+	}
+	if !strings.Contains(err.Error(), "session file not found") {
+		t.Errorf("expected 'session file not found' error, got: %v", err)
+	}
+}
+
+func TestTagSession_JSONLFormat(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+	projDir := setupTestProjectDir(t, "/test/jsonl-format")
+
+	sessionFile := writeSessionFile(t, projDir, sessionID,
+		`{"type":"user","uuid":"u1","sessionId":"`+sessionID+`","message":{"role":"user","content":"hello"}}`+"\n")
+
+	tag := "release-v1"
+	dir := "/test/jsonl-format"
+	if err := TagSession(sessionID, &tag, &dir); err != nil {
+		t.Fatalf("TagSession failed: %v", err)
+	}
+
+	content, err := os.ReadFile(sessionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	lastLine := lines[len(lines)-1]
+
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(lastLine), &entry); err != nil {
+		t.Fatalf("appended entry is not valid JSON: %v\nline: %s", err, lastLine)
+	}
+
+	if entry["type"] != "tag" {
+		t.Errorf("expected type 'tag', got %v", entry["type"])
+	}
+	if entry["tag"] != "release-v1" {
+		t.Errorf("expected tag 'release-v1', got %v", entry["tag"])
+	}
+	if entry["sessionId"] != sessionID {
+		t.Errorf("expected sessionId %q, got %v", sessionID, entry["sessionId"])
+	}
+}
