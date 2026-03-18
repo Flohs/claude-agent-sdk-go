@@ -137,6 +137,70 @@ func TestParseMessage_AssistantMessage_WithUsage(t *testing.T) {
 	}
 }
 
+func TestParseMessage_AssistantMessage_UsageAbsent(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model": "claude-sonnet-4-5-20250514",
+			"content": []any{
+				map[string]any{"type": "text", "text": "Hello!"},
+			},
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	asst := msg.(*AssistantMessage)
+	if asst.Usage != nil {
+		t.Errorf("expected Usage to be nil when absent, got %v", asst.Usage)
+	}
+}
+
+func TestParseMessage_AssistantMessage_UsageNull(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model":   "claude-sonnet-4-5-20250514",
+			"content": []any{map[string]any{"type": "text", "text": "Hi"}},
+			"usage":   nil,
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	asst := msg.(*AssistantMessage)
+	if asst.Usage != nil {
+		t.Errorf("expected Usage to be nil for null value, got %v", asst.Usage)
+	}
+}
+
+func TestParseMessage_AssistantMessage_UsageWrongType(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model":   "claude-sonnet-4-5-20250514",
+			"content": []any{map[string]any{"type": "text", "text": "Hi"}},
+			"usage":   "not-a-map",
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	asst := msg.(*AssistantMessage)
+	if asst.Usage != nil {
+		t.Errorf("expected Usage to be nil for wrong type, got %v", asst.Usage)
+	}
+}
+
 func TestParseMessage_ToolUseBlock(t *testing.T) {
 	data := map[string]any{
 		"type": "assistant",
