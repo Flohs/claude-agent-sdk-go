@@ -1839,3 +1839,47 @@ func TestCanonicalizePath_NonexistentPath(t *testing.T) {
 		t.Error("expected non-empty result even for nonexistent path")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// RenameSession tests
+// ---------------------------------------------------------------------------
+
+func TestRenameSession(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+
+	// Use setupTestProjectDir with a stable fake path (avoids symlink issues with real tmpDir)
+	projectDir := setupTestProjectDir(t, "/test/rename")
+
+	// Write initial session file
+	sessionFile := filepath.Join(projectDir, sessionID+".jsonl")
+	initial := `{"type":"user","uuid":"u1","sessionId":"` + sessionID + `","message":{"role":"user","content":"hello"}}` + "\n"
+	if err := os.WriteFile(sessionFile, []byte(initial), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := "/test/rename"
+	err := RenameSession(sessionID, "My Custom Title", &dir)
+	if err != nil {
+		t.Fatalf("RenameSession failed: %v", err)
+	}
+
+	// Read the file and check for the custom-title entry
+	content, err := os.ReadFile(sessionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(content), `"custom-title"`) {
+		t.Error("expected custom-title entry in session file")
+	}
+	if !strings.Contains(string(content), `"My Custom Title"`) {
+		t.Error("expected title in session file")
+	}
+}
+
+func TestRenameSession_InvalidUUID(t *testing.T) {
+	err := RenameSession("not-a-uuid", "title", nil)
+	if err == nil {
+		t.Error("expected error for invalid UUID")
+	}
+}
