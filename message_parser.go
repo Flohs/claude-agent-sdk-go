@@ -28,6 +28,11 @@ func ParseMessage(data map[string]any) (Message, error) {
 		return parseResultMessage(data)
 	case "stream_event":
 		return parseStreamEvent(data)
+	case "rate_limit_event":
+		return &RateLimitEvent{
+			Type: msgType,
+			Data: data,
+		}, nil
 	default:
 		// Forward-compatible: skip unrecognized message types
 		return nil, nil

@@ -383,6 +383,76 @@ func TestParseMessage_ResultMessage_StopReasonAbsent(t *testing.T) {
 	}
 }
 
+func TestParseMessage_RateLimitEvent(t *testing.T) {
+	data := map[string]any{
+		"type":        "rate_limit_event",
+		"retry_after": float64(30),
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	event, ok := msg.(*RateLimitEvent)
+	if !ok {
+		t.Fatalf("expected *RateLimitEvent, got %T", msg)
+	}
+	if event.Type != "rate_limit_event" {
+		t.Errorf("expected type 'rate_limit_event', got %s", event.Type)
+	}
+	if event.Data["retry_after"] != float64(30) {
+		t.Errorf("expected retry_after=30, got %v", event.Data["retry_after"])
+	}
+}
+
+func TestParseMessage_RateLimitEvent_Minimal(t *testing.T) {
+	data := map[string]any{
+		"type": "rate_limit_event",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	event, ok := msg.(*RateLimitEvent)
+	if !ok {
+		t.Fatalf("expected *RateLimitEvent, got %T", msg)
+	}
+	if event.Type != "rate_limit_event" {
+		t.Errorf("expected type 'rate_limit_event', got %s", event.Type)
+	}
+	if event.Data == nil {
+		t.Error("expected Data to be non-nil (contains at least the type field)")
+	}
+}
+
+func TestParseMessage_RateLimitEvent_ImplementsMessage(t *testing.T) {
+	data := map[string]any{
+		"type": "rate_limit_event",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify it can be used as a Message interface
+	m := Message(msg)
+	if m == nil {
+		t.Fatal("expected non-nil Message")
+	}
+
+	// Verify type switch works
+	switch m.(type) {
+	case *RateLimitEvent:
+		// expected
+	default:
+		t.Errorf("expected *RateLimitEvent in type switch, got %T", m)
+	}
+}
+
 func TestParseMessage_StreamEvent(t *testing.T) {
 	data := map[string]any{
 		"type":       "stream_event",
