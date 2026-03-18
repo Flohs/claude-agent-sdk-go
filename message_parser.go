@@ -103,6 +103,10 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		msg.Error = AssistantMessageError(errStr)
 	}
 
+	if usage, ok := message["usage"].(map[string]any); ok {
+		msg.Usage = usage
+	}
+
 	return msg, nil
 }
 
