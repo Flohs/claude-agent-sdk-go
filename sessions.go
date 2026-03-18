@@ -912,7 +912,7 @@ func appendJSONLEntry(filePath string, entry map[string]any) error {
 	if err != nil {
 		return fmt.Errorf("failed to open session file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	_, err = f.Write(append([]byte("\n"), append(data, '\n')...))
 	if err != nil {
