@@ -14,7 +14,7 @@ Steps or minimal code example to reproduce the behavior.
 What you expected to happen.
 
 **Environment**
-- Go version: [e.g. 1.24]
+- Go version: [e.g. 1.26]
 - Claude Code CLI version: [e.g. 2.0.0]
 - OS: [e.g. macOS 15, Ubuntu 24.04]
 - SDK version: [e.g. v0.2.0]

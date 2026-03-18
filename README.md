@@ -14,7 +14,7 @@ go get github.com/Flohs/claude-agent-sdk-go
 
 **Prerequisites:**
 
-- Go 1.23+
+- Go 1.26+
 - Claude Code CLI (>= 2.0.0) installed: `npm install -g @anthropic-ai/claude-code`
   - Or specify a custom path: `Options{CLIPath: "/path/to/claude"}`
   - The SDK uses the bidirectional JSON streaming protocol (`--output-format stream-json`), which requires CLI version 2.0.0 or later. A version check runs automatically on connect and warns if the CLI is too old.
@@ -264,6 +264,7 @@ for _, server := range status.McpServers {
 | `UserMessage` | User message (also contains tool results) |
 | `SystemMessage` | System messages (init, status, etc.) |
 | `ResultMessage` | Final result with cost and usage info |
+| `RateLimitEvent` | Rate limit status changes from the CLI |
 | `StreamEvent` | Partial message updates (when streaming enabled) |
 | `TaskStartedMessage` | Task started notification |
 | `TaskProgressMessage` | Task progress update |
@@ -335,6 +336,14 @@ for _, s := range sessions {
 messages, _ := claude.GetSessionMessages("session-uuid", claude.GetSessionMessagesOptions{
     Directory: "/path/to/project",
 })
+
+// Rename a session
+dir := "/path/to/project"
+claude.RenameSession("session-uuid", "My Custom Title", &dir)
+
+// Tag a session
+tag := "reviewed"
+claude.TagSession("session-uuid", &tag, &dir)
 ```
 
 ## Examples
@@ -351,6 +360,12 @@ See the [examples/](examples/) directory for complete working examples:
 | [agents](examples/agents/) | Custom agent definitions |
 | [system_prompt](examples/system_prompt/) | System prompt configurations |
 | [budget](examples/budget/) | Cost control with MaxBudgetUSD |
+| [include_partial_messages](examples/include_partial_messages/) | Real-time streaming with StreamEvent |
+| [tools_option](examples/tools_option/) | Tools vs AllowedTools distinction |
+| [setting_sources](examples/setting_sources/) | SettingSources configuration |
+| [stderr_callback](examples/stderr_callback/) | Stderr callback and debug output |
+| [plugins](examples/plugins/) | Local plugin loading |
+| [filesystem_agents](examples/filesystem_agents/) | Loading agents from .claude/agents/*.md |
 
 ## License and Terms
 
