@@ -29,10 +29,8 @@ func ParseMessage(data map[string]any) (Message, error) {
 	case "stream_event":
 		return parseStreamEvent(data)
 	case "rate_limit_event":
-		return &RateLimitEvent{
-			Type: msgType,
-			Data: data,
-		}, nil
+		return parseRateLimitEvent(data)
+
 	default:
 		// Forward-compatible: skip unrecognized message types
 		return nil, nil
@@ -210,6 +208,36 @@ func parseStreamEvent(data map[string]any) (*StreamEvent, error) {
 	}, nil
 }
 
+func parseRateLimitEvent(data map[string]any) (*RateLimitEvent, error) {
+	event := &RateLimitEvent{
+		Type:      stringField(data, "type"),
+		UUID:      stringField(data, "uuid"),
+		SessionID: stringField(data, "session_id"),
+	}
+
+	// Extract rate_limit_info from nested map if present
+	if infoMap, ok := data["rate_limit_info"].(map[string]any); ok {
+		event.RateLimitInfo = parseRateLimitInfo(infoMap)
+	}
+
+	return event, nil
+}
+
+func parseRateLimitInfo(m map[string]any) RateLimitInfo {
+	info := RateLimitInfo{
+		Status: RateLimitStatus(stringField(m, "status")),
+	}
+	info.ResetsAt = optionalStringField(m, "resets_at")
+	info.RateLimitType = optionalStringField(m, "rate_limit_type")
+	info.OverageStatus = optionalStringField(m, "overage_status")
+	info.OverageResetsAt = optionalStringField(m, "overage_resets_at")
+	info.OverageDisabledReason = optionalStringField(m, "overage_disabled_reason")
+	if v, ok := m["utilization"].(float64); ok {
+		info.Utilization = &v
+	}
+	return info
+}
+
 func parseContentBlocks(raw []any) ([]ContentBlock, error) {
 	blocks := make([]ContentBlock, 0, len(raw))
 	for _, item := range raw {
@@ -282,4 +310,12 @@ func intFromAny(v any) int {
 func boolField(m map[string]any, key string) bool {
 	v, _ := m[key].(bool)
 	return v
+}
+
+func optionalStringField(m map[string]any, key string) *string {
+	v, ok := m[key].(string)
+	if !ok {
+		return nil
+	}
+	return &v
 }
