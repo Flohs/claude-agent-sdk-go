@@ -2,13 +2,16 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-03-20
+
 ### Added
 
 - `RenameSession` function to programmatically set custom session titles by appending a `custom-title` entry to the JSONL transcript. Port of Python SDK [#668](https://github.com/anthropics/claude-agent-sdk-python/pull/668). ([#40](https://github.com/Flohs/claude-agent-sdk-go/issues/40))
 
 ### Changed
 
-- `RateLimitEvent` now uses typed `RateLimitInfo` struct with `Status`, `ResetsAt`, `RateLimitType`, `Utilization`, `OverageStatus`, `OverageResetsAt`, and `OverageDisabledReason` fields instead of `Data map[string]any`. Adds `RateLimitStatus` type constants. Port of Python SDK [#648](https://github.com/anthropics/claude-agent-sdk-python/pull/648). ([#41](https://github.com/Flohs/claude-agent-sdk-go/issues/41))
+- **Breaking:** `RateLimitEvent` now uses typed `RateLimitInfo` struct with `Status`, `ResetsAt`, `RateLimitType`, `Utilization`, `OverageStatus`, `OverageResetsAt`, and `OverageDisabledReason` fields instead of `Data map[string]any`. Adds `RateLimitStatus` type constants. Port of Python SDK [#648](https://github.com/anthropics/claude-agent-sdk-python/pull/648). ([#41](https://github.com/Flohs/claude-agent-sdk-go/issues/41))
+- `sdkVersion` constant updated from `0.2.0` to `1.1.0`.
 
 ### Fixed
 
