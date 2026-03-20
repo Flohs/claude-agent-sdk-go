@@ -127,6 +127,37 @@ func TagSession(sessionID string, tag *string, directory *string) error {
 	return appendJSONLEntry(filePath, entry)
 }
 
+// RenameSession sets a custom title for a session by appending a custom-title
+// entry to the session's JSONL transcript file.
+func RenameSession(sessionID string, title string, directory *string) error {
+	if !isValidUUID(sessionID) {
+		return fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+
+	trimmedTitle := strings.TrimSpace(title)
+	if trimmedTitle == "" {
+		return fmt.Errorf("title cannot be empty or whitespace-only")
+	}
+
+	dir := ""
+	if directory != nil {
+		dir = *directory
+	}
+
+	filePath := findSessionFilePath(sessionID, dir)
+	if filePath == "" {
+		return fmt.Errorf("session file not found for session %s", sessionID)
+	}
+
+	entry := map[string]any{
+		"type":        "custom-title",
+		"customTitle": trimmedTitle,
+		"sessionId":   sessionID,
+	}
+
+	return appendJSONLEntry(filePath, entry)
+}
+
 // sanitizeTag removes potentially problematic Unicode characters and normalizes using NFKC.
 func sanitizeTag(s string) string {
 	// Apply NFKC normalization

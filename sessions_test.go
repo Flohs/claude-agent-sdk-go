@@ -2016,3 +2016,143 @@ func TestTagSession_JSONLFormat(t *testing.T) {
 		t.Errorf("expected sessionId %q, got %v", sessionID, entry["sessionId"])
 	}
 }
+
+func TestRenameSession(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+	projDir := setupTestProjectDir(t, "/test/rename-session")
+
+	sessionFile := writeSessionFile(t, projDir, sessionID,
+		`{"type":"user","uuid":"u1","sessionId":"`+sessionID+`","message":{"role":"user","content":"hello"}}`+"\n")
+
+	dir := "/test/rename-session"
+	err := RenameSession(sessionID, "My Custom Title", &dir)
+	if err != nil {
+		t.Fatalf("RenameSession failed: %v", err)
+	}
+
+	content, err := os.ReadFile(sessionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(content), `"custom-title"`) {
+		t.Error("expected custom-title entry in session file")
+	}
+	if !strings.Contains(string(content), `"My Custom Title"`) {
+		t.Error("expected custom title value in session file")
+	}
+}
+
+func TestRenameSession_InvalidUUID(t *testing.T) {
+	err := RenameSession("not-a-uuid", "title", nil)
+	if err == nil {
+		t.Error("expected error for invalid UUID")
+	}
+	if !strings.Contains(err.Error(), "invalid session ID") {
+		t.Errorf("expected 'invalid session ID' error, got: %v", err)
+	}
+}
+
+func TestRenameSession_EmptyTitle(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+
+	err := RenameSession(sessionID, "", nil)
+	if err == nil {
+		t.Error("expected error for empty title")
+	}
+	if !strings.Contains(err.Error(), "title cannot be empty") {
+		t.Errorf("expected 'title cannot be empty' error, got: %v", err)
+	}
+}
+
+func TestRenameSession_WhitespaceOnlyTitle(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+
+	err := RenameSession(sessionID, "   \t\n  ", nil)
+	if err == nil {
+		t.Error("expected error for whitespace-only title")
+	}
+	if !strings.Contains(err.Error(), "title cannot be empty") {
+		t.Errorf("expected 'title cannot be empty' error, got: %v", err)
+	}
+}
+
+func TestRenameSession_TitleTrimmed(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+	projDir := setupTestProjectDir(t, "/test/rename-trim")
+
+	sessionFile := writeSessionFile(t, projDir, sessionID,
+		`{"type":"user","uuid":"u1","sessionId":"`+sessionID+`","message":{"role":"user","content":"hello"}}`+"\n")
+
+	dir := "/test/rename-trim"
+	err := RenameSession(sessionID, "  padded title  ", &dir)
+	if err != nil {
+		t.Fatalf("RenameSession failed: %v", err)
+	}
+
+	content, err := os.ReadFile(sessionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	lastLine := lines[len(lines)-1]
+
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(lastLine), &entry); err != nil {
+		t.Fatalf("appended entry is not valid JSON: %v", err)
+	}
+	if entry["customTitle"] != "padded title" {
+		t.Errorf("expected trimmed title 'padded title', got %v", entry["customTitle"])
+	}
+}
+
+func TestRenameSession_SessionNotFound(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+
+	sessionID := "12345678-1234-1234-1234-123456789012"
+	dir := "/test/nonexistent-project"
+	err := RenameSession(sessionID, "title", &dir)
+	if err == nil {
+		t.Fatal("expected error for missing session file")
+	}
+	if !strings.Contains(err.Error(), "session file not found") {
+		t.Errorf("expected 'session file not found' error, got: %v", err)
+	}
+}
+
+func TestRenameSession_JSONLFormat(t *testing.T) {
+	sessionID := "12345678-1234-1234-1234-123456789012"
+	projDir := setupTestProjectDir(t, "/test/rename-jsonl")
+
+	sessionFile := writeSessionFile(t, projDir, sessionID,
+		`{"type":"user","uuid":"u1","sessionId":"`+sessionID+`","message":{"role":"user","content":"hello"}}`+"\n")
+
+	dir := "/test/rename-jsonl"
+	if err := RenameSession(sessionID, "New Title", &dir); err != nil {
+		t.Fatalf("RenameSession failed: %v", err)
+	}
+
+	content, err := os.ReadFile(sessionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	lastLine := lines[len(lines)-1]
+
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(lastLine), &entry); err != nil {
+		t.Fatalf("appended entry is not valid JSON: %v\nline: %s", err, lastLine)
+	}
+
+	if entry["type"] != "custom-title" {
+		t.Errorf("expected type 'custom-title', got %v", entry["type"])
+	}
+	if entry["customTitle"] != "New Title" {
+		t.Errorf("expected customTitle 'New Title', got %v", entry["customTitle"])
+	}
+	if entry["sessionId"] != sessionID {
+		t.Errorf("expected sessionId %q, got %v", sessionID, entry["sessionId"])
+	}
+}
