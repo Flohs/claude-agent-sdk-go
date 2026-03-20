@@ -384,9 +384,18 @@ func TestParseMessage_ResultMessage_StopReasonAbsent(t *testing.T) {
 }
 
 func TestParseMessage_RateLimitEvent(t *testing.T) {
+	utilization := float64(0.85)
 	data := map[string]any{
-		"type":        "rate_limit_event",
-		"retry_after": float64(30),
+		"type":       "rate_limit_event",
+		"uuid":       "rl-uuid-1",
+		"session_id": "sess-rl-1",
+		"rate_limit_info": map[string]any{
+			"status":          "allowed_warning",
+			"resets_at":       "2026-03-20T12:00:00Z",
+			"rate_limit_type": "token",
+			"utilization":     utilization,
+			"overage_status":  "active",
+		},
 	}
 
 	msg, err := ParseMessage(data)
@@ -401,8 +410,29 @@ func TestParseMessage_RateLimitEvent(t *testing.T) {
 	if event.Type != "rate_limit_event" {
 		t.Errorf("expected type 'rate_limit_event', got %s", event.Type)
 	}
-	if event.Data["retry_after"] != float64(30) {
-		t.Errorf("expected retry_after=30, got %v", event.Data["retry_after"])
+	if event.UUID != "rl-uuid-1" {
+		t.Errorf("expected UUID 'rl-uuid-1', got %s", event.UUID)
+	}
+	if event.SessionID != "sess-rl-1" {
+		t.Errorf("expected SessionID 'sess-rl-1', got %s", event.SessionID)
+	}
+	if event.RateLimitInfo.Status != RateLimitStatusAllowedWarning {
+		t.Errorf("expected status 'allowed_warning', got %s", event.RateLimitInfo.Status)
+	}
+	if event.RateLimitInfo.ResetsAt == nil || *event.RateLimitInfo.ResetsAt != "2026-03-20T12:00:00Z" {
+		t.Errorf("expected resets_at '2026-03-20T12:00:00Z', got %v", event.RateLimitInfo.ResetsAt)
+	}
+	if event.RateLimitInfo.RateLimitType == nil || *event.RateLimitInfo.RateLimitType != "token" {
+		t.Errorf("expected rate_limit_type 'token', got %v", event.RateLimitInfo.RateLimitType)
+	}
+	if event.RateLimitInfo.Utilization == nil || *event.RateLimitInfo.Utilization != 0.85 {
+		t.Errorf("expected utilization 0.85, got %v", event.RateLimitInfo.Utilization)
+	}
+	if event.RateLimitInfo.OverageStatus == nil || *event.RateLimitInfo.OverageStatus != "active" {
+		t.Errorf("expected overage_status 'active', got %v", event.RateLimitInfo.OverageStatus)
+	}
+	if event.RateLimitInfo.OverageResetsAt != nil {
+		t.Errorf("expected overage_resets_at nil, got %v", event.RateLimitInfo.OverageResetsAt)
 	}
 }
 
@@ -423,8 +453,8 @@ func TestParseMessage_RateLimitEvent_Minimal(t *testing.T) {
 	if event.Type != "rate_limit_event" {
 		t.Errorf("expected type 'rate_limit_event', got %s", event.Type)
 	}
-	if event.Data == nil {
-		t.Error("expected Data to be non-nil (contains at least the type field)")
+	if event.RateLimitInfo.Status != "" {
+		t.Errorf("expected empty status for minimal event, got %s", event.RateLimitInfo.Status)
 	}
 }
 

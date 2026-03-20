@@ -163,10 +163,32 @@ type StreamEvent struct {
 
 func (StreamEvent) messageMarker() {}
 
+// RateLimitStatus represents the status of a rate limit check.
+type RateLimitStatus string
+
+const (
+	RateLimitStatusAllowed        RateLimitStatus = "allowed"
+	RateLimitStatusAllowedWarning RateLimitStatus = "allowed_warning"
+	RateLimitStatusRejected       RateLimitStatus = "rejected"
+)
+
+// RateLimitInfo contains detailed rate limit information.
+type RateLimitInfo struct {
+	Status                RateLimitStatus `json:"status"`
+	ResetsAt              *string         `json:"resets_at,omitempty"`
+	RateLimitType         *string         `json:"rate_limit_type,omitempty"`
+	Utilization           *float64        `json:"utilization,omitempty"`
+	OverageStatus         *string         `json:"overage_status,omitempty"`
+	OverageResetsAt       *string         `json:"overage_resets_at,omitempty"`
+	OverageDisabledReason *string         `json:"overage_disabled_reason,omitempty"`
+}
+
 // RateLimitEvent represents a rate limit status change from the CLI.
 type RateLimitEvent struct {
-	Type string         `json:"type"`
-	Data map[string]any `json:"data,omitempty"`
+	Type          string        `json:"type"`
+	RateLimitInfo RateLimitInfo `json:"rate_limit_info"`
+	UUID          string        `json:"uuid,omitempty"`
+	SessionID     string        `json:"session_id,omitempty"`
 }
 
 func (RateLimitEvent) messageMarker() {}
