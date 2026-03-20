@@ -81,22 +81,16 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	args := t.buildCommand()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 
-	// Merge environment
-	env := os.Environ()
+	// Merge environment using layered ordering:
+	// 1. SDK defaults (overridable by system env or user env)
+	env := []string{"CLAUDE_CODE_ENTRYPOINT=sdk-go"}
+	// 2. System environment
+	env = append(env, os.Environ()...)
+	// 3. User-provided env vars (override defaults and system env)
 	for k, v := range t.options.Env {
 		env = append(env, k+"="+v)
 	}
-	// Only set CLAUDE_CODE_ENTRYPOINT if not already in the environment
-	entrypointSet := false
-	for _, e := range env {
-		if strings.HasPrefix(e, "CLAUDE_CODE_ENTRYPOINT=") {
-			entrypointSet = true
-			break
-		}
-	}
-	if !entrypointSet {
-		env = append(env, "CLAUDE_CODE_ENTRYPOINT=sdk-go")
-	}
+	// 4. SDK-controlled vars (never overridable)
 	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+sdkVersion)
 	if t.options.EnableFileCheckpointing {
 		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
