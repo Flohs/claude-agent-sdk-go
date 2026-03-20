@@ -10,6 +10,10 @@
 
 - `RateLimitEvent` now uses typed `RateLimitInfo` struct with `Status`, `ResetsAt`, `RateLimitType`, `Utilization`, `OverageStatus`, `OverageResetsAt`, and `OverageDisabledReason` fields instead of `Data map[string]any`. Adds `RateLimitStatus` type constants. Port of Python SDK [#648](https://github.com/anthropics/claude-agent-sdk-python/pull/648). ([#41](https://github.com/Flohs/claude-agent-sdk-go/issues/41))
 
+### Fixed
+
+- Refactored env variable merging to use layered ordering: `CLAUDE_CODE_ENTRYPOINT` is set first as a default so users can override it via `Options.Env`, while `CLAUDE_AGENT_SDK_VERSION` remains last and SDK-controlled. Port of Python SDK [#686](https://github.com/anthropics/claude-agent-sdk-python/pull/686). ([#42](https://github.com/Flohs/claude-agent-sdk-go/issues/42))
+
 ## [1.0.0] - 2026-03-18
 
 ### Added
