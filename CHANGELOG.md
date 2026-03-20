@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `RenameSession` function to programmatically set custom session titles by appending a `custom-title` entry to the JSONL transcript. Port of Python SDK [#668](https://github.com/anthropics/claude-agent-sdk-python/pull/668). ([#40](https://github.com/Flohs/claude-agent-sdk-go/issues/40))
+
 ## [1.0.0] - 2026-03-18
 
 ### Added
