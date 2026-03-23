@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"golang.org/x/text/unicode/norm"
@@ -536,15 +537,21 @@ func readSessionsFromDir(projectDir string, projectPath string) []SDKSessionInfo
 			sessionCwd = projectPath
 		}
 
+		tag := extractTagFromTranscript(lite.head, lite.tail)
+		createdAt := extractCreatedAtFromHead(lite.head)
+		fileSize := lite.size
+
 		results = append(results, SDKSessionInfo{
 			SessionID:    sessionID,
 			Summary:      summary,
 			LastModified: lite.mtime,
-			FileSize:     lite.size,
+			FileSize:     &fileSize,
 			CustomTitle:  customTitle,
 			FirstPrompt:  firstPrompt,
 			GitBranch:    gitBranch,
 			Cwd:          sessionCwd,
+			Tag:          tag,
+			CreatedAt:    createdAt,
 		})
 	}
 
@@ -919,6 +926,150 @@ func toSessionMessage(entry transcriptEntry) SessionMessage {
 		SessionID: sessionID,
 		Message:   entry["message"],
 	}
+}
+
+// extractTagFromTranscript scans transcript head and tail for the last {"type":"tag"} entry
+// and returns the tag value. Returns nil if no tag entry is found.
+func extractTagFromTranscript(head, tail string) *string {
+	// Search tail first (more recent), then head
+	for _, section := range []string{tail, head} {
+		var lastTag *string
+		for _, line := range strings.Split(section, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			// Quick check: must contain "type" and "tag" to be a tag entry
+			if !strings.Contains(line, `"type"`) {
+				continue
+			}
+			if !strings.Contains(line, `"tag"`) {
+				continue
+			}
+			var entry map[string]any
+			if err := json.Unmarshal([]byte(line), &entry); err != nil {
+				continue
+			}
+			if entry["type"] != "tag" {
+				continue
+			}
+			if tagVal, ok := entry["tag"].(string); ok {
+				lastTag = &tagVal
+			}
+		}
+		if lastTag != nil {
+			return lastTag
+		}
+	}
+	return nil
+}
+
+// extractCreatedAtFromHead extracts the timestamp from the first transcript entry.
+// Returns the timestamp in Unix milliseconds, or nil if not found.
+func extractCreatedAtFromHead(head string) *int64 {
+	for _, line := range strings.Split(head, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		// Look for a timestamp field
+		if ts, ok := entry["timestamp"].(string); ok && ts != "" {
+			// Parse ISO 8601 timestamp to Unix milliseconds
+			for _, layout := range []string{
+				"2006-01-02T15:04:05.000Z",
+				"2006-01-02T15:04:05Z",
+				"2006-01-02T15:04:05.000-07:00",
+				"2006-01-02T15:04:05-07:00",
+			} {
+				if t, err := time.Parse(layout, ts); err == nil {
+					ms := t.UnixMilli()
+					return &ms
+				}
+			}
+		}
+		// Also check for numeric timestamp
+		if ts, ok := entry["timestamp"].(float64); ok {
+			ms := int64(ts)
+			return &ms
+		}
+		// Only check the first valid JSON line
+		return nil
+	}
+	return nil
+}
+
+// GetSessionInfo retrieves session metadata for a single session by its ID.
+// It locates the JSONL file and parses it to extract metadata including
+// tag, created_at, summary, and other fields.
+// Returns nil and an error if the session is not found.
+func GetSessionInfo(sessionID string, directory ...string) (*SDKSessionInfo, error) {
+	if !isValidUUID(sessionID) {
+		return nil, fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+
+	dir := ""
+	if len(directory) > 0 {
+		dir = directory[0]
+	}
+
+	filePath := findSessionFilePath(sessionID, dir)
+	if filePath == "" {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	lite := readSessionLite(filePath)
+	if lite == nil {
+		return nil, fmt.Errorf("failed to read session file: %s", sessionID)
+	}
+
+	// Check for sidechain
+	firstNewline := strings.Index(lite.head, "\n")
+	firstLine := lite.head
+	if firstNewline >= 0 {
+		firstLine = lite.head[:firstNewline]
+	}
+	if strings.Contains(firstLine, `"isSidechain":true`) || strings.Contains(firstLine, `"isSidechain": true`) {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	customTitle := extractLastJSONStringField(lite.tail, "customTitle")
+	firstPrompt := extractFirstPromptFromHead(lite.head)
+
+	summary := customTitle
+	if summary == "" {
+		summary = extractLastJSONStringField(lite.tail, "summary")
+	}
+	if summary == "" {
+		summary = firstPrompt
+	}
+
+	gitBranch := extractLastJSONStringField(lite.tail, "gitBranch")
+	if gitBranch == "" {
+		gitBranch = extractJSONStringField(lite.head, "gitBranch")
+	}
+
+	sessionCwd := extractJSONStringField(lite.head, "cwd")
+
+	tag := extractTagFromTranscript(lite.head, lite.tail)
+	createdAt := extractCreatedAtFromHead(lite.head)
+	fileSize := lite.size
+
+	return &SDKSessionInfo{
+		SessionID:    sessionID,
+		Summary:      summary,
+		LastModified: lite.mtime,
+		FileSize:     &fileSize,
+		CustomTitle:  customTitle,
+		FirstPrompt:  firstPrompt,
+		GitBranch:    gitBranch,
+		Cwd:          sessionCwd,
+		Tag:          tag,
+		CreatedAt:    createdAt,
+	}, nil
 }
 
 // findSessionFilePath locates the JSONL file for a given session ID.

@@ -193,16 +193,18 @@ type RateLimitEvent struct {
 
 func (RateLimitEvent) messageMarker() {}
 
-// SDKSessionInfo contains session metadata returned by ListSessions.
+// SDKSessionInfo contains session metadata returned by ListSessions and GetSessionInfo.
 type SDKSessionInfo struct {
 	SessionID    string `json:"session_id"`
 	Summary      string `json:"summary"`
 	LastModified int64  `json:"last_modified"`
-	FileSize     int64  `json:"file_size"`
+	FileSize     *int64 `json:"file_size,omitempty"`
 	CustomTitle  string `json:"custom_title,omitempty"`
 	FirstPrompt  string `json:"first_prompt,omitempty"`
 	GitBranch    string `json:"git_branch,omitempty"`
 	Cwd          string `json:"cwd,omitempty"`
+	Tag          *string `json:"tag,omitempty"`
+	CreatedAt    *int64  `json:"created_at,omitempty"`
 }
 
 // SessionMessage represents a user or assistant message from a session transcript.
