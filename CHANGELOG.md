@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- `GetSessionInfo` function to retrieve metadata for a single session by ID without scanning all directories. ([#46](https://github.com/Flohs/claude-agent-sdk-go/issues/46))
+- `Tag *string` and `CreatedAt *int64` fields on `SDKSessionInfo`, populated by both `ListSessions` and `GetSessionInfo`. Tag is extracted from `type:"tag"` transcript entries; CreatedAt from the first entry's timestamp. Port of Python SDK [#667](https://github.com/anthropics/claude-agent-sdk-python/pull/667). ([#46](https://github.com/Flohs/claude-agent-sdk-go/issues/46))
+
+### Changed
+
+- **Breaking:** `SDKSessionInfo.FileSize` changed from `int64` to `*int64` to align with the Python SDK. ([#46](https://github.com/Flohs/claude-agent-sdk-go/issues/46))
+
 ## [1.1.0] - 2026-03-20
 
 ### Added
