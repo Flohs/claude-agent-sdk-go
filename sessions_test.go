@@ -921,8 +921,8 @@ func TestListSessions_LargeFileHeadTailSplit(t *testing.T) {
 	if s.GitBranch != "main" {
 		t.Errorf("expected git branch 'main', got %q", s.GitBranch)
 	}
-	if s.FileSize <= int64(liteReadBufSize) {
-		t.Errorf("expected file size > %d, got %d", liteReadBufSize, s.FileSize)
+	if s.FileSize == nil || *s.FileSize <= int64(liteReadBufSize) {
+		t.Errorf("expected file size > %d, got %v", liteReadBufSize, s.FileSize)
 	}
 }
 
@@ -2154,5 +2154,282 @@ func TestRenameSession_JSONLFormat(t *testing.T) {
 	}
 	if entry["sessionId"] != sessionID {
 		t.Errorf("expected sessionId %q, got %v", sessionID, entry["sessionId"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GetSessionInfo tests
+// ---------------------------------------------------------------------------
+
+func TestGetSessionInfo_Basic(t *testing.T) {
+	sessionID := testUUID1
+	projDir := setupTestProjectDir(t, "/test/get-info")
+
+	content := strings.Join([]string{
+		`{"type":"user","uuid":"u1","timestamp":"2025-01-15T10:30:00.000Z","message":{"role":"user","content":"Hello Claude"}}`,
+		makeAssistantLine("a1", "u1", "Hi there!"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, sessionID, content)
+
+	info, err := GetSessionInfo(sessionID, "/test/get-info")
+	if err != nil {
+		t.Fatalf("GetSessionInfo failed: %v", err)
+	}
+	if info == nil {
+		t.Fatal("expected non-nil session info")
+	}
+	if info.SessionID != sessionID {
+		t.Errorf("expected session ID %s, got %s", sessionID, info.SessionID)
+	}
+	if info.FirstPrompt != "Hello Claude" {
+		t.Errorf("expected first prompt 'Hello Claude', got %q", info.FirstPrompt)
+	}
+	if info.FileSize == nil {
+		t.Error("expected non-nil FileSize")
+	}
+}
+
+func TestGetSessionInfo_WithTag(t *testing.T) {
+	sessionID := testUUID1
+	projDir := setupTestProjectDir(t, "/test/get-info-tag")
+
+	content := strings.Join([]string{
+		`{"type":"user","uuid":"u1","timestamp":"2025-01-15T10:30:00.000Z","message":{"role":"user","content":"Hello"}}`,
+		makeAssistantLine("a1", "u1", "Hi!"),
+		`{"type":"tag","tag":"my-feature-tag","sessionId":"` + sessionID + `"}`,
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, sessionID, content)
+
+	info, err := GetSessionInfo(sessionID, "/test/get-info-tag")
+	if err != nil {
+		t.Fatalf("GetSessionInfo failed: %v", err)
+	}
+	if info.Tag == nil {
+		t.Fatal("expected non-nil Tag")
+	}
+	if *info.Tag != "my-feature-tag" {
+		t.Errorf("expected tag 'my-feature-tag', got %q", *info.Tag)
+	}
+}
+
+func TestGetSessionInfo_TagOnlyFromTagType(t *testing.T) {
+	sessionID := testUUID1
+	projDir := setupTestProjectDir(t, "/test/get-info-tag-type")
+
+	// Include a user message that mentions "tag" in its content — should NOT be picked up
+	content := strings.Join([]string{
+		`{"type":"user","uuid":"u1","timestamp":"2025-01-15T10:30:00.000Z","message":{"role":"user","content":"please tag this"}}`,
+		makeAssistantLine("a1", "u1", "Done!"),
+		// Entry with a "tag" key but type is NOT "tag" — should NOT be picked up
+		`{"type":"user","uuid":"u2","parentUuid":"a1","message":{"role":"user","content":"result"},"tag":"not-this-one"}`,
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, sessionID, content)
+
+	info, err := GetSessionInfo(sessionID, "/test/get-info-tag-type")
+	if err != nil {
+		t.Fatalf("GetSessionInfo failed: %v", err)
+	}
+	if info.Tag != nil {
+		t.Errorf("expected nil Tag (no type:tag entry), got %q", *info.Tag)
+	}
+}
+
+func TestGetSessionInfo_CreatedAt(t *testing.T) {
+	sessionID := testUUID1
+	projDir := setupTestProjectDir(t, "/test/get-info-created")
+
+	content := strings.Join([]string{
+		`{"type":"user","uuid":"u1","timestamp":"2025-01-15T10:30:00.000Z","message":{"role":"user","content":"Hello"}}`,
+		makeAssistantLine("a1", "u1", "Hi!"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, sessionID, content)
+
+	info, err := GetSessionInfo(sessionID, "/test/get-info-created")
+	if err != nil {
+		t.Fatalf("GetSessionInfo failed: %v", err)
+	}
+	if info.CreatedAt == nil {
+		t.Fatal("expected non-nil CreatedAt")
+	}
+	// 2025-01-15T10:30:00.000Z in Unix milliseconds
+	expected := int64(1736937000000)
+	if *info.CreatedAt != expected {
+		t.Errorf("expected CreatedAt %d, got %d", expected, *info.CreatedAt)
+	}
+}
+
+func TestGetSessionInfo_CreatedAtNumericTimestamp(t *testing.T) {
+	sessionID := testUUID1
+	projDir := setupTestProjectDir(t, "/test/get-info-created-num")
+
+	content := strings.Join([]string{
+		`{"type":"user","uuid":"u1","timestamp":1736937000000,"message":{"role":"user","content":"Hello"}}`,
+		makeAssistantLine("a1", "u1", "Hi!"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, sessionID, content)
+
+	info, err := GetSessionInfo(sessionID, "/test/get-info-created-num")
+	if err != nil {
+		t.Fatalf("GetSessionInfo failed: %v", err)
+	}
+	if info.CreatedAt == nil {
+		t.Fatal("expected non-nil CreatedAt")
+	}
+	if *info.CreatedAt != 1736937000000 {
+		t.Errorf("expected CreatedAt 1736937000000, got %d", *info.CreatedAt)
+	}
+}
+
+func TestGetSessionInfo_NoTimestamp(t *testing.T) {
+	sessionID := testUUID1
+	projDir := setupTestProjectDir(t, "/test/get-info-no-ts")
+
+	content := strings.Join([]string{
+		makeUserLine("u1", "", "Hello"),
+		makeAssistantLine("a1", "u1", "Hi!"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, sessionID, content)
+
+	info, err := GetSessionInfo(sessionID, "/test/get-info-no-ts")
+	if err != nil {
+		t.Fatalf("GetSessionInfo failed: %v", err)
+	}
+	if info.CreatedAt != nil {
+		t.Errorf("expected nil CreatedAt, got %d", *info.CreatedAt)
+	}
+}
+
+func TestGetSessionInfo_NotFound(t *testing.T) {
+	setupTestProjectDir(t, "/test/get-info-notfound")
+
+	_, err := GetSessionInfo(testUUID1, "/test/get-info-notfound")
+	if err == nil {
+		t.Error("expected error for non-existent session")
+	}
+}
+
+func TestGetSessionInfo_InvalidUUID(t *testing.T) {
+	_, err := GetSessionInfo("not-a-uuid")
+	if err == nil {
+		t.Error("expected error for invalid UUID")
+	}
+}
+
+func TestGetSessionInfo_NoDirectory(t *testing.T) {
+	sessionID := testUUID1
+	projDir := setupTestProjectDir(t, "/test/get-info-nodir")
+
+	content := strings.Join([]string{
+		`{"type":"user","uuid":"u1","timestamp":"2025-01-15T10:30:00.000Z","message":{"role":"user","content":"Hello"}}`,
+		makeAssistantLine("a1", "u1", "Hi!"),
+		`{"type":"tag","tag":"test-tag","sessionId":"` + sessionID + `"}`,
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, sessionID, content)
+
+	// Call without directory — should search all project dirs
+	info, err := GetSessionInfo(sessionID)
+	if err != nil {
+		t.Fatalf("GetSessionInfo failed: %v", err)
+	}
+	if info.SessionID != sessionID {
+		t.Errorf("expected session ID %s, got %s", sessionID, info.SessionID)
+	}
+	if info.Tag == nil || *info.Tag != "test-tag" {
+		t.Error("expected tag 'test-tag'")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ListSessions tag/created_at integration tests
+// ---------------------------------------------------------------------------
+
+func TestListSessions_TagExtraction(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/list-tag")
+
+	content := strings.Join([]string{
+		`{"type":"user","uuid":"u1","timestamp":"2025-01-15T10:30:00.000Z","message":{"role":"user","content":"Hello"}}`,
+		makeAssistantLine("a1", "u1", "Hi!"),
+		`{"type":"tag","tag":"feature-x","sessionId":"` + testUUID1 + `"}`,
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, testUUID1, content)
+
+	sessions, err := ListSessions(ListSessionsOptions{
+		Directory:        "/test/list-tag",
+		IncludeWorktrees: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+	if sessions[0].Tag == nil {
+		t.Fatal("expected non-nil Tag")
+	}
+	if *sessions[0].Tag != "feature-x" {
+		t.Errorf("expected tag 'feature-x', got %q", *sessions[0].Tag)
+	}
+}
+
+func TestListSessions_CreatedAtExtraction(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/list-created")
+
+	content := strings.Join([]string{
+		`{"type":"user","uuid":"u1","timestamp":"2025-01-15T10:30:00.000Z","message":{"role":"user","content":"Hello"}}`,
+		makeAssistantLine("a1", "u1", "Hi!"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, testUUID1, content)
+
+	sessions, err := ListSessions(ListSessionsOptions{
+		Directory:        "/test/list-created",
+		IncludeWorktrees: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+	if sessions[0].CreatedAt == nil {
+		t.Fatal("expected non-nil CreatedAt")
+	}
+	expected := int64(1736937000000)
+	if *sessions[0].CreatedAt != expected {
+		t.Errorf("expected CreatedAt %d, got %d", expected, *sessions[0].CreatedAt)
+	}
+}
+
+func TestExtractTagFromTranscript_OnlyTagType(t *testing.T) {
+	// A line with type "user" that has a "tag" field should NOT be extracted
+	head := `{"type":"user","uuid":"u1","tag":"wrong","message":{"role":"user","content":"hi"}}` + "\n"
+	tail := head
+
+	tag := extractTagFromTranscript(head, tail)
+	if tag != nil {
+		t.Errorf("expected nil tag, got %q", *tag)
+	}
+}
+
+func TestExtractTagFromTranscript_LastTagWins(t *testing.T) {
+	head := strings.Join([]string{
+		`{"type":"tag","tag":"first-tag","sessionId":"s1"}`,
+		`{"type":"tag","tag":"second-tag","sessionId":"s1"}`,
+	}, "\n") + "\n"
+	tail := head
+
+	tag := extractTagFromTranscript(head, tail)
+	if tag == nil {
+		t.Fatal("expected non-nil tag")
+	}
+	if *tag != "second-tag" {
+		t.Errorf("expected 'second-tag', got %q", *tag)
+	}
+}
+
+func TestExtractCreatedAtFromHead_NoTimestamp(t *testing.T) {
+	head := `{"type":"user","uuid":"u1","message":{"role":"user","content":"hello"}}` + "\n"
+	result := extractCreatedAtFromHead(head)
+	if result != nil {
+		t.Errorf("expected nil, got %d", *result)
 	}
 }
