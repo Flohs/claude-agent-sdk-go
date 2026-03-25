@@ -476,9 +476,26 @@ func (q *query) receiveMessages() <-chan map[string]any {
 	return out
 }
 
-func (q *query) interrupt() error {
-	_, err := q.sendControlRequest(map[string]any{"subtype": "interrupt"}, 60*time.Second)
-	return err
+func (q *query) interrupt(ctx context.Context) error {
+	// Run sendControlRequest in a goroutine so we can select on ctx.Done()
+	// for both deadline expiry and explicit cancellation. The underlying
+	// request still runs to completion (best-effort signal to the subprocess),
+	// but the caller is unblocked immediately.
+	type result struct {
+		resp map[string]any
+		err  error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		resp, err := q.sendControlRequest(map[string]any{"subtype": "interrupt"}, 30*time.Second)
+		ch <- result{resp, err}
+	}()
+	select {
+	case r := <-ch:
+		return r.err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (q *query) setPermissionMode(mode string) error {
