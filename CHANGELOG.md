@@ -16,6 +16,7 @@
 - `ReceiveResponse` and `ReceiveMessages` now check `ctx.Done()` in the inner receive loop, fixing indefinite hangs when context is cancelled while waiting for subprocess messages. ([#48](https://github.com/Flohs/claude-agent-sdk-go/pull/48))
 - `SendQuery` now checks `transport.IsReady()` before writing, returning an error if the subprocess has exited instead of silently writing to a dead pipe. ([#48](https://github.com/Flohs/claude-agent-sdk-go/pull/48))
 - `Interrupt` now respects the caller's context for both deadline expiry and explicit cancellation, and uses a 30-second default timeout (down from 60s). ([#48](https://github.com/Flohs/claude-agent-sdk-go/pull/48))
+- `Close()` now waits up to 5 seconds for the subprocess to exit naturally after closing stdin before sending SIGINT, preventing loss of the last assistant message when the CLI is still writing the session file. Aligns with Python SDK fix [anthropics/claude-agent-sdk-python@40cc6f5](https://github.com/anthropics/claude-agent-sdk-python/commit/40cc6f5). ([#49](https://github.com/Flohs/claude-agent-sdk-go/issues/49))
 
 ## [1.1.0] - 2026-03-20
 

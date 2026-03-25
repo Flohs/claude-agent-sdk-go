@@ -250,14 +250,21 @@ func (t *SubprocessTransport) Close() error {
 	}
 
 	if t.cmd != nil && t.cmd.Process != nil {
-		_ = t.cmd.Process.Signal(os.Interrupt)
-		// Give it a moment to exit gracefully
 		done := make(chan error, 1)
 		go func() { done <- t.cmd.Wait() }()
+		// Wait for process to exit naturally after stdin close
 		select {
 		case <-done:
+			// Process exited cleanly — no signal needed
 		case <-time.After(5 * time.Second):
-			_ = t.cmd.Process.Kill()
+			// Grace period expired — escalate to SIGINT
+			_ = t.cmd.Process.Signal(os.Interrupt)
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				_ = t.cmd.Process.Kill()
+				<-done
+			}
 		}
 	}
 
