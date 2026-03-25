@@ -87,6 +87,10 @@ func (c *Client) SendQuery(ctx context.Context, prompt string) error {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
 
+	if !c.transport.IsReady() {
+		return &ConnectionError{SDKError: SDKError{Message: "Transport is not ready. The subprocess may have exited."}}
+	}
+
 	message := map[string]any{
 		"type":               "user",
 		"message":            map[string]any{"role": "user", "content": prompt},
@@ -107,15 +111,25 @@ func (c *Client) ReceiveMessages(ctx context.Context) <-chan Message {
 		return out
 	}
 
+	msgCh := c.q.receiveMessages()
+
 	go func() {
 		defer close(out)
-		for msg := range c.q.receiveMessages() {
-			parsed, err := ParseMessage(msg)
-			if err != nil || parsed == nil {
-				continue
-			}
+		for {
 			select {
-			case out <- parsed:
+			case msg, ok := <-msgCh:
+				if !ok {
+					return
+				}
+				parsed, err := ParseMessage(msg)
+				if err != nil || parsed == nil {
+					continue
+				}
+				select {
+				case out <- parsed:
+				case <-ctx.Done():
+					return
+				}
 			case <-ctx.Done():
 				return
 			}
@@ -134,19 +148,29 @@ func (c *Client) ReceiveResponse(ctx context.Context) <-chan Message {
 		return out
 	}
 
+	msgCh := c.q.receiveMessages()
+
 	go func() {
 		defer close(out)
-		for msg := range c.q.receiveMessages() {
-			parsed, err := ParseMessage(msg)
-			if err != nil || parsed == nil {
-				continue
-			}
+		for {
 			select {
-			case out <- parsed:
+			case msg, ok := <-msgCh:
+				if !ok {
+					return
+				}
+				parsed, err := ParseMessage(msg)
+				if err != nil || parsed == nil {
+					continue
+				}
+				select {
+				case out <- parsed:
+				case <-ctx.Done():
+					return
+				}
+				if _, ok := parsed.(*ResultMessage); ok {
+					return
+				}
 			case <-ctx.Done():
-				return
-			}
-			if _, ok := parsed.(*ResultMessage); ok {
 				return
 			}
 		}
@@ -156,11 +180,13 @@ func (c *Client) ReceiveResponse(ctx context.Context) <-chan Message {
 }
 
 // Interrupt sends an interrupt signal to the current operation.
+// The ctx parameter is respected: if the context is cancelled or its deadline
+// expires, the interrupt request is abandoned.
 func (c *Client) Interrupt(ctx context.Context) error {
 	if c.q == nil {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
-	return c.q.interrupt()
+	return c.q.interrupt(ctx)
 }
 
 // SetPermissionMode changes the permission mode during a conversation.

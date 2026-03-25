@@ -476,8 +476,19 @@ func (q *query) receiveMessages() <-chan map[string]any {
 	return out
 }
 
-func (q *query) interrupt() error {
-	_, err := q.sendControlRequest(map[string]any{"subtype": "interrupt"}, 60*time.Second)
+func (q *query) interrupt(ctx context.Context) error {
+	// Use a 30-second timeout for the interrupt control request, but also
+	// respect the caller's context so the interrupt can be cancelled externally.
+	timeout := 30 * time.Second
+
+	// If the caller's context has a deadline, use the shorter of the two.
+	if deadline, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(deadline); remaining < timeout {
+			timeout = remaining
+		}
+	}
+
+	_, err := q.sendControlRequest(map[string]any{"subtype": "interrupt"}, timeout)
 	return err
 }
 
