@@ -10,6 +10,7 @@
 ### Changed
 
 - **Breaking:** `SDKSessionInfo.FileSize` changed from `int64` to `*int64` to align with the Python SDK. ([#46](https://github.com/Flohs/claude-agent-sdk-go/issues/46))
+- Minimum Claude CLI version bumped from `2.0.0` to `2.1.0` to ensure compatibility with features like skills, memory, mcpServers in agent definitions, typed `RateLimitEvent`, and `GetSessionInfo` with `tag/created_at`. ([#50](https://github.com/Flohs/claude-agent-sdk-go/issues/50))
 
 ### Fixed
 
