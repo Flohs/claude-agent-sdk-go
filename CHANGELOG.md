@@ -11,6 +11,12 @@
 
 - **Breaking:** `SDKSessionInfo.FileSize` changed from `int64` to `*int64` to align with the Python SDK. ([#46](https://github.com/Flohs/claude-agent-sdk-go/issues/46))
 
+### Fixed
+
+- `ReceiveResponse` and `ReceiveMessages` now check `ctx.Done()` in the inner receive loop, fixing indefinite hangs when context is cancelled while waiting for subprocess messages. ([#48](https://github.com/Flohs/claude-agent-sdk-go/pull/48))
+- `SendQuery` now checks `transport.IsReady()` before writing, returning an error if the subprocess has exited instead of silently writing to a dead pipe. ([#48](https://github.com/Flohs/claude-agent-sdk-go/pull/48))
+- `Interrupt` now respects the caller's context for both deadline expiry and explicit cancellation, and uses a 30-second default timeout (down from 60s). ([#48](https://github.com/Flohs/claude-agent-sdk-go/pull/48))
+
 ## [1.1.0] - 2026-03-20
 
 ### Added
