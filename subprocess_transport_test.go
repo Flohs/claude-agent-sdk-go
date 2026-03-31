@@ -289,13 +289,18 @@ func assertContainsFlag(t *testing.T, cmd []string, flag string) {
 }
 
 func TestBuildCommand_SettingSources(t *testing.T) {
-	t.Run("nil setting sources sends empty", func(t *testing.T) {
+	t.Run("nil setting sources omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{
 			cliPath: "claude",
 			options: &Options{},
 		}
 		cmd := transport.buildCommand()
-		assertContains(t, cmd, "--setting-sources", "")
+		for _, arg := range cmd {
+			if arg == "--setting-sources" {
+				t.Error("--setting-sources flag should not be present when SettingSources is nil")
+				return
+			}
+		}
 	})
 
 	t.Run("explicit setting sources", func(t *testing.T) {

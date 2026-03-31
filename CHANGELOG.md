@@ -14,6 +14,10 @@
 - `Background`, `Effort`, `PermissionMode`, `DisallowedTools`, `MaxTurns`, and `InitialPrompt` fields on `AgentDefinition` for full agent configuration parity. Port of Python SDK v0.1.51/v0.1.53. ([#58](https://github.com/Flohs/claude-agent-sdk-go/issues/58))
 - `SystemPromptFile` option to load system prompts from a file via `--system-prompt-file` CLI flag. Mutually exclusive with `SystemPrompt`. Port of Python SDK v0.1.51. ([#59](https://github.com/Flohs/claude-agent-sdk-go/issues/59))
 
+### Fixed
+
+- `--setting-sources` flag is no longer sent when `SettingSources` is not explicitly configured, aligning with Python SDK v0.1.53 fix. Previously an empty string was always sent. ([#60](https://github.com/Flohs/claude-agent-sdk-go/issues/60))
+
 ## [1.2.0] - 2026-03-25
 
 ### Added
