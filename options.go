@@ -141,6 +141,9 @@ type Options struct {
 	AllowedTools []string
 	// SystemPrompt configures the system prompt. Use StringPrompt or PresetPrompt.
 	SystemPrompt SystemPrompt
+	// SystemPromptFile is a path to a file containing the system prompt.
+	// Mutually exclusive with SystemPrompt.
+	SystemPromptFile string
 	// McpServers maps server names to their config. Use map[string]McpServerConfig or a string/path.
 	McpServers any // map[string]McpServerConfig | string | nil
 	// PermissionMode controls tool execution permissions. Used as the fallback

@@ -325,7 +325,9 @@ func (t *SubprocessTransport) buildCommand() []string {
 	opts := t.options
 
 	// System prompt
-	if opts.SystemPrompt == nil {
+	if opts.SystemPromptFile != "" {
+		cmd = append(cmd, "--system-prompt-file", opts.SystemPromptFile)
+	} else if opts.SystemPrompt == nil {
 		cmd = append(cmd, "--system-prompt", "")
 	} else {
 		switch sp := opts.SystemPrompt.(type) {
