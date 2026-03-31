@@ -110,6 +110,8 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		msg.Usage = usage
 	}
 
+	msg.RawData = data
+
 	return msg, nil
 }
 
@@ -198,6 +200,8 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		msg.Usage = usage
 	}
 	msg.StructuredOutput = data["structured_output"]
+
+	msg.RawData = data
 
 	return msg, nil
 }

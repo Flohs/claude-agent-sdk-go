@@ -14,6 +14,7 @@
 - `Background`, `Effort`, `PermissionMode`, `DisallowedTools`, `MaxTurns`, and `InitialPrompt` fields on `AgentDefinition` for full agent configuration parity. Port of Python SDK v0.1.51/v0.1.53. ([#58](https://github.com/Flohs/claude-agent-sdk-go/issues/58))
 - `SystemPromptFile` option to load system prompts from a file via `--system-prompt-file` CLI flag. Mutually exclusive with `SystemPrompt`. Port of Python SDK v0.1.51. ([#59](https://github.com/Flohs/claude-agent-sdk-go/issues/59))
 - `Errors` field on `ResultMessage` to capture structured error information from the CLI. Port of Python SDK v0.1.51. ([#62](https://github.com/Flohs/claude-agent-sdk-go/issues/62))
+- `RawData` field on `AssistantMessage` and `ResultMessage` preserving the full raw message map for forward compatibility with fields not yet modeled by the SDK. Port of Python SDK v0.1.51. ([#65](https://github.com/Flohs/claude-agent-sdk-go/issues/65))
 
 ### Fixed
 
