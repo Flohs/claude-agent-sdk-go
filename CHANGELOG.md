@@ -5,6 +5,9 @@
 ### Added
 
 - `GetContextUsage` method on `Client` to query context window utilization by category. Port of Python SDK v0.1.52. ([#53](https://github.com/Flohs/claude-agent-sdk-go/issues/53))
+- `DeleteSession` function to delete a session's transcript file. ([#54](https://github.com/Flohs/claude-agent-sdk-go/issues/54))
+- `ForkSession` function to create a copy of a session transcript with a new session ID. ([#54](https://github.com/Flohs/claude-agent-sdk-go/issues/54))
+- `Offset` field on `ListSessionsOptions` for offset-based pagination. ([#54](https://github.com/Flohs/claude-agent-sdk-go/issues/54))
 
 ## [1.2.0] - 2026-03-25
 
