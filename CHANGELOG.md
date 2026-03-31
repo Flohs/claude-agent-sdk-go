@@ -19,6 +19,7 @@
 
 - `--setting-sources` flag is no longer sent when `SettingSources` is not explicitly configured, aligning with Python SDK v0.1.53 fix. Previously an empty string was always sent. ([#60](https://github.com/Flohs/claude-agent-sdk-go/issues/60))
 - `control_cancel_request` messages from the CLI now properly cancel pending control requests instead of being silently ignored. Port of Python SDK v0.1.52. ([#61](https://github.com/Flohs/claude-agent-sdk-go/issues/61))
+- `CLAUDECODE` environment variable is now filtered from the subprocess environment to prevent interference with nested SDK/CLI instances. Port of Python SDK v0.1.51. ([#63](https://github.com/Flohs/claude-agent-sdk-go/issues/63))
 
 ## [1.2.0] - 2026-03-25
 

@@ -84,8 +84,12 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	// Merge environment using layered ordering:
 	// 1. SDK defaults (overridable by system env or user env)
 	env := []string{"CLAUDE_CODE_ENTRYPOINT=sdk-go"}
-	// 2. System environment
-	env = append(env, os.Environ()...)
+	// 2. System environment (filter CLAUDECODE to prevent interference with nested instances)
+	for _, e := range os.Environ() {
+		if !strings.HasPrefix(e, "CLAUDECODE=") {
+			env = append(env, e)
+		}
+	}
 	// 3. User-provided env vars (override defaults and system env)
 	for k, v := range t.options.Env {
 		env = append(env, k+"="+v)
