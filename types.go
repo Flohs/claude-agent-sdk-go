@@ -142,6 +142,7 @@ type ResultMessage struct {
 	DurationMs       int            `json:"duration_ms"`
 	DurationAPIMs    int            `json:"duration_api_ms"`
 	IsError          bool           `json:"is_error"`
+	Errors           []any          `json:"errors,omitempty"`
 	NumTurns         int            `json:"num_turns"`
 	SessionID        string         `json:"session_id"`
 	StopReason       string         `json:"stop_reason,omitempty"`
