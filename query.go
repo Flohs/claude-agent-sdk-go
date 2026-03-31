@@ -533,6 +533,24 @@ func (q *query) getMcpStatus() (*McpStatusResponse, error) {
 	return &status, nil
 }
 
+func (q *query) getContextUsage() (*ContextUsage, error) {
+	resp, err := q.sendControlRequest(map[string]any{"subtype": "get_context_usage"}, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var usage ContextUsage
+	if err := json.Unmarshal(data, &usage); err != nil {
+		return nil, err
+	}
+	return &usage, nil
+}
+
 func (q *query) reconnectMcpServer(serverName string) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype":    "mcp_reconnect",

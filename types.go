@@ -193,6 +193,13 @@ type RateLimitEvent struct {
 
 func (RateLimitEvent) messageMarker() {}
 
+// ContextUsage contains context window utilization broken down by category.
+type ContextUsage struct {
+	TotalTokens     int            `json:"total_tokens"`
+	UsedTokens      int            `json:"used_tokens"`
+	UsageByCategory map[string]int `json:"usage_by_category,omitempty"`
+}
+
 // SDKSessionInfo contains session metadata returned by ListSessions and GetSessionInfo.
 type SDKSessionInfo struct {
 	SessionID    string `json:"session_id"`
