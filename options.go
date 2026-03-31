@@ -61,13 +61,19 @@ type ToolsPreset struct {
 
 // AgentDefinition is an agent definition configuration.
 type AgentDefinition struct {
-	Description string   `json:"description"`
-	Prompt      string   `json:"prompt"`
-	Tools       []string `json:"tools,omitempty"`
-	Model       string   `json:"model,omitempty"` // "sonnet", "opus", "haiku", "inherit"
-	Skills      []string `json:"skills,omitempty"`
-	Memory      string   `json:"memory,omitempty"` // "user" | "project" | "local"
-	MCPServers  []any    `json:"mcpServers,omitempty"`
+	Description     string   `json:"description"`
+	Prompt          string   `json:"prompt"`
+	Tools           []string `json:"tools,omitempty"`
+	Model           string   `json:"model,omitempty"` // "sonnet", "opus", "haiku", "inherit"
+	Skills          []string `json:"skills,omitempty"`
+	Memory          string   `json:"memory,omitempty"` // "user" | "project" | "local"
+	MCPServers      []any    `json:"mcpServers,omitempty"`
+	Background      bool     `json:"background,omitempty"`
+	Effort          string   `json:"effort,omitempty"`
+	PermissionMode  string   `json:"permissionMode,omitempty"`
+	DisallowedTools []string `json:"disallowedTools,omitempty"`
+	MaxTurns        *int     `json:"maxTurns,omitempty"`
+	InitialPrompt   string   `json:"initialPrompt,omitempty"`
 }
 
 // ThinkingConfig is the interface for thinking configuration.
