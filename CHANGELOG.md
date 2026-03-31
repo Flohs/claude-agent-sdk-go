@@ -10,6 +10,7 @@
 - `Offset` field on `ListSessionsOptions` for offset-based pagination. ([#54](https://github.com/Flohs/claude-agent-sdk-go/issues/54))
 - `TaskBudget` option for per-task token budget management via `--task-budget` CLI flag. Port of Python SDK v0.1.51. ([#55](https://github.com/Flohs/claude-agent-sdk-go/issues/55))
 - `SessionID` option to specify a custom session ID for conversations. Port of Python SDK v0.1.52. ([#56](https://github.com/Flohs/claude-agent-sdk-go/issues/56))
+- `ToolUseID` and `AgentID` fields on `ToolPermissionContext` to identify which tool-use and sub-agent is requesting permission. Port of Python SDK v0.1.52. ([#57](https://github.com/Flohs/claude-agent-sdk-go/issues/57))
 
 ## [1.2.0] - 2026-03-25
 

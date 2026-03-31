@@ -264,7 +264,10 @@ func (q *query) handleCanUseTool(request map[string]any) (map[string]any, error)
 	input, _ := request["input"].(map[string]any)
 	originalInput := input
 
-	permCtx := ToolPermissionContext{}
+	permCtx := ToolPermissionContext{
+		ToolUseID: stringField(request, "tool_use_id"),
+		AgentID:   stringField(request, "agent_id"),
+	}
 	if suggestions, ok := request["permission_suggestions"].([]any); ok {
 		for _, s := range suggestions {
 			if sm, ok := s.(map[string]any); ok {

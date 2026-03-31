@@ -111,6 +111,10 @@ func (PermissionResultDeny) permissionResultMarker() {}
 // ToolPermissionContext provides context for tool permission callbacks.
 type ToolPermissionContext struct {
 	Suggestions []PermissionUpdate
+	// ToolUseID is the ID of the tool use that triggered this permission request.
+	ToolUseID string
+	// AgentID is the ID of the sub-agent requesting permission, if applicable.
+	AgentID string
 }
 
 // CanUseToolFunc is the callback type for tool permission decisions.
