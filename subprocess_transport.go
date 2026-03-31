@@ -199,6 +199,11 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 				continue
 			}
 
+			// Skip non-JSON lines when not accumulating a partial object
+			if jsonBuffer == "" && len(line) > 0 && line[0] != '{' {
+				continue
+			}
+
 			jsonBuffer += line
 
 			if len(jsonBuffer) > t.maxBufSize {
