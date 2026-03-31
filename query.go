@@ -212,6 +212,15 @@ func (q *query) readMessages() {
 		}
 
 		if msgType == "control_cancel_request" {
+			requestID, _ := msg["request_id"].(string)
+			if requestID != "" {
+				q.pendingMu.Lock()
+				if ch, ok := q.pendingEvents[requestID]; ok {
+					q.pendingResults[requestID] = fmt.Errorf("request cancelled by CLI")
+					close(ch)
+				}
+				q.pendingMu.Unlock()
+			}
 			continue
 		}
 
