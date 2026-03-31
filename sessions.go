@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -37,6 +38,7 @@ var (
 type ListSessionsOptions struct {
 	Directory        string
 	Limit            *int
+	Offset           int
 	IncludeWorktrees bool // defaults to true
 }
 
@@ -51,9 +53,9 @@ type GetSessionMessagesOptions struct {
 func ListSessions(opts ListSessionsOptions) ([]SDKSessionInfo, error) {
 	if opts.Directory != "" {
 		includeWorktrees := opts.IncludeWorktrees
-		return listSessionsForProject(opts.Directory, opts.Limit, includeWorktrees), nil
+		return listSessionsForProject(opts.Directory, opts.Offset, opts.Limit, includeWorktrees), nil
 	}
-	return listAllSessions(opts.Limit), nil
+	return listAllSessions(opts.Offset, opts.Limit), nil
 }
 
 // GetSessionMessages reads a session's conversation messages from its JSONL transcript file.
@@ -159,6 +161,61 @@ func RenameSession(sessionID string, title string, directory *string) error {
 	return appendJSONLEntry(filePath, entry)
 }
 
+// DeleteSession deletes a session's JSONL transcript file.
+func DeleteSession(sessionID string, directory ...string) error {
+	if !isValidUUID(sessionID) {
+		return fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+
+	dir := ""
+	if len(directory) > 0 {
+		dir = directory[0]
+	}
+
+	filePath := findSessionFilePath(sessionID, dir)
+	if filePath == "" {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	return os.Remove(filePath)
+}
+
+// ForkSession creates a copy of a session's transcript file with a new session ID.
+// Returns the new session ID.
+func ForkSession(sessionID string, directory ...string) (string, error) {
+	if !isValidUUID(sessionID) {
+		return "", fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+
+	dir := ""
+	if len(directory) > 0 {
+		dir = directory[0]
+	}
+
+	sourcePath := findSessionFilePath(sessionID, dir)
+	if sourcePath == "" {
+		return "", fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	// Generate new UUID
+	newID := generateUUID()
+
+	// Copy file
+	sourceDir := filepath.Dir(sourcePath)
+	destPath := filepath.Join(sourceDir, newID+".jsonl")
+
+	data, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read session file: %w", err)
+	}
+
+	if err := os.WriteFile(destPath, data, 0644); err != nil {
+		return "", fmt.Errorf("failed to write forked session file: %w", err)
+	}
+
+	return newID, nil
+}
+
 // sanitizeTag removes potentially problematic Unicode characters and normalizes using NFKC.
 func sanitizeTag(s string) string {
 	// Apply NFKC normalization
@@ -193,6 +250,14 @@ type transcriptEntry = map[string]any
 
 func isValidUUID(s string) bool {
 	return uuidRE.MatchString(s)
+}
+
+func generateUUID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant 2
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
 func simpleHash(s string) string {
@@ -590,17 +655,23 @@ func deduplicateBySessionID(sessions []SDKSessionInfo) []SDKSessionInfo {
 	return result
 }
 
-func applySortAndLimit(sessions []SDKSessionInfo, limit *int) []SDKSessionInfo {
+func applySortAndLimit(sessions []SDKSessionInfo, offset int, limit *int) []SDKSessionInfo {
 	sort.Slice(sessions, func(i, j int) bool {
 		return sessions[i].LastModified > sessions[j].LastModified
 	})
+	if offset > 0 {
+		if offset >= len(sessions) {
+			return nil
+		}
+		sessions = sessions[offset:]
+	}
 	if limit != nil && *limit > 0 && *limit < len(sessions) {
 		sessions = sessions[:*limit]
 	}
 	return sessions
 }
 
-func listSessionsForProject(directory string, limit *int, includeWorktrees bool) []SDKSessionInfo {
+func listSessionsForProject(directory string, offset int, limit *int, includeWorktrees bool) []SDKSessionInfo {
 	canonicalDir := canonicalizePath(directory)
 
 	var worktreePaths []string
@@ -614,7 +685,7 @@ func listSessionsForProject(directory string, limit *int, includeWorktrees bool)
 			return nil
 		}
 		sessions := readSessionsFromDir(projectDir, canonicalDir)
-		return applySortAndLimit(sessions, limit)
+		return applySortAndLimit(sessions, offset, limit)
 	}
 
 	// Worktree-aware scanning
@@ -626,7 +697,7 @@ func listSessionsForProject(directory string, limit *int, includeWorktrees bool)
 			return nil
 		}
 		sessions := readSessionsFromDir(projectDir, canonicalDir)
-		return applySortAndLimit(sessions, limit)
+		return applySortAndLimit(sessions, offset, limit)
 	}
 
 	var allSessions []SDKSessionInfo
@@ -675,10 +746,10 @@ func listSessionsForProject(directory string, limit *int, includeWorktrees bool)
 	}
 
 	deduped := deduplicateBySessionID(allSessions)
-	return applySortAndLimit(deduped, limit)
+	return applySortAndLimit(deduped, offset, limit)
 }
 
-func listAllSessions(limit *int) []SDKSessionInfo {
+func listAllSessions(offset int, limit *int) []SDKSessionInfo {
 	projectsDir := getProjectsDir()
 	projectDirs, err := os.ReadDir(projectsDir)
 	if err != nil {
@@ -695,7 +766,7 @@ func listAllSessions(limit *int) []SDKSessionInfo {
 	}
 
 	deduped := deduplicateBySessionID(allSessions)
-	return applySortAndLimit(deduped, limit)
+	return applySortAndLimit(deduped, offset, limit)
 }
 
 func readSessionFile(sessionID string, directory string) string {

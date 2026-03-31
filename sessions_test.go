@@ -1681,7 +1681,7 @@ func TestApplySortAndLimit(t *testing.T) {
 		{SessionID: "c", LastModified: 200},
 	}
 
-	sorted := applySortAndLimit(sessions, nil)
+	sorted := applySortAndLimit(sessions, 0, nil)
 	if sorted[0].SessionID != "b" || sorted[1].SessionID != "c" || sorted[2].SessionID != "a" {
 		t.Errorf("unexpected sort order: %v", sorted)
 	}
@@ -1690,7 +1690,7 @@ func TestApplySortAndLimit(t *testing.T) {
 		{SessionID: "a", LastModified: 100},
 		{SessionID: "b", LastModified: 300},
 		{SessionID: "c", LastModified: 200},
-	}, intPtr(1))
+	}, 0, intPtr(1))
 	if len(limited) != 1 {
 		t.Fatalf("expected 1, got %d", len(limited))
 	}
