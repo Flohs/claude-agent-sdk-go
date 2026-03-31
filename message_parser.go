@@ -187,6 +187,10 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		Result:        stringField(data, "result"),
 	}
 
+	if errors, ok := data["errors"].([]any); ok {
+		msg.Errors = errors
+	}
+
 	if cost, ok := data["total_cost_usd"].(float64); ok {
 		msg.TotalCostUSD = &cost
 	}
