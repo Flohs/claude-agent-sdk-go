@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `GetContextUsage` method on `Client` to query context window utilization by category. Port of Python SDK v0.1.52. ([#53](https://github.com/Flohs/claude-agent-sdk-go/issues/53))
+
 ## [1.2.0] - 2026-03-25
 
 ### Added

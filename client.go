@@ -213,6 +213,14 @@ func (c *Client) GetMcpStatus(ctx context.Context) (*McpStatusResponse, error) {
 	return c.q.getMcpStatus()
 }
 
+// GetContextUsage returns the current context window usage breakdown.
+func (c *Client) GetContextUsage(ctx context.Context) (*ContextUsage, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getContextUsage()
+}
+
 // ReconnectMcpServer reconnects a disconnected or failed MCP server.
 func (c *Client) ReconnectMcpServer(ctx context.Context, name string) error {
 	if c.q == nil {
