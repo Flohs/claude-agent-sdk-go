@@ -264,9 +264,11 @@ func (r *sdkMcpRouter) handleRequest(ctx context.Context, serverName string, mes
 			return map[string]any{
 				"jsonrpc": "2.0",
 				"id":      message["id"],
-				"error": map[string]any{
-					"code":    -32603,
-					"message": err.Error(),
+				"result": map[string]any{
+					"content": []map[string]any{
+						{"type": "text", "text": err.Error()},
+					},
+					"isError": true,
 				},
 			}
 		}
