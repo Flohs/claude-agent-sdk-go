@@ -455,8 +455,6 @@ func (t *SubprocessTransport) buildCommand() []string {
 			sources[i] = string(s)
 		}
 		cmd = append(cmd, "--setting-sources", strings.Join(sources, ","))
-	} else {
-		cmd = append(cmd, "--setting-sources", "")
 	}
 
 	// Plugins
