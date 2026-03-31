@@ -136,6 +136,24 @@ func newQuery(cfg queryConfig) *query {
 			if len(def.MCPServers) > 0 {
 				m["mcpServers"] = def.MCPServers
 			}
+			if def.Background {
+				m["background"] = true
+			}
+			if def.Effort != "" {
+				m["effort"] = def.Effort
+			}
+			if def.PermissionMode != "" {
+				m["permissionMode"] = def.PermissionMode
+			}
+			if len(def.DisallowedTools) > 0 {
+				m["disallowedTools"] = def.DisallowedTools
+			}
+			if def.MaxTurns != nil {
+				m["maxTurns"] = *def.MaxTurns
+			}
+			if def.InitialPrompt != "" {
+				m["initialPrompt"] = def.InitialPrompt
+			}
 			q.agents[name] = m
 		}
 	}
