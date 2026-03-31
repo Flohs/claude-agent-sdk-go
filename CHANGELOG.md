@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.3.0] - 2026-03-31
 
 ### Added
 
@@ -27,6 +27,10 @@
 - `CLAUDECODE` environment variable is now filtered from the subprocess environment to prevent interference with nested SDK/CLI instances. Port of Python SDK v0.1.51. ([#63](https://github.com/Flohs/claude-agent-sdk-go/issues/63))
 - Non-JSON lines on CLI stdout (e.g. native module warnings) are now skipped instead of accumulating in the JSON parse buffer. Port of Python SDK v0.1.51. ([#64](https://github.com/Flohs/claude-agent-sdk-go/issues/64))
 - SDK MCP tool handler errors are now returned as MCP tool results with `isError: true` instead of JSONRPC protocol errors, conforming to the MCP specification. **Note:** code inspecting raw JSONRPC responses from SDK MCP tool handlers will see a `"result"` with `"isError": true` instead of a JSONRPC `"error"` object. Port of Python SDK v0.1.51. ([#67](https://github.com/Flohs/claude-agent-sdk-go/issues/67))
+
+### Changed
+
+- `sdkVersion` constant updated from `1.2.0` to `1.3.0`.
 
 ## [1.2.0] - 2026-03-25
 

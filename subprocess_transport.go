@@ -20,7 +20,7 @@ import (
 const (
 	defaultMaxBufferSize       = 1024 * 1024 // 1MB
 	minimumClaudeCodeVersion   = "2.1.0"
-	sdkVersion                 = "1.2.0"
+	sdkVersion                 = "1.3.0"
 )
 
 // SubprocessTransport implements Transport using the Claude Code CLI subprocess.
