@@ -16,6 +16,9 @@
 - `Errors` field on `ResultMessage` to capture structured error information from the CLI. Port of Python SDK v0.1.51. ([#62](https://github.com/Flohs/claude-agent-sdk-go/issues/62))
 - `RawData` field on `AssistantMessage` and `ResultMessage` preserving the full raw message map for forward compatibility with fields not yet modeled by the SDK. Port of Python SDK v0.1.51. ([#65](https://github.com/Flohs/claude-agent-sdk-go/issues/65))
 - `PermissionModeDontAsk` constant for the `dontAsk` permission mode. Port of Python SDK v0.1.51. ([#66](https://github.com/Flohs/claude-agent-sdk-go/issues/66))
+- `SdkMcpResource` and `SdkMcpResourceHandler` types for defining MCP server resources. ([#68](https://github.com/Flohs/claude-agent-sdk-go/issues/68))
+- `NewSdkMcpServerWithResources` constructor for creating MCP servers with both tools and resources. ([#68](https://github.com/Flohs/claude-agent-sdk-go/issues/68))
+- `resources/list` and `resources/read` MCP method handling in SDK MCP servers. Port of Python SDK v0.1.51. ([#68](https://github.com/Flohs/claude-agent-sdk-go/issues/68))
 
 ### Fixed
 

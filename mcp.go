@@ -75,9 +75,11 @@ func (c McpHTTPServerConfig) MarshalJSON() ([]byte, error) {
 
 // McpSdkServerConfig configures an in-process SDK MCP server.
 type McpSdkServerConfig struct {
-	Name    string
-	tools   []SdkMcpTool
-	version string
+	Name            string
+	tools           []SdkMcpTool
+	resources       []SdkMcpResource
+	resourceHandler SdkMcpResourceHandler
+	version         string
 }
 
 func (McpSdkServerConfig) mcpServerConfigMarker() {}
@@ -152,6 +154,17 @@ type SdkMcpTool struct {
 	Handler     SdkMcpToolHandler
 }
 
+// SdkMcpResource defines an SDK MCP resource.
+type SdkMcpResource struct {
+	URI         string
+	Name        string
+	Description string
+	MimeType    string
+}
+
+// SdkMcpResourceHandler is the handler function for reading an SDK MCP resource.
+type SdkMcpResourceHandler func(ctx context.Context, uri string) (string, string, error) // content, mimeType, error
+
 // NewSdkMcpServer creates an in-process MCP server configuration.
 func NewSdkMcpServer(name string, version string, tools []SdkMcpTool) *McpSdkServerConfig {
 	if version == "" {
@@ -161,6 +174,20 @@ func NewSdkMcpServer(name string, version string, tools []SdkMcpTool) *McpSdkSer
 		Name:    name,
 		tools:   tools,
 		version: version,
+	}
+}
+
+// NewSdkMcpServerWithResources creates an in-process MCP server configuration with tools and resources.
+func NewSdkMcpServerWithResources(name string, version string, tools []SdkMcpTool, resources []SdkMcpResource, resourceHandler SdkMcpResourceHandler) *McpSdkServerConfig {
+	if version == "" {
+		version = "1.0.0"
+	}
+	return &McpSdkServerConfig{
+		Name:            name,
+		tools:           tools,
+		resources:       resources,
+		resourceHandler: resourceHandler,
+		version:         version,
 	}
 }
 
@@ -203,14 +230,18 @@ func (r *sdkMcpRouter) handleRequest(ctx context.Context, serverName string, mes
 
 	switch method {
 	case "initialize":
+		capabilities := map[string]any{
+			"tools": map[string]any{},
+		}
+		if len(server.resources) > 0 {
+			capabilities["resources"] = map[string]any{}
+		}
 		return map[string]any{
 			"jsonrpc": "2.0",
 			"id":      message["id"],
 			"result": map[string]any{
 				"protocolVersion": "2024-11-05",
-				"capabilities": map[string]any{
-					"tools": map[string]any{},
-				},
+				"capabilities":    capabilities,
 				"serverInfo": map[string]any{
 					"name":    server.Name,
 					"version": server.version,
@@ -276,6 +307,66 @@ func (r *sdkMcpRouter) handleRequest(ctx context.Context, serverName string, mes
 			"jsonrpc": "2.0",
 			"id":      message["id"],
 			"result":  result,
+		}
+
+	case "resources/list":
+		resourcesList := make([]map[string]any, len(server.resources))
+		for i, res := range server.resources {
+			resData := map[string]any{
+				"uri":  res.URI,
+				"name": res.Name,
+			}
+			if res.Description != "" {
+				resData["description"] = res.Description
+			}
+			if res.MimeType != "" {
+				resData["mimeType"] = res.MimeType
+			}
+			resourcesList[i] = resData
+		}
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"id":      message["id"],
+			"result": map[string]any{
+				"resources": resourcesList,
+			},
+		}
+
+	case "resources/read":
+		uri, _ := params["uri"].(string)
+		if server.resourceHandler == nil {
+			return map[string]any{
+				"jsonrpc": "2.0",
+				"id":      message["id"],
+				"error": map[string]any{
+					"code":    -32601,
+					"message": "No resource handler configured",
+				},
+			}
+		}
+		content, mimeType, err := server.resourceHandler(ctx, uri)
+		if err != nil {
+			return map[string]any{
+				"jsonrpc": "2.0",
+				"id":      message["id"],
+				"error": map[string]any{
+					"code":    -32603,
+					"message": err.Error(),
+				},
+			}
+		}
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"id":      message["id"],
+			"result": map[string]any{
+				"contents": []map[string]any{
+					{
+						"uri":      uri,
+						"mimeType": mimeType,
+						"text":     content,
+					},
+				},
+			},
 		}
 
 	case "notifications/initialized":
