@@ -72,6 +72,9 @@ type AssistantMessage struct {
 	ParentToolUseID string                `json:"parent_tool_use_id,omitempty"`
 	Error           AssistantMessageError `json:"error,omitempty"`
 	Usage           map[string]any        `json:"usage,omitempty"`
+	// RawData contains the full raw message data for forward compatibility
+	// with fields not yet modeled by the SDK.
+	RawData map[string]any `json:"-"`
 }
 
 func (AssistantMessage) messageMarker() {}
@@ -150,6 +153,9 @@ type ResultMessage struct {
 	Usage            map[string]any `json:"usage,omitempty"`
 	Result           string         `json:"result,omitempty"`
 	StructuredOutput any            `json:"structured_output,omitempty"`
+	// RawData contains the full raw message data for forward compatibility
+	// with fields not yet modeled by the SDK.
+	RawData map[string]any `json:"-"`
 }
 
 func (ResultMessage) messageMarker() {}
