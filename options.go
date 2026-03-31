@@ -144,6 +144,8 @@ type Options struct {
 	ContinueConversation bool
 	// Resume resumes a specific session by ID.
 	Resume string
+	// SessionID specifies a custom session ID for the conversation.
+	SessionID string
 	// MaxTurns limits the number of conversation turns.
 	MaxTurns *int
 	// MaxBudgetUSD limits the total cost.

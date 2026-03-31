@@ -9,6 +9,7 @@
 - `ForkSession` function to create a copy of a session transcript with a new session ID. ([#54](https://github.com/Flohs/claude-agent-sdk-go/issues/54))
 - `Offset` field on `ListSessionsOptions` for offset-based pagination. ([#54](https://github.com/Flohs/claude-agent-sdk-go/issues/54))
 - `TaskBudget` option for per-task token budget management via `--task-budget` CLI flag. Port of Python SDK v0.1.51. ([#55](https://github.com/Flohs/claude-agent-sdk-go/issues/55))
+- `SessionID` option to specify a custom session ID for conversations. Port of Python SDK v0.1.52. ([#56](https://github.com/Flohs/claude-agent-sdk-go/issues/56))
 
 ## [1.2.0] - 2026-03-25
 
