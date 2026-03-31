@@ -364,6 +364,10 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--max-budget-usd", strconv.FormatFloat(*opts.MaxBudgetUSD, 'f', -1, 64))
 	}
 
+	if opts.TaskBudget != nil {
+		cmd = append(cmd, "--task-budget", strconv.Itoa(*opts.TaskBudget))
+	}
+
 	if len(opts.DisallowedTools) > 0 {
 		cmd = append(cmd, "--disallowedTools", strings.Join(opts.DisallowedTools, ","))
 	}

@@ -148,6 +148,8 @@ type Options struct {
 	MaxTurns *int
 	// MaxBudgetUSD limits the total cost.
 	MaxBudgetUSD *float64
+	// TaskBudget sets a token budget per task.
+	TaskBudget *int
 	// DisallowedTools lists tools to explicitly deny. Takes precedence over
 	// AllowedTools — a tool in both lists will be denied.
 	DisallowedTools []string
