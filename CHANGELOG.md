@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Prevent deadlock in `Query()` when many messages arrive before the result. When SDK MCP servers or hooks triggered >100 tool calls, the `messageCh` buffer filled before the consumer started draining, blocking `readMessages()` from ever reaching the `result` message. Port of Python SDK [anthropics/claude-agent-sdk-python#780](https://github.com/anthropics/claude-agent-sdk-python/pull/780). ([#85](https://github.com/Flohs/claude-agent-sdk-go/issues/85))
+
 ## [1.3.0] - 2026-03-31
 
 ### Added
