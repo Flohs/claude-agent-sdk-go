@@ -123,7 +123,7 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			_ = q.close()
 			return
 		}
-		q.waitForResultAndEndInput()
+		go q.waitForResultAndEndInput()
 
 		// Receive and parse messages
 		for msg := range q.receiveMessages() {
