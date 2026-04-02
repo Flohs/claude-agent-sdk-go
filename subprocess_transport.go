@@ -19,7 +19,7 @@ import (
 
 const (
 	defaultMaxBufferSize       = 1024 * 1024 // 1MB
-	minimumClaudeCodeVersion   = "2.1.0"
+	minimumClaudeCodeVersion   = "2.1.90"
 	sdkVersion                 = "1.3.0"
 )
 

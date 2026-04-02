@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Minimum Claude CLI version bumped from `2.1.0` to `2.1.90` to align with Python SDK and ensure compatibility with v1.3.0 features (TaskBudget, ForkSession, DeleteSession, GetContextUsage, control_cancel_request, Errors on ResultMessage). ([#88](https://github.com/Flohs/claude-agent-sdk-go/issues/88))
+
 ### Fixed
 
 - Prevent deadlock in `Query()` when many messages arrive before the result. When SDK MCP servers or hooks triggered >100 tool calls, the `messageCh` buffer filled before the consumer started draining, blocking `readMessages()` from ever reaching the `result` message. Port of Python SDK [anthropics/claude-agent-sdk-python#780](https://github.com/anthropics/claude-agent-sdk-python/pull/780). ([#85](https://github.com/Flohs/claude-agent-sdk-go/issues/85))
