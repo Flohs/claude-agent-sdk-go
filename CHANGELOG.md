@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.4.0] - 2026-04-07
 
 ### Added
 
@@ -11,6 +11,7 @@
 ### Changed
 
 - Minimum Claude CLI version bumped from `2.1.0` to `2.1.90` to align with Python SDK and ensure compatibility with v1.3.0 features (TaskBudget, ForkSession, DeleteSession, GetContextUsage, control_cancel_request, Errors on ResultMessage). ([#88](https://github.com/Flohs/claude-agent-sdk-go/issues/88))
+- `sdkVersion` constant updated from `1.3.0` to `1.4.0`.
 
 ### Fixed
 
