@@ -70,7 +70,10 @@ func newQuery(cfg queryConfig) *query {
 
 	initTimeout := cfg.initTimeout
 	if initTimeout == 0 {
-		initTimeoutMs, _ := strconv.ParseFloat(os.Getenv("CLAUDE_CODE_STREAM_CLOSE_TIMEOUT"), 64)
+		initTimeoutMs, _ := strconv.ParseFloat(os.Getenv("CLAUDE_AGENT_SDK_INITIALIZE_TIMEOUT"), 64)
+		if initTimeoutMs == 0 {
+			initTimeoutMs, _ = strconv.ParseFloat(os.Getenv("CLAUDE_CODE_STREAM_CLOSE_TIMEOUT"), 64)
+		}
 		if initTimeoutMs == 0 {
 			initTimeoutMs = 60000
 		}
