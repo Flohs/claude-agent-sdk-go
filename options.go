@@ -9,6 +9,7 @@ const (
 	PermissionModePlan              PermissionMode = "plan"
 	PermissionModeBypassPermissions PermissionMode = "bypassPermissions"
 	PermissionModeDontAsk           PermissionMode = "dontAsk"
+	PermissionModeAuto              PermissionMode = "auto"
 )
 
 // SdkBeta represents beta feature flags.
