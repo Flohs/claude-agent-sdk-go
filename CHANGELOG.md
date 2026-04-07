@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `CLAUDE_AGENT_SDK_INITIALIZE_TIMEOUT` environment variable support for configuring the initialization timeout, with fallback to `CLAUDE_CODE_STREAM_CLOSE_TIMEOUT` for backwards compatibility. Port of Python SDK [anthropics/claude-agent-sdk-python#743](https://github.com/anthropics/claude-agent-sdk-python/pull/743). ([#92](https://github.com/Flohs/claude-agent-sdk-go/issues/92))
+
 ### Changed
 
 - Minimum Claude CLI version bumped from `2.1.0` to `2.1.90` to align with Python SDK and ensure compatibility with v1.3.0 features (TaskBudget, ForkSession, DeleteSession, GetContextUsage, control_cancel_request, Errors on ResultMessage). ([#88](https://github.com/Flohs/claude-agent-sdk-go/issues/88))
