@@ -6,6 +6,7 @@
 
 - `CLAUDE_AGENT_SDK_INITIALIZE_TIMEOUT` environment variable support for configuring the initialization timeout, with fallback to `CLAUDE_CODE_STREAM_CLOSE_TIMEOUT` for backwards compatibility. Port of Python SDK [anthropics/claude-agent-sdk-python#743](https://github.com/anthropics/claude-agent-sdk-python/pull/743). ([#92](https://github.com/Flohs/claude-agent-sdk-go/issues/92))
 - `PermissionModeAuto` constant for the `auto` permission mode supported by CLI 2.1.90+. Port of Python SDK [anthropics/claude-agent-sdk-python#785](https://github.com/anthropics/claude-agent-sdk-python/pull/785). ([#90](https://github.com/Flohs/claude-agent-sdk-go/issues/90))
+- `SdkMcpToolAnnotations` type and `Annotations` field on `SdkMcpTool` for configuring MCP tool annotations including `MaxResultSizeChars`, which is forwarded via `_meta["anthropic/maxResultSizeChars"]` to bypass Zod annotation stripping in the CLI. Port of Python SDK [anthropics/claude-agent-sdk-python#756](https://github.com/anthropics/claude-agent-sdk-python/pull/756). ([#91](https://github.com/Flohs/claude-agent-sdk-go/issues/91))
 
 ### Changed
 

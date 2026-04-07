@@ -146,11 +146,20 @@ type McpStatusResponse struct {
 // SdkMcpToolHandler is the handler function for an SDK MCP tool.
 type SdkMcpToolHandler func(ctx context.Context, arguments map[string]any) (map[string]any, error)
 
+// SdkMcpToolAnnotations contains tool annotations for SDK MCP tools.
+type SdkMcpToolAnnotations struct {
+	ReadOnly           *bool `json:"readOnly,omitempty"`
+	Destructive        *bool `json:"destructive,omitempty"`
+	OpenWorld          *bool `json:"openWorld,omitempty"`
+	MaxResultSizeChars *int  `json:"maxResultSizeChars,omitempty"`
+}
+
 // SdkMcpTool defines an SDK MCP tool.
 type SdkMcpTool struct {
 	Name        string
 	Description string
 	InputSchema map[string]any
+	Annotations *SdkMcpToolAnnotations
 	Handler     SdkMcpToolHandler
 }
 
@@ -256,6 +265,26 @@ func (r *sdkMcpRouter) handleRequest(ctx context.Context, serverName string, mes
 				"name":        tool.Name,
 				"description": tool.Description,
 				"inputSchema": tool.InputSchema,
+			}
+			if tool.Annotations != nil {
+				annotations := map[string]any{}
+				if tool.Annotations.ReadOnly != nil {
+					annotations["readOnly"] = *tool.Annotations.ReadOnly
+				}
+				if tool.Annotations.Destructive != nil {
+					annotations["destructive"] = *tool.Annotations.Destructive
+				}
+				if tool.Annotations.OpenWorld != nil {
+					annotations["openWorld"] = *tool.Annotations.OpenWorld
+				}
+				if len(annotations) > 0 {
+					toolData["annotations"] = annotations
+				}
+				if tool.Annotations.MaxResultSizeChars != nil {
+					toolData["_meta"] = map[string]any{
+						"anthropic/maxResultSizeChars": *tool.Annotations.MaxResultSizeChars,
+					}
+				}
 			}
 			toolsList[i] = toolData
 		}
