@@ -161,17 +161,28 @@ func textOnlyExample(ctx context.Context) {
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("Multimodal Input Examples")
-	fmt.Println("========================")
-	fmt.Println()
-	fmt.Println("These examples demonstrate how to send images and documents to Claude.")
-	fmt.Println("Make sure the referenced files (image.png, document.pdf, etc.) exist")
-	fmt.Println("in the current directory before running the corresponding example.")
-	fmt.Println()
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run ./examples/multimodal_input <example>")
+		fmt.Println()
+		fmt.Println("Examples:")
+		fmt.Println("  text        Text-only (backward compatible)")
+		fmt.Println("  image       Single image input (requires image.png)")
+		fmt.Println("  document    PDF document input (requires document.pdf)")
+		fmt.Println("  multi       Multiple images (requires photo1.jpg, photo2.jpg)")
+		return
+	}
 
-	// Uncomment the examples you want to run:
-	// imageInputExample(ctx)
-	// documentInputExample(ctx)
-	// multipleImagesExample(ctx)
-	textOnlyExample(ctx)
+	switch os.Args[1] {
+	case "text":
+		textOnlyExample(ctx)
+	case "image":
+		imageInputExample(ctx)
+	case "document":
+		documentInputExample(ctx)
+	case "multi":
+		multipleImagesExample(ctx)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown example: %s\n", os.Args[1])
+		os.Exit(1)
+	}
 }

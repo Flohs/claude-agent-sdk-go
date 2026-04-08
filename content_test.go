@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 )
@@ -94,7 +95,7 @@ func TestSendQueryWithContent_InvalidContentType(t *testing.T) {
 		q:         q,
 	}
 
-	err := c.SendQueryWithContent(nil, 42)
+	err := c.SendQueryWithContent(context.TODO(), 42)
 	if err == nil {
 		t.Fatal("expected error for invalid content type")
 	}
@@ -112,7 +113,7 @@ func TestSendQueryWithContent_NilContent(t *testing.T) {
 		q:         q,
 	}
 
-	err := c.SendQueryWithContent(nil, nil)
+	err := c.SendQueryWithContent(context.TODO(), nil)
 	if err == nil {
 		t.Fatal("expected error for nil content")
 	}
@@ -281,7 +282,7 @@ func TestSendQueryWithContent_StringContent(t *testing.T) {
 		q:         q,
 	}
 
-	err := c.SendQueryWithContent(nil, "hello")
+	err := c.SendQueryWithContent(context.TODO(), "hello")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -323,7 +324,7 @@ func TestSendQueryWithContent_MultimodalContent(t *testing.T) {
 		NewBase64Content("image/png", "aWJhc2U2NA=="),
 	}
 
-	err := c.SendQueryWithContent(nil, content)
+	err := c.SendQueryWithContent(context.TODO(), content)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -373,7 +374,7 @@ func TestSendQueryWithContent_DocumentContent(t *testing.T) {
 		NewBase64Content("application/pdf", "cGRmZGF0YQ=="),
 	}
 
-	err := c.SendQueryWithContent(nil, content)
+	err := c.SendQueryWithContent(context.TODO(), content)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -401,7 +402,7 @@ func TestSendQueryWithContent_DocumentContent(t *testing.T) {
 func TestSendQueryWithContent_NotConnected(t *testing.T) {
 	c := &Client{options: &Options{}}
 
-	err := c.SendQueryWithContent(nil, "hello")
+	err := c.SendQueryWithContent(context.TODO(), "hello")
 	if err == nil {
 		t.Fatal("expected error for not connected client")
 	}
@@ -419,7 +420,7 @@ func TestSendQuery_DelegatesToSendQueryWithContent(t *testing.T) {
 		q:         q,
 	}
 
-	err := c.SendQuery(nil, "test prompt")
+	err := c.SendQuery(context.TODO(), "test prompt")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
