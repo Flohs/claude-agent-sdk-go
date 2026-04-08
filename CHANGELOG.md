@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.5.0] - 2026-04-08
 
 ### Added
 
@@ -10,6 +10,10 @@
 - Image and document content block parsing in the message parser. ([#96](https://github.com/Flohs/claude-agent-sdk-go/issues/96))
 - Input validation for `SendQueryWithContent` (rejects invalid content types) and `NewBase64Content` (rejects empty media type or data). ([#96](https://github.com/Flohs/claude-agent-sdk-go/issues/96))
 - `examples/multimodal_input` example demonstrating image and document input. ([#96](https://github.com/Flohs/claude-agent-sdk-go/issues/96))
+
+### Changed
+
+- `sdkVersion` constant updated from `1.4.0` to `1.5.0`.
 
 ## [1.4.0] - 2026-04-07
 
