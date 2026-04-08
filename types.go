@@ -1,5 +1,7 @@
 package claude
 
+import "strings"
+
 // Message is the interface implemented by all message types returned from the SDK.
 type Message interface {
 	messageMarker()
@@ -16,6 +18,52 @@ type TextBlock struct {
 }
 
 func (TextBlock) contentBlockMarker() {}
+
+// Base64Source describes a base64-encoded source for image and document content blocks.
+type Base64Source struct {
+	Type      string `json:"type"`       // "base64"
+	MediaType string `json:"media_type"` // e.g. "image/png", "application/pdf", "text/plain"
+	Data      string `json:"data"`       // base64-encoded data
+}
+
+// Base64Block represents an image or document content block for multimodal messages.
+// The Type field distinguishes block kinds: "image" for images, "document" for PDFs and text files.
+type Base64Block struct {
+	Type   string       `json:"type"` // "image" or "document"
+	Source Base64Source `json:"source"`
+}
+
+func (Base64Block) contentBlockMarker() {}
+
+// NewTextContent creates a text content block for use with [Client.SendQueryWithContent].
+func NewTextContent(text string) map[string]any {
+	return map[string]any{"type": "text", "text": text}
+}
+
+// NewBase64Content creates a base64-encoded content block for use with [Client.SendQueryWithContent].
+// The block type is inferred from the media type: image/* media types produce an "image" block,
+// all others (application/pdf, text/plain, text/html, text/csv, etc.) produce a "document" block.
+// Both mediaType and base64Data must be non-empty.
+func NewBase64Content(mediaType, base64Data string) map[string]any {
+	if mediaType == "" {
+		panic("claude: NewBase64Content called with empty mediaType")
+	}
+	if base64Data == "" {
+		panic("claude: NewBase64Content called with empty base64Data")
+	}
+	blockType := "document"
+	if strings.HasPrefix(mediaType, "image/") {
+		blockType = "image"
+	}
+	return map[string]any{
+		"type": blockType,
+		"source": map[string]any{
+			"type":       "base64",
+			"media_type": mediaType,
+			"data":       base64Data,
+		},
+	}
+}
 
 // ThinkingBlock represents a thinking content block.
 type ThinkingBlock struct {

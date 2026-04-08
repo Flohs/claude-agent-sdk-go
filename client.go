@@ -3,6 +3,7 @@ package claude
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 )
 
@@ -81,8 +82,30 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 	return nil
 }
 
-// SendQuery sends a new message to Claude.
+// SendQuery sends a new text message to Claude.
 func (c *Client) SendQuery(ctx context.Context, prompt string) error {
+	return c.SendQueryWithContent(ctx, prompt)
+}
+
+// SendQueryWithContent sends a message to Claude with arbitrary content.
+// The content parameter can be a plain string for text-only messages,
+// or a slice of content blocks for multimodal messages (text, images, documents).
+//
+// Use the helper constructors to build content blocks:
+//
+//	content := []any{
+//	    claude.NewTextContent("Describe this image"),
+//	    claude.NewBase64Content("image/png", base64ImageData),
+//	}
+//	client.SendQueryWithContent(ctx, content)
+//
+// For documents (PDFs, plain text, HTML, CSV):
+//
+//	content := []any{
+//	    claude.NewTextContent("Summarize this document"),
+//	    claude.NewBase64Content("application/pdf", base64PDFData),
+//	}
+func (c *Client) SendQueryWithContent(ctx context.Context, content any) error {
 	if c.q == nil || c.transport == nil {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
@@ -91,9 +114,18 @@ func (c *Client) SendQuery(ctx context.Context, prompt string) error {
 		return &ConnectionError{SDKError: SDKError{Message: "Transport is not ready. The subprocess may have exited."}}
 	}
 
+	switch content.(type) {
+	case string:
+		// ok
+	case []any:
+		// ok
+	default:
+		return &SDKError{Message: fmt.Sprintf("content must be a string or []any, got %T", content)}
+	}
+
 	message := map[string]any{
 		"type":               "user",
-		"message":            map[string]any{"role": "user", "content": prompt},
+		"message":            map[string]any{"role": "user", "content": content},
 		"parent_tool_use_id": nil,
 		"session_id":         "default",
 	}
