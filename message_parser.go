@@ -262,6 +262,8 @@ func parseContentBlocks(raw []any) ([]ContentBlock, error) {
 			thinking, _ := blockMap["thinking"].(string)
 			signature, _ := blockMap["signature"].(string)
 			blocks = append(blocks, ThinkingBlock{Thinking: thinking, Signature: signature})
+		case "image", "document":
+			blocks = append(blocks, Base64Block{Type: blockType, Source: parseBase64Source(blockMap)})
 		case "tool_use":
 			id, _ := blockMap["id"].(string)
 			name, _ := blockMap["name"].(string)
@@ -277,6 +279,18 @@ func parseContentBlocks(raw []any) ([]ContentBlock, error) {
 		}
 	}
 	return blocks, nil
+}
+
+func parseBase64Source(blockMap map[string]any) Base64Source {
+	source, _ := blockMap["source"].(map[string]any)
+	if source == nil {
+		return Base64Source{}
+	}
+	return Base64Source{
+		Type:      stringField(source, "type"),
+		MediaType: stringField(source, "media_type"),
+		Data:      stringField(source, "data"),
+	}
 }
 
 func parseTaskUsage(v any) TaskUsage {
