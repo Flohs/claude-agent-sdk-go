@@ -57,13 +57,20 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 	// Extract SDK MCP servers
 	sdkServers := extractSdkMcpServers(configuredOpts.McpServers)
 
+	// Extract excludeDynamicSections from PresetPrompt if set
+	var excludeDynamic bool
+	if pp, ok := configuredOpts.SystemPrompt.(PresetPrompt); ok {
+		excludeDynamic = pp.ExcludeDynamicSections
+	}
+
 	// Create query handler
 	c.q = newQuery(queryConfig{
-		transport:  transport,
-		canUseTool: configuredOpts.CanUseTool,
-		hooks:      configuredOpts.Hooks,
-		mcpServers: sdkServers,
-		agents:     configuredOpts.Agents,
+		transport:              transport,
+		canUseTool:             configuredOpts.CanUseTool,
+		hooks:                  configuredOpts.Hooks,
+		mcpServers:             sdkServers,
+		agents:                 configuredOpts.Agents,
+		excludeDynamicSections: excludeDynamic,
 	})
 
 	c.q.start()
