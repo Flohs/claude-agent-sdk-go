@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `ExcludeDynamicSections` field on `PresetPrompt` for cross-user prompt caching. When set, the SDK sends `excludeDynamicSections` in the initialize request to tell Claude Code to omit user-specific dynamic sections from the system prompt. ([#98](https://github.com/Flohs/claude-agent-sdk-go/issues/98))
+
 ### Fixed
 
 - `ThinkingConfigAdaptive` and `ThinkingConfigDisabled` now correctly map to `--thinking adaptive` / `--thinking disabled` CLI flags instead of incorrectly using `--max-thinking-tokens`. `ThinkingConfigEnabled` and the deprecated `MaxThinkingTokens` field continue to use `--max-thinking-tokens`. ([#99](https://github.com/Flohs/claude-agent-sdk-go/issues/99))

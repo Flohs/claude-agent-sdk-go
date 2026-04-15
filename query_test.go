@@ -2,6 +2,8 @@ package claude
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -234,4 +236,137 @@ func TestStreamInput_UsesWaitForResultAndEndInput(t *testing.T) {
 	if len(mt.written) == 0 {
 		t.Fatal("expected at least one message to be written")
 	}
+}
+
+// autoRespondTransport extends mockTransport to automatically respond to control requests.
+// It overrides ReadMessages to respect context cancellation, so query.close() doesn't deadlock.
+type autoRespondTransport struct {
+	mockTransport
+}
+
+func newAutoRespondTransport() *autoRespondTransport {
+	return &autoRespondTransport{
+		mockTransport: mockTransport{
+			messages: make(chan map[string]any, 100),
+		},
+	}
+}
+
+func (a *autoRespondTransport) Write(data string) error {
+	a.mu.Lock()
+	a.written = append(a.written, data)
+	a.mu.Unlock()
+
+	// Auto-respond to control requests
+	var msg map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(data)), &msg); err == nil {
+		if msg["type"] == "control_request" {
+			reqID, _ := msg["request_id"].(string)
+			go func() {
+				a.messages <- map[string]any{
+					"type": "control_response",
+					"response": map[string]any{
+						"subtype":    "success",
+						"request_id": reqID,
+						"response":   map[string]any{},
+					},
+				}
+			}()
+		}
+	}
+	return nil
+}
+
+func (a *autoRespondTransport) ReadMessages(ctx context.Context) <-chan map[string]any {
+	out := make(chan map[string]any, 100)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case msg, ok := <-a.messages:
+				if !ok {
+					return
+				}
+				out <- msg
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out
+}
+
+func TestInitialize_ExcludeDynamicSections(t *testing.T) {
+	t.Run("sends excludeDynamicSections when true", func(t *testing.T) {
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{
+			transport:              mt,
+			excludeDynamicSections: true,
+		})
+
+		q.start()
+		_, err := q.initialize()
+		if err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+
+		// Copy written data before close (close acquires mu)
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+
+		_ = q.close()
+
+		found := false
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			req, _ := msg["request"].(map[string]any)
+			if req != nil && req["subtype"] == "initialize" {
+				if val, ok := req["excludeDynamicSections"]; ok && val == true {
+					found = true
+				}
+			}
+		}
+		if !found {
+			t.Error("initialize request should contain excludeDynamicSections: true")
+		}
+	})
+
+	t.Run("omits excludeDynamicSections when false", func(t *testing.T) {
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{
+			transport:              mt,
+			excludeDynamicSections: false,
+		})
+
+		q.start()
+		_, err := q.initialize()
+		if err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+
+		_ = q.close()
+
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			req, _ := msg["request"].(map[string]any)
+			if req != nil && req["subtype"] == "initialize" {
+				if _, ok := req["excludeDynamicSections"]; ok {
+					t.Error("initialize request should not contain excludeDynamicSections when false")
+				}
+			}
+		}
+	})
 }

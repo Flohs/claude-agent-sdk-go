@@ -50,8 +50,9 @@ func (StringPrompt) systemPromptMarker() {}
 
 // PresetPrompt is a preset system prompt (e.g. "claude_code") with optional appended text.
 type PresetPrompt struct {
-	Preset string `json:"preset"` // e.g. "claude_code"
-	Append string `json:"append,omitempty"`
+	Preset                 string `json:"preset"` // e.g. "claude_code"
+	Append                 string `json:"append,omitempty"`
+	ExcludeDynamicSections bool   `json:"excludeDynamicSections,omitempty"`
 }
 
 func (PresetPrompt) systemPromptMarker() {}

@@ -32,13 +32,14 @@ type query struct {
 	messageCh chan map[string]any
 
 	// State
-	initTimeout        float64
-	initialized        bool
-	closed             bool
-	initializationResult map[string]any
-	firstResultCh      chan struct{}
-	firstResultOnce    sync.Once
-	streamCloseTimeout float64
+	initTimeout            float64
+	initialized            bool
+	closed                 bool
+	initializationResult   map[string]any
+	firstResultCh          chan struct{}
+	firstResultOnce        sync.Once
+	streamCloseTimeout     float64
+	excludeDynamicSections bool
 
 	ctx       context.Context
 	cancelFn  context.CancelFunc
@@ -52,12 +53,13 @@ type hookMatcherInternal struct {
 }
 
 type queryConfig struct {
-	transport      Transport
-	canUseTool     CanUseToolFunc
-	hooks          map[HookEvent][]HookMatcher
-	mcpServers     map[string]*McpSdkServerConfig
-	initTimeout    float64
-	agents         map[string]AgentDefinition
+	transport              Transport
+	canUseTool             CanUseToolFunc
+	hooks                  map[HookEvent][]HookMatcher
+	mcpServers             map[string]*McpSdkServerConfig
+	initTimeout            float64
+	agents                 map[string]AgentDefinition
+	excludeDynamicSections bool
 }
 
 func newQuery(cfg queryConfig) *query {
@@ -81,17 +83,18 @@ func newQuery(cfg queryConfig) *query {
 	}
 
 	q := &query{
-		transport:      cfg.transport,
-		canUseTool:     cfg.canUseTool,
-		hookCallbacks:  make(map[string]HookCallback),
-		pendingEvents:  make(map[string]chan struct{}),
-		pendingResults: make(map[string]any),
-		messageCh:      make(chan map[string]any, 100),
-		initTimeout:    initTimeout,
-		firstResultCh:  make(chan struct{}),
-		streamCloseTimeout: streamCloseTimeoutMs / 1000.0,
-		ctx:            ctx,
-		cancelFn:       cancel,
+		transport:              cfg.transport,
+		canUseTool:             cfg.canUseTool,
+		hookCallbacks:          make(map[string]HookCallback),
+		pendingEvents:          make(map[string]chan struct{}),
+		pendingResults:         make(map[string]any),
+		messageCh:              make(chan map[string]any, 100),
+		initTimeout:            initTimeout,
+		firstResultCh:          make(chan struct{}),
+		streamCloseTimeout:     streamCloseTimeoutMs / 1000.0,
+		excludeDynamicSections: cfg.excludeDynamicSections,
+		ctx:                    ctx,
+		cancelFn:               cancel,
 	}
 
 	// Convert hooks
@@ -407,6 +410,10 @@ func (q *query) initialize() (map[string]any, error) {
 	request := map[string]any{
 		"subtype": "initialize",
 		"hooks":   hooksConfig,
+	}
+
+	if q.excludeDynamicSections {
+		request["excludeDynamicSections"] = true
 	}
 
 	if q.agents != nil {
