@@ -2433,3 +2433,54 @@ func TestExtractCreatedAtFromHead_NoTimestamp(t *testing.T) {
 		t.Errorf("expected nil, got %d", *result)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// DeleteSession
+// ---------------------------------------------------------------------------
+
+func TestDeleteSession_RemovesJSONLAndSubagentDir(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/delete-cascade")
+	filePath := writeSessionFile(t, projDir, testUUID1, "{}\n")
+
+	subagentDir := filepath.Join(projDir, testUUID1)
+	if err := os.MkdirAll(subagentDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	subagentFile := filepath.Join(subagentDir, testUUID2+".jsonl")
+	if err := os.WriteFile(subagentFile, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := DeleteSession(testUUID1, "/test/delete-cascade"); err != nil {
+		t.Fatalf("DeleteSession returned error: %v", err)
+	}
+	if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+		t.Errorf("expected .jsonl to be removed, stat err=%v", err)
+	}
+	if _, err := os.Stat(subagentDir); !os.IsNotExist(err) {
+		t.Errorf("expected subagent dir to be removed, stat err=%v", err)
+	}
+}
+
+func TestDeleteSession_NoSubagentDirNoError(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/delete-no-subagent")
+	filePath := writeSessionFile(t, projDir, testUUID1, "{}\n")
+
+	if err := DeleteSession(testUUID1, "/test/delete-no-subagent"); err != nil {
+		t.Fatalf("DeleteSession returned error: %v", err)
+	}
+	if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+		t.Errorf("expected .jsonl to be removed, stat err=%v", err)
+	}
+}
+
+func TestDeleteSession_MissingSessionStillErrors(t *testing.T) {
+	// Preserves existing "session not found" behavior when the .jsonl is
+	// absent. Ensures the cascade logic didn't change the primary contract.
+	_ = setupTestProjectDir(t, "/test/delete-missing")
+
+	err := DeleteSession(testUUID1, "/test/delete-missing")
+	if err == nil {
+		t.Fatal("expected error for missing session, got nil")
+	}
+}

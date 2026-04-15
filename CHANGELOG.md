@@ -6,6 +6,10 @@
 
 - `ExcludeDynamicSections` field on `PresetPrompt` for cross-user prompt caching. When set, the SDK sends `excludeDynamicSections` in the initialize request to tell Claude Code to omit user-specific dynamic sections from the system prompt. ([#98](https://github.com/Flohs/claude-agent-sdk-go/issues/98))
 
+### Changed
+
+- `DeleteSession` now also removes the sibling `{session_id}/` directory (where subagent transcripts live) on a best-effort basis, matching the Python SDK and TypeScript SDK. Failures removing the sibling directory are swallowed so the primary `.jsonl` delete still counts. Port of Python SDK [anthropics/claude-agent-sdk-python#805](https://github.com/anthropics/claude-agent-sdk-python/pull/805). ([#105](https://github.com/Flohs/claude-agent-sdk-go/issues/105))
+
 ### Fixed
 
 - `ThinkingConfigAdaptive` and `ThinkingConfigDisabled` now correctly map to `--thinking adaptive` / `--thinking disabled` CLI flags instead of incorrectly using `--max-thinking-tokens`. `ThinkingConfigEnabled` and the deprecated `MaxThinkingTokens` field continue to use `--max-thinking-tokens`. ([#99](https://github.com/Flohs/claude-agent-sdk-go/issues/99))
