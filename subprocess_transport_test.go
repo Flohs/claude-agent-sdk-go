@@ -97,7 +97,7 @@ func TestBuildCommand_Tools(t *testing.T) {
 }
 
 func TestBuildCommand_ThinkingConfig(t *testing.T) {
-	t.Run("adaptive", func(t *testing.T) {
+	t.Run("adaptive uses --thinking flag", func(t *testing.T) {
 		transport := &SubprocessTransport{
 			cliPath: "claude",
 			options: &Options{
@@ -105,10 +105,23 @@ func TestBuildCommand_ThinkingConfig(t *testing.T) {
 			},
 		}
 		cmd := transport.buildCommand()
-		assertContains(t, cmd, "--max-thinking-tokens", "32000")
+		assertContains(t, cmd, "--thinking", "adaptive")
+		assertNotContainsFlag(t, cmd, "--max-thinking-tokens")
 	})
 
-	t.Run("enabled", func(t *testing.T) {
+	t.Run("disabled uses --thinking flag", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Thinking: ThinkingConfigDisabled{},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--thinking", "disabled")
+		assertNotContainsFlag(t, cmd, "--max-thinking-tokens")
+	})
+
+	t.Run("enabled uses --max-thinking-tokens", func(t *testing.T) {
 		transport := &SubprocessTransport{
 			cliPath: "claude",
 			options: &Options{
@@ -117,17 +130,34 @@ func TestBuildCommand_ThinkingConfig(t *testing.T) {
 		}
 		cmd := transport.buildCommand()
 		assertContains(t, cmd, "--max-thinking-tokens", "16000")
+		assertNotContainsFlag(t, cmd, "--thinking")
 	})
 
-	t.Run("disabled", func(t *testing.T) {
+	t.Run("deprecated MaxThinkingTokens fallback", func(t *testing.T) {
+		v := 8000
 		transport := &SubprocessTransport{
 			cliPath: "claude",
 			options: &Options{
-				Thinking: ThinkingConfigDisabled{},
+				MaxThinkingTokens: &v,
 			},
 		}
 		cmd := transport.buildCommand()
-		assertContains(t, cmd, "--max-thinking-tokens", "0")
+		assertContains(t, cmd, "--max-thinking-tokens", "8000")
+		assertNotContainsFlag(t, cmd, "--thinking")
+	})
+
+	t.Run("Thinking takes precedence over MaxThinkingTokens", func(t *testing.T) {
+		v := 8000
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Thinking:          ThinkingConfigAdaptive{},
+				MaxThinkingTokens: &v,
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--thinking", "adaptive")
+		assertNotContainsFlag(t, cmd, "--max-thinking-tokens")
 	})
 }
 
@@ -286,6 +316,16 @@ func assertContainsFlag(t *testing.T, cmd []string, flag string) {
 		}
 	}
 	t.Errorf("command %v does not contain %s", cmd, flag)
+}
+
+func assertNotContainsFlag(t *testing.T, cmd []string, flag string) {
+	t.Helper()
+	for _, arg := range cmd {
+		if arg == flag {
+			t.Errorf("command %v should not contain %s", cmd, flag)
+			return
+		}
+	}
 }
 
 func TestBuildCommand_SettingSources(t *testing.T) {
