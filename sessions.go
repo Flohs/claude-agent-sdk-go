@@ -161,7 +161,14 @@ func RenameSession(sessionID string, title string, directory *string) error {
 	return appendJSONLEntry(filePath, entry)
 }
 
-// DeleteSession deletes a session's JSONL transcript file.
+// DeleteSession deletes a session's JSONL transcript file and any subagent
+// transcripts stored in the sibling {session_id}/ directory.
+//
+// The JSONL file is a hard delete — an error is returned if it cannot be
+// removed. The sibling directory (if any) is removed on a best-effort basis;
+// failures there are swallowed so the primary delete still counts as a
+// success. This mirrors the Python SDK's `shutil.rmtree(..., ignore_errors=True)`
+// behavior.
 func DeleteSession(sessionID string, directory ...string) error {
 	if !isValidUUID(sessionID) {
 		return fmt.Errorf("invalid session ID: %s", sessionID)
@@ -177,7 +184,16 @@ func DeleteSession(sessionID string, directory ...string) error {
 		return fmt.Errorf("session not found: %s", sessionID)
 	}
 
-	return os.Remove(filePath)
+	if err := os.Remove(filePath); err != nil {
+		return err
+	}
+
+	// Subagent transcripts live in a sibling {session_id}/ dir alongside the
+	// .jsonl file. Often absent; remove best-effort.
+	siblingDir := filepath.Join(filepath.Dir(filePath), sessionID)
+	_ = os.RemoveAll(siblingDir)
+
+	return nil
 }
 
 // ForkSession creates a copy of a session's transcript file with a new session ID.
