@@ -94,6 +94,26 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			NotificationType: stringField(input, "notification_type"),
 		}, nil
 
+	case HookEventTeammateIdle:
+		return &TeammateIdleHookInput{
+			BaseHookInput:   base,
+			SubagentContext: parseSubagentContext(input),
+		}, nil
+
+	case HookEventTaskCompleted:
+		return &TaskCompletedHookInput{
+			BaseHookInput:   base,
+			SubagentContext: parseSubagentContext(input),
+			TaskID:          stringField(input, "task_id"),
+			ToolUseID:       stringField(input, "tool_use_id"),
+		}, nil
+
+	case HookEventConfigChange:
+		return &ConfigChangeHookInput{
+			BaseHookInput: base,
+			Changes:       mapField(input, "changes"),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil

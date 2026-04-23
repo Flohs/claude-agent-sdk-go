@@ -16,6 +16,15 @@ const (
 	HookEventNotification        HookEvent = "Notification"
 	HookEventSubagentStart       HookEvent = "SubagentStart"
 	HookEventPermissionRequest   HookEvent = "PermissionRequest"
+	// HookEventTeammateIdle fires when a sub-agent idles waiting for input.
+	// Port of TypeScript SDK v0.2.33.
+	HookEventTeammateIdle HookEvent = "TeammateIdle"
+	// HookEventTaskCompleted fires when a Task-spawned sub-agent completes.
+	// Port of TypeScript SDK v0.2.33.
+	HookEventTaskCompleted HookEvent = "TaskCompleted"
+	// HookEventConfigChange fires when session configuration changes (e.g.
+	// permission mode switch, model change). Port of TypeScript SDK v0.2.49.
+	HookEventConfigChange HookEvent = "ConfigChange"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -149,6 +158,35 @@ type NotificationHookInput struct {
 }
 
 func (*NotificationHookInput) hookInputMarker() {}
+
+// TeammateIdleHookInput is the typed input for TeammateIdle hook events.
+type TeammateIdleHookInput struct {
+	BaseHookInput
+	SubagentContext
+}
+
+func (*TeammateIdleHookInput) hookInputMarker() {}
+
+// TaskCompletedHookInput is the typed input for TaskCompleted hook events.
+type TaskCompletedHookInput struct {
+	BaseHookInput
+	SubagentContext
+	TaskID    string `json:"task_id,omitempty"`
+	ToolUseID string `json:"tool_use_id,omitempty"`
+}
+
+func (*TaskCompletedHookInput) hookInputMarker() {}
+
+// ConfigChangeHookInput is the typed input for ConfigChange hook events.
+type ConfigChangeHookInput struct {
+	BaseHookInput
+	// Changes carries the set of configuration keys that changed with their
+	// new values (e.g. {"permission_mode": "acceptEdits"}). The shape is
+	// preserved as a raw map to allow forward compatibility with new fields.
+	Changes map[string]any `json:"changes,omitempty"`
+}
+
+func (*ConfigChangeHookInput) hookInputMarker() {}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {
