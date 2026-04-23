@@ -4,6 +4,7 @@
 
 ### Added
 
+- `Client.StopAsyncMessage(ctx, uuid)` method that drops a queued user message by UUID before it reaches execution via the `cancel_async_message` control request. Port of TypeScript SDK v0.2.76. ([#122](https://github.com/Flohs/claude-agent-sdk-go/issues/122))
 - `Client.PromptSuggestion(ctx)` method that requests prompt suggestions based on the current conversation context. Port of TypeScript SDK v0.2.47. ([#121](https://github.com/Flohs/claude-agent-sdk-go/issues/121))
 - `Client.SupportedAgents(ctx)` and `Client.SupportedCommands(ctx)` methods for querying available subagents and slash commands in the running session. Port of TypeScript SDK v0.2.63 / v0.2.74. ([#120](https://github.com/Flohs/claude-agent-sdk-go/issues/120))
 - `Client.EnableMcpChannel(ctx, serverName, channel)` method and `Capabilities []string` field on `McpServerStatus` for activating SDK-driven MCP channels. Port of TypeScript SDK v0.2.84. ([#119](https://github.com/Flohs/claude-agent-sdk-go/issues/119))

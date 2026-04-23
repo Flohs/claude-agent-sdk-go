@@ -637,6 +637,14 @@ func (q *query) promptSuggestion() ([]string, error) {
 	return stringSliceFromResponse(resp, "suggestions")
 }
 
+func (q *query) stopAsyncMessage(uuid string) error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype": "cancel_async_message",
+		"uuid":    uuid,
+	}, 60*time.Second)
+	return err
+}
+
 func stringSliceFromResponse(resp map[string]any, key string) ([]string, error) {
 	raw, ok := resp[key].([]any)
 	if !ok {
