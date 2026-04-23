@@ -282,6 +282,22 @@ func parseContentBlocks(raw []any) ([]ContentBlock, error) {
 				block.IsError = &isErr
 			}
 			blocks = append(blocks, block)
+		case "server_tool_use":
+			id, _ := blockMap["id"].(string)
+			name, _ := blockMap["name"].(string)
+			input, _ := blockMap["input"].(map[string]any)
+			blocks = append(blocks, ServerToolUseBlock{
+				ID:    id,
+				Name:  ServerToolName(name),
+				Input: input,
+			})
+		case "advisor_tool_result", "server_tool_result":
+			toolUseID, _ := blockMap["tool_use_id"].(string)
+			content, _ := blockMap["content"].(map[string]any)
+			blocks = append(blocks, ServerToolResultBlock{
+				ToolUseID: toolUseID,
+				Content:   content,
+			})
 		}
 	}
 	return blocks, nil

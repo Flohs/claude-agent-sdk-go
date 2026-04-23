@@ -102,6 +102,53 @@ func TestParseMessage_AssistantMessage(t *testing.T) {
 	}
 }
 
+func TestParseMessage_AssistantMessage_ServerToolUseAndResult(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model": "claude-opus-4-7",
+			"content": []any{
+				map[string]any{
+					"type":  "server_tool_use",
+					"id":    "srvtooluse_1",
+					"name":  "web_search",
+					"input": map[string]any{"query": "golang generics"},
+				},
+				map[string]any{
+					"type":        "advisor_tool_result",
+					"tool_use_id": "srvtooluse_1",
+					"content":     map[string]any{"type": "web_search_result", "results": []any{}},
+				},
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	if len(asst.Content) != 2 {
+		t.Fatalf("expected 2 blocks, got %d", len(asst.Content))
+	}
+	server, ok := asst.Content[0].(ServerToolUseBlock)
+	if !ok {
+		t.Fatalf("expected ServerToolUseBlock, got %T", asst.Content[0])
+	}
+	if server.Name != ServerToolWebSearch {
+		t.Errorf("Name = %q, want %q", server.Name, ServerToolWebSearch)
+	}
+	result, ok := asst.Content[1].(ServerToolResultBlock)
+	if !ok {
+		t.Fatalf("expected ServerToolResultBlock, got %T", asst.Content[1])
+	}
+	if result.ToolUseID != "srvtooluse_1" {
+		t.Errorf("ToolUseID = %q, want %q", result.ToolUseID, "srvtooluse_1")
+	}
+	if result.Content["type"] != "web_search_result" {
+		t.Errorf("Content[type] = %v, want web_search_result", result.Content["type"])
+	}
+}
+
 func TestParseMessage_AssistantMessage_TypedFields(t *testing.T) {
 	data := map[string]any{
 		"type":       "assistant",
