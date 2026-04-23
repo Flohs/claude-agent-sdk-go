@@ -429,6 +429,10 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--settings", settingsValue)
 	}
 
+	if opts.ManagedSettings != "" {
+		cmd = append(cmd, "--managed-settings", opts.ManagedSettings)
+	}
+
 	for _, dir := range opts.AddDirs {
 		cmd = append(cmd, "--add-dir", dir)
 	}
