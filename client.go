@@ -304,6 +304,15 @@ func (c *Client) PromptSuggestion(ctx context.Context) ([]string, error) {
 	return c.q.promptSuggestion()
 }
 
+// StopAsyncMessage cancels a queued user message by its UUID before it
+// reaches execution.
+func (c *Client) StopAsyncMessage(ctx context.Context, uuid string) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.stopAsyncMessage(uuid)
+}
+
 // ReconnectMcpServer reconnects a disconnected or failed MCP server.
 func (c *Client) ReconnectMcpServer(ctx context.Context, name string) error {
 	if c.q == nil {
