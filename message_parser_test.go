@@ -102,6 +102,41 @@ func TestParseMessage_AssistantMessage(t *testing.T) {
 	}
 }
 
+func TestParseMessage_AssistantMessage_TypedFields(t *testing.T) {
+	data := map[string]any{
+		"type":       "assistant",
+		"session_id": "sess-123",
+		"uuid":       "msg-uuid-abc",
+		"message": map[string]any{
+			"id":          "msg_01",
+			"model":       "claude-opus-4-7",
+			"stop_reason": "end_turn",
+			"content": []any{
+				map[string]any{"type": "text", "text": "done"},
+			},
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+
+	if asst.MessageID != "msg_01" {
+		t.Errorf("MessageID = %q, want msg_01", asst.MessageID)
+	}
+	if asst.SessionID != "sess-123" {
+		t.Errorf("SessionID = %q, want sess-123", asst.SessionID)
+	}
+	if asst.UUID != "msg-uuid-abc" {
+		t.Errorf("UUID = %q, want msg-uuid-abc", asst.UUID)
+	}
+	if asst.StopReason != "end_turn" {
+		t.Errorf("StopReason = %q, want end_turn", asst.StopReason)
+	}
+}
+
 func TestParseMessage_AssistantMessage_WithUsage(t *testing.T) {
 	data := map[string]any{
 		"type": "assistant",

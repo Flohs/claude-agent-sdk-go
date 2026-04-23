@@ -120,6 +120,16 @@ type AssistantMessage struct {
 	ParentToolUseID string                `json:"parent_tool_use_id,omitempty"`
 	Error           AssistantMessageError `json:"error,omitempty"`
 	Usage           map[string]any        `json:"usage,omitempty"`
+	// MessageID is the API-side message identifier (from the nested message
+	// object). Empty when not provided by the CLI.
+	MessageID string `json:"message_id,omitempty"`
+	// SessionID is the session this message belongs to.
+	SessionID string `json:"session_id,omitempty"`
+	// UUID uniquely identifies this message in the session transcript.
+	UUID string `json:"uuid,omitempty"`
+	// StopReason is why the model stopped generating (e.g. "end_turn",
+	// "tool_use", "max_tokens"). Empty when not provided.
+	StopReason string `json:"stop_reason,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
