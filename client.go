@@ -313,6 +313,16 @@ func (c *Client) StopAsyncMessage(ctx context.Context, uuid string) error {
 	return c.q.stopAsyncMessage(uuid)
 }
 
+// SeedReadState seeds the CLI's read-file-state tracker with the given
+// entries so Edit-style tools can operate across context compactions
+// without first requiring a fresh Read.
+func (c *Client) SeedReadState(ctx context.Context, entries []ReadStateEntry) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.seedReadState(entries)
+}
+
 // ReconnectMcpServer reconnects a disconnected or failed MCP server.
 func (c *Client) ReconnectMcpServer(ctx context.Context, name string) error {
 	if c.q == nil {

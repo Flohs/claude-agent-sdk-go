@@ -645,6 +645,18 @@ func (q *query) stopAsyncMessage(uuid string) error {
 	return err
 }
 
+func (q *query) seedReadState(entries []ReadStateEntry) error {
+	payload := make([]map[string]any, len(entries))
+	for i, e := range entries {
+		payload[i] = map[string]any{"path": e.Path, "mtime": e.Mtime}
+	}
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype": "seed_read_state",
+		"entries": payload,
+	}, 60*time.Second)
+	return err
+}
+
 func stringSliceFromResponse(resp map[string]any, key string) ([]string, error) {
 	raw, ok := resp[key].([]any)
 	if !ok {

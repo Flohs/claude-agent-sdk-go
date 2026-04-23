@@ -4,6 +4,7 @@
 
 ### Added
 
+- `Client.SeedReadState(ctx, entries)` method and `ReadStateEntry` type. Sends the `seed_read_state` control request to populate the CLI's `readFileState` with path/mtime pairs so Edit-style tools work across context compactions. Port of TypeScript SDK v0.2.83. ([#123](https://github.com/Flohs/claude-agent-sdk-go/issues/123))
 - `Client.StopAsyncMessage(ctx, uuid)` method that drops a queued user message by UUID before it reaches execution via the `cancel_async_message` control request. Port of TypeScript SDK v0.2.76. ([#122](https://github.com/Flohs/claude-agent-sdk-go/issues/122))
 - `Client.PromptSuggestion(ctx)` method that requests prompt suggestions based on the current conversation context. Port of TypeScript SDK v0.2.47. ([#121](https://github.com/Flohs/claude-agent-sdk-go/issues/121))
 - `Client.SupportedAgents(ctx)` and `Client.SupportedCommands(ctx)` methods for querying available subagents and slash commands in the running session. Port of TypeScript SDK v0.2.63 / v0.2.74. ([#120](https://github.com/Flohs/claude-agent-sdk-go/issues/120))
