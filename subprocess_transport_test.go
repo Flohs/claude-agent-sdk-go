@@ -401,6 +401,19 @@ func TestBuildCommand_Skills(t *testing.T) {
 	})
 }
 
+func TestBuildCommand_IncludeHookEvents(t *testing.T) {
+	t.Run("false omits flag", func(t *testing.T) {
+		transport := &SubprocessTransport{cliPath: "claude", options: &Options{}}
+		cmd := transport.buildCommand()
+		assertNotContainsFlag(t, cmd, "--include-hook-events")
+	})
+	t.Run("true sets flag", func(t *testing.T) {
+		transport := &SubprocessTransport{cliPath: "claude", options: &Options{IncludeHookEvents: true}}
+		cmd := transport.buildCommand()
+		assertContainsFlag(t, cmd, "--include-hook-events")
+	})
+}
+
 func TestBuildCommand_ManagedSettings(t *testing.T) {
 	t.Run("empty omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{

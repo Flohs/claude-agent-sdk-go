@@ -511,6 +511,10 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--include-partial-messages")
 	}
 
+	if opts.IncludeHookEvents {
+		cmd = append(cmd, "--include-hook-events")
+	}
+
 	if opts.ForkSession {
 		cmd = append(cmd, "--fork-session")
 	}

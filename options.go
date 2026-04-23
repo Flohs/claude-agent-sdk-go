@@ -205,6 +205,9 @@ type Options struct {
 	User string
 	// IncludePartialMessages enables partial message streaming.
 	IncludePartialMessages bool
+	// IncludeHookEvents enables hook lifecycle system messages
+	// (hook_started, hook_progress, hook_response) for all hook event types.
+	IncludeHookEvents bool
 	// ForkSession forks resumed sessions to a new session ID.
 	ForkSession bool
 	// Agents defines custom agent configurations.
