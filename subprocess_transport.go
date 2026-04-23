@@ -515,6 +515,10 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--include-hook-events")
 	}
 
+	if opts.AgentProgressSummaries {
+		cmd = append(cmd, "--agent-progress-summaries")
+	}
+
 	if opts.ForkSession {
 		cmd = append(cmd, "--fork-session")
 	}

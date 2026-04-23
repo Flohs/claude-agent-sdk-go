@@ -152,6 +152,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			SessionID:     stringField(data, "session_id"),
 			ToolUseID:     stringField(data, "tool_use_id"),
 			LastToolName:  stringField(data, "last_tool_name"),
+			Summary:       stringField(data, "summary"),
 		}, nil
 
 	case "task_notification":
