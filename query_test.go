@@ -3,6 +3,7 @@ package claude
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -41,6 +42,9 @@ func (m *mockTransport) ReadMessages(ctx context.Context) <-chan map[string]any 
 func (m *mockTransport) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return nil
+	}
 	m.closed = true
 	close(m.messages)
 	return nil
@@ -294,6 +298,116 @@ func (a *autoRespondTransport) ReadMessages(ctx context.Context) <-chan map[stri
 		}
 	}()
 	return out
+}
+
+// TestQueryFramePeel_TranscriptMirror drives a fake transport that emits
+// interleaved transcript_mirror and regular messages. The test verifies:
+//   - mirror frames land in the attached SessionStore,
+//   - mirror frames are NEVER yielded through receiveMessages to the caller,
+//   - a result message unblocks receiveMessages as usual.
+func TestQueryFramePeel_TranscriptMirror(t *testing.T) {
+	mt := newMockTransport()
+	store := NewInMemorySessionStore()
+
+	projectsDir := filepath.Join(t.TempDir(), "projects")
+	sessionID := "deadbeef-dead-beef-dead-beefdeadbeef"
+	mirrorPath := filepath.Join(projectsDir, "my-project", sessionID+".jsonl")
+
+	q := newQuery(queryConfig{
+		transport:    mt,
+		sessionStore: store,
+		projectsDir:  projectsDir,
+	})
+	q.start()
+
+	// Emit: regular user msg, transcript_mirror (should be peeled),
+	// regular assistant msg, another transcript_mirror, result.
+	frames := []map[string]any{
+		{"type": "user", "uuid": "u1"},
+		{
+			"type":     "transcript_mirror",
+			"filePath": mirrorPath,
+			"entries":  []any{map[string]any{"uuid": "e1"}, map[string]any{"uuid": "e2"}},
+		},
+		{"type": "assistant", "uuid": "a1"},
+		{
+			"type":     "transcript_mirror",
+			"filePath": mirrorPath,
+			"entries":  []any{map[string]any{"uuid": "e3"}},
+		},
+		{"type": "result", "subtype": "success"},
+	}
+	go func() {
+		for _, f := range frames {
+			mt.messages <- f
+		}
+	}()
+
+	// Receive messages through the query's receive channel. Collect types
+	// observed; transcript_mirror must not appear.
+	out := q.receiveMessages()
+	var observed []string
+	timeout := time.After(2 * time.Second)
+collectLoop:
+	for {
+		select {
+		case msg, ok := <-out:
+			if !ok {
+				break collectLoop
+			}
+			t, _ := msg["type"].(string)
+			observed = append(observed, t)
+			if t == "result" {
+				break collectLoop
+			}
+		case <-timeout:
+			t.Fatalf("timed out waiting for messages; observed so far: %v", observed)
+		}
+	}
+
+	for _, obs := range observed {
+		if obs == "transcript_mirror" {
+			t.Fatalf("caller observed transcript_mirror frame (should be peeled): %v", observed)
+		}
+	}
+	want := []string{"user", "assistant", "result"}
+	if !stringSlicesEqual(observed, want) {
+		t.Fatalf("observed = %v, want %v", observed, want)
+	}
+
+	// The store must have received all 3 entries in order.
+	key := SessionKey{
+		ProjectKey: "my-project",
+		SessionID:  sessionID,
+	}
+	entries, err := store.Load(context.Background(), key)
+	if err != nil {
+		t.Fatalf("store.Load: %v", err)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries in store, got %d: %+v", len(entries), entries)
+	}
+	for i, want := range []string{"e1", "e2", "e3"} {
+		if entries[i]["uuid"] != want {
+			t.Errorf("entries[%d].uuid = %v, want %s", i, entries[i]["uuid"], want)
+		}
+	}
+
+	// Close the transport so readMessages exits; then close the query.
+	_ = mt.Close()
+	_ = q.close()
+}
+
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestInitialize_ExcludeDynamicSections(t *testing.T) {

@@ -662,3 +662,71 @@ func TestParseMessage_StreamEvent(t *testing.T) {
 		t.Fatalf("expected uuid 'u1', got %s", event.UUID)
 	}
 }
+
+func TestParseMessage_MirrorErrorMessage(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "mirror_error",
+		"error":   "append failed: network reset",
+		"uuid":    "err-uuid-123",
+		"key": map[string]any{
+			"project_key": "my-project",
+			"session_id":  "abcd",
+			"subpath":     "",
+		},
+		"session_id": "abcd",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	me, ok := msg.(*MirrorErrorMessage)
+	if !ok {
+		t.Fatalf("expected *MirrorErrorMessage, got %T", msg)
+	}
+	if me.Error != "append failed: network reset" {
+		t.Errorf("Error = %q", me.Error)
+	}
+	if me.UUID != "err-uuid-123" {
+		t.Errorf("UUID = %q", me.UUID)
+	}
+	if me.SessionID != "abcd" {
+		t.Errorf("SessionID = %q", me.SessionID)
+	}
+	if me.Key == nil {
+		t.Fatal("expected Key to be set")
+	}
+	if me.Key.ProjectKey != "my-project" || me.Key.SessionID != "abcd" {
+		t.Errorf("Key = %+v", me.Key)
+	}
+	if me.Subtype != "mirror_error" {
+		t.Errorf("Subtype = %q", me.Subtype)
+	}
+}
+
+func TestParseMessage_MirrorErrorMessage_NullKey(t *testing.T) {
+	// When the key is absent/nil, the Key pointer should remain nil and the
+	// rest of the fields should populate.
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "mirror_error",
+		"error":      "adapter unavailable",
+		"uuid":       "err-xyz",
+		"session_id": "",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	me, ok := msg.(*MirrorErrorMessage)
+	if !ok {
+		t.Fatalf("expected *MirrorErrorMessage, got %T", msg)
+	}
+	if me.Key != nil {
+		t.Errorf("expected nil Key, got %+v", me.Key)
+	}
+	if me.Error != "adapter unavailable" {
+		t.Errorf("Error = %q", me.Error)
+	}
+}

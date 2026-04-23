@@ -41,6 +41,15 @@ type query struct {
 	streamCloseTimeout     float64
 	excludeDynamicSections bool
 
+	// Transcript mirror wiring. batcher is nil when Options.SessionStore is
+	// unset; when non-nil, transcript_mirror frames are peeled off the
+	// inbound stream and handed to the batcher, and synthesized
+	// mirror_error frames are surfaced via injectedCh.
+	batcher        *transcriptMirrorBatcher
+	injectedCh     chan map[string]any
+	flushTimeout   time.Duration
+	stderrCallback func(string)
+
 	ctx       context.Context
 	cancelFn  context.CancelFunc
 	wg        sync.WaitGroup
@@ -60,6 +69,16 @@ type queryConfig struct {
 	initTimeout            float64
 	agents                 map[string]AgentDefinition
 	excludeDynamicSections bool
+	// sessionStore, when non-nil, enables transcript mirroring. projectsDir
+	// is the base directory the CLI emits transcript filePath values under
+	// (resolved by [getProjectsDir]). loadTimeoutMs caps the batcher's
+	// flush-before-result wait; 0 means the 10s default.
+	sessionStore  SessionStore
+	projectsDir   string
+	loadTimeoutMs int
+	// stderr receives diagnostics emitted by the batcher when it encounters
+	// a filePath it cannot resolve to a SessionKey. Optional.
+	stderr func(string)
 }
 
 func newQuery(cfg queryConfig) *query {
@@ -82,6 +101,11 @@ func newQuery(cfg queryConfig) *query {
 		initTimeout = max(initTimeoutMs/1000.0, 60.0)
 	}
 
+	flushTimeout := 10 * time.Second
+	if cfg.loadTimeoutMs > 0 {
+		flushTimeout = time.Duration(cfg.loadTimeoutMs) * time.Millisecond
+	}
+
 	q := &query{
 		transport:              cfg.transport,
 		canUseTool:             cfg.canUseTool,
@@ -93,8 +117,22 @@ func newQuery(cfg queryConfig) *query {
 		firstResultCh:          make(chan struct{}),
 		streamCloseTimeout:     streamCloseTimeoutMs / 1000.0,
 		excludeDynamicSections: cfg.excludeDynamicSections,
+		flushTimeout:           flushTimeout,
+		stderrCallback:         cfg.stderr,
 		ctx:                    ctx,
 		cancelFn:               cancel,
+	}
+
+	if cfg.sessionStore != nil {
+		// Buffered so the batcher worker never blocks; when full we drop +
+		// log so the mirror I/O path cannot stall the message pump.
+		q.injectedCh = make(chan map[string]any, 100)
+		q.batcher = newTranscriptMirrorBatcher(
+			cfg.sessionStore,
+			cfg.projectsDir,
+			q.reportMirrorError,
+			cfg.stderr,
+		)
 	}
 
 	// Convert hooks
@@ -170,6 +208,72 @@ func newQuery(cfg queryConfig) *query {
 func (q *query) start() {
 	q.wg.Add(1)
 	go q.readMessages()
+	if q.injectedCh != nil {
+		q.wg.Add(1)
+		go q.forwardInjected()
+	}
+}
+
+// forwardInjected drains SDK-synthesized frames (currently mirror_error) to
+// the inbound message channel. It runs as long as the query's context is
+// live; on context cancellation it exits so close() can proceed.
+func (q *query) forwardInjected() {
+	defer q.wg.Done()
+	for {
+		select {
+		case msg, ok := <-q.injectedCh:
+			if !ok {
+				return
+			}
+			select {
+			case q.messageCh <- msg:
+			case <-q.ctx.Done():
+				return
+			}
+		case <-q.ctx.Done():
+			return
+		}
+	}
+}
+
+// reportMirrorError is the mirrorErrorFunc handed to the batcher. It
+// constructs a mirror_error frame matching the Python reference and pushes
+// it onto the injected-frames channel for forwardInjected to deliver. When
+// the channel is full the message is dropped and the stderr callback is
+// notified so the mirror I/O path cannot stall the message pump.
+func (q *query) reportMirrorError(key SessionKey, err error) {
+	if err == nil {
+		return
+	}
+	keyCopy := key
+	frame := map[string]any{
+		"type":       "system",
+		"subtype":    "mirror_error",
+		"error":      err.Error(),
+		"uuid":       newMirrorErrorUUID(),
+		"session_id": keyCopy.SessionID,
+		"key": map[string]any{
+			"project_key": keyCopy.ProjectKey,
+			"session_id":  keyCopy.SessionID,
+			"subpath":     keyCopy.Subpath,
+		},
+	}
+	select {
+	case q.injectedCh <- frame:
+	default:
+		if q.stderrCallback != nil {
+			q.stderrCallback(fmt.Sprintf(
+				"[SessionStore] dropping mirror_error (injection buffer full): %s/%s",
+				keyCopy.ProjectKey, keyCopy.SessionID,
+			))
+		}
+	}
+}
+
+// newMirrorErrorUUID generates a random v4 UUID for synthesized
+// mirror_error frames. Reuses the existing UUID pattern in sessions.go.
+func newMirrorErrorUUID() string {
+	return generateUUID()
 }
 
 func (q *query) readMessages() {
@@ -230,8 +334,20 @@ func (q *query) readMessages() {
 			continue
 		}
 
-		// Track results for proper stream closure
+		// Peel transcript_mirror frames off the stream — they never surface
+		// to callers. Frames are handed to the batcher, which persists them
+		// to the configured SessionStore in the background.
+		if msgType == "transcript_mirror" {
+			q.handleTranscriptMirrorFrame(msg)
+			continue
+		}
+
+		// Flush the batcher before yielding each result message so any
+		// entries emitted during the turn land in the store before the
+		// caller observes the result. Runs in a goroutine with a bounded
+		// wait so a slow adapter cannot block result delivery.
 		if msgType == "result" {
+			q.flushBeforeResult()
 			q.firstResultOnce.Do(func() { close(q.firstResultCh) })
 		}
 
@@ -240,6 +356,66 @@ func (q *query) readMessages() {
 		case q.messageCh <- msg:
 		case <-q.ctx.Done():
 			return
+		}
+	}
+}
+
+// handleTranscriptMirrorFrame processes a transcript_mirror frame from the
+// CLI stdout. When the batcher is nil (SessionStore unset) or the frame is
+// malformed, the frame is silently dropped. Frames whose filePath cannot be
+// resolved to a SessionKey are also dropped with a stderr warning — this is
+// treated as an SDK bug path, not a user-visible error.
+func (q *query) handleTranscriptMirrorFrame(msg map[string]any) {
+	if q.batcher == nil {
+		return
+	}
+	filePath, _ := msg["filePath"].(string)
+	if filePath == "" {
+		return
+	}
+	rawEntries, ok := msg["entries"].([]any)
+	if !ok {
+		return
+	}
+	entries := make([]SessionStoreEntry, 0, len(rawEntries))
+	for _, raw := range rawEntries {
+		if m, ok := raw.(map[string]any); ok {
+			entries = append(entries, m)
+		}
+	}
+	if len(entries) == 0 {
+		return
+	}
+	q.batcher.Enqueue(filePath, entries)
+}
+
+// flushBeforeResult waits (up to flushTimeout) for the batcher to drain
+// every pending entry so the store sees the session's work before the
+// caller sees the result. Runs the Flush in a goroutine so result delivery
+// is never blocked by a slow adapter — on timeout the result still flows
+// and a diagnostic is emitted via stderr.
+func (q *query) flushBeforeResult() {
+	if q.batcher == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(q.ctx, q.flushTimeout)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- q.batcher.Flush(ctx)
+	}()
+	select {
+	case err := <-done:
+		if err != nil && q.stderrCallback != nil {
+			q.stderrCallback(fmt.Sprintf(
+				"[SessionStore] flush-before-result failed: %v", err,
+			))
+		}
+	case <-ctx.Done():
+		if q.stderrCallback != nil {
+			q.stderrCallback(fmt.Sprintf(
+				"[SessionStore] flush-before-result timed out after %s", q.flushTimeout,
+			))
 		}
 	}
 }
@@ -736,6 +912,13 @@ func (q *query) waitForResultAndEndInput() {
 
 func (q *query) close() error {
 	q.closed = true
+	// Drain the batcher BEFORE cancelling the context / closing stdin so
+	// in-flight mirror writes have a chance to reach the store before the
+	// CLI subprocess is torn down. Close() performs a final Flush with the
+	// same retry policy and blocks until the worker goroutine has exited.
+	if q.batcher != nil {
+		q.batcher.Close()
+	}
 	q.cancelFn()
 	q.wg.Wait()
 	return q.transport.Close()

@@ -269,4 +269,15 @@ type Options struct {
 	// TraceState is the W3C `tracestate` header value paired with TraceParent.
 	// Set together with TraceParent when forwarding a specific span.
 	TraceState string
+	// SessionStore, when non-nil, enables active mirroring: every transcript
+	// line the CLI writes to disk is parallel-copied to the store. Terminal
+	// mirror failures surface on the normal message channel as
+	// *MirrorErrorMessage. Mutually exclusive with EnableFileCheckpointing —
+	// see [validateSessionStoreOptions]. Forwarded to the CLI as
+	// `--session-mirror`.
+	SessionStore SessionStore
+	// LoadTimeoutMs bounds [SessionStore.Load] during resume (Sub-C) and the
+	// flush-before-result wait used by the transcript mirror batcher. Zero
+	// means the internal default (10s) is used.
+	LoadTimeoutMs int
 }
