@@ -172,6 +172,9 @@ type TaskProgressMessage struct {
 	SessionID    string    `json:"session_id"`
 	ToolUseID    string    `json:"tool_use_id,omitempty"`
 	LastToolName string    `json:"last_tool_name,omitempty"`
+	// Summary is an AI-generated progress summary when AgentProgressSummaries
+	// is enabled in Options.
+	Summary string `json:"summary,omitempty"`
 }
 
 // TaskNotificationMessage is emitted when a task completes, fails, or is stopped.
