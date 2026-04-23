@@ -286,6 +286,15 @@ type SDKSessionInfo struct {
 	CreatedAt    *int64  `json:"created_at,omitempty"`
 }
 
+// ReadStateEntry is a single file-state record used by
+// [Client.SeedReadState]. It tells the CLI which files the caller has read
+// out-of-band so that Edit-style tools can operate across context
+// compactions without a fresh Read.
+type ReadStateEntry struct {
+	Path  string `json:"path"`
+	Mtime int64  `json:"mtime"`
+}
+
 // SessionMessage represents a user or assistant message from a session transcript.
 type SessionMessage struct {
 	Type            string `json:"type"` // "user" or "assistant"
