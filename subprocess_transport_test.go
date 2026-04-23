@@ -328,6 +328,26 @@ func assertNotContainsFlag(t *testing.T, cmd []string, flag string) {
 	}
 }
 
+func TestBuildCommand_Title(t *testing.T) {
+	t.Run("empty title omits flag", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{},
+		}
+		cmd := transport.buildCommand()
+		assertNotContainsFlag(t, cmd, "--title")
+	})
+
+	t.Run("title sets flag", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{Title: "My Session"},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--title", "My Session")
+	})
+}
+
 func TestBuildCommand_SettingSources(t *testing.T) {
 	t.Run("nil setting sources omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{
