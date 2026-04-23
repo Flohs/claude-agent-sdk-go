@@ -627,6 +627,16 @@ func (q *query) supportedCommands() ([]string, error) {
 	return stringSliceFromResponse(resp, "commands")
 }
 
+func (q *query) promptSuggestion() ([]string, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "prompt_suggestion",
+	}, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return stringSliceFromResponse(resp, "suggestions")
+}
+
 func stringSliceFromResponse(resp map[string]any, key string) ([]string, error) {
 	raw, ok := resp[key].([]any)
 	if !ok {
