@@ -209,6 +209,12 @@ type Options struct {
 	ForkSession bool
 	// Agents defines custom agent configurations.
 	Agents map[string]AgentDefinition
+	// Skills enables skills on the main session without manually configuring
+	// AllowedTools and SettingSources. Use []string for named skills,
+	// the string "all" for every discovered skill, or leave nil to disable.
+	// When set, the SDK automatically injects Skill tool entries into
+	// AllowedTools and defaults SettingSources to [user, project] if unset.
+	Skills any // []string | "all" | nil
 	// SettingSources specifies which setting sources to load.
 	SettingSources []SettingSource
 	// Sandbox configures bash command isolation.
