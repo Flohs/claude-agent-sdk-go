@@ -598,6 +598,15 @@ func (q *query) reloadPlugins() (map[string]any, error) {
 	return resp, err
 }
 
+func (q *query) enableMcpChannel(serverName, channel string) error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype":    "mcp_enable_channel",
+		"serverName": serverName,
+		"channel":    channel,
+	}, 60*time.Second)
+	return err
+}
+
 func (q *query) reconnectMcpServer(serverName string) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype":    "mcp_reconnect",
