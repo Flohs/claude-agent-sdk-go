@@ -260,6 +260,15 @@ func (c *Client) GetContextUsage(ctx context.Context) (*ContextUsage, error) {
 	return c.q.getContextUsage()
 }
 
+// ReloadPlugins reloads plugins and returns refreshed commands, agents, and
+// MCP server status.
+func (c *Client) ReloadPlugins(ctx context.Context) (map[string]any, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.reloadPlugins()
+}
+
 // ReconnectMcpServer reconnects a disconnected or failed MCP server.
 func (c *Client) ReconnectMcpServer(ctx context.Context, name string) error {
 	if c.q == nil {

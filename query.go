@@ -591,6 +591,13 @@ func (q *query) getContextUsage() (*ContextUsage, error) {
 	return &usage, nil
 }
 
+func (q *query) reloadPlugins() (map[string]any, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "reload_plugins",
+	}, 60*time.Second)
+	return resp, err
+}
+
 func (q *query) reconnectMcpServer(serverName string) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype":    "mcp_reconnect",
