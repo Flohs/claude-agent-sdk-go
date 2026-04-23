@@ -401,6 +401,32 @@ func TestBuildCommand_Skills(t *testing.T) {
 	})
 }
 
+func TestBuildCommand_ThinkingDisplay(t *testing.T) {
+	t.Run("no display omits flag", func(t *testing.T) {
+		transport := &SubprocessTransport{cliPath: "claude", options: &Options{
+			Thinking: ThinkingConfigAdaptive{},
+		}}
+		cmd := transport.buildCommand()
+		assertNotContainsFlag(t, cmd, "--thinking-display")
+	})
+	t.Run("adaptive with summarized display", func(t *testing.T) {
+		transport := &SubprocessTransport{cliPath: "claude", options: &Options{
+			Thinking: ThinkingConfigAdaptive{Display: ThinkingDisplaySummarized},
+		}}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--thinking", "adaptive")
+		assertContains(t, cmd, "--thinking-display", "summarized")
+	})
+	t.Run("enabled with omitted display", func(t *testing.T) {
+		transport := &SubprocessTransport{cliPath: "claude", options: &Options{
+			Thinking: ThinkingConfigEnabled{BudgetTokens: 2048, Display: ThinkingDisplayOmitted},
+		}}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--max-thinking-tokens", "2048")
+		assertContains(t, cmd, "--thinking-display", "omitted")
+	})
+}
+
 func TestBuildCommand_AgentProgressSummaries(t *testing.T) {
 	t.Run("false omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{cliPath: "claude", options: &Options{}}
