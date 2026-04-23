@@ -85,7 +85,7 @@ func (ToolUseBlock) contentBlockMarker() {}
 // ToolResultBlock represents a tool result content block.
 type ToolResultBlock struct {
 	ToolUseID string `json:"tool_use_id"`
-	Content   any    `json:"content,omitempty"`   // string | []map[string]any | nil
+	Content   any    `json:"content,omitempty"` // string | []map[string]any | nil
 	IsError   *bool  `json:"is_error,omitempty"`
 }
 
@@ -130,10 +130,10 @@ func (ServerToolResultBlock) contentBlockMarker() {}
 
 // UserMessage represents a user message.
 type UserMessage struct {
-	Content          any            `json:"content"`                      // string | []ContentBlock
-	UUID             string         `json:"uuid,omitempty"`
-	ParentToolUseID  string         `json:"parent_tool_use_id,omitempty"`
-	ToolUseResult    map[string]any `json:"tool_use_result,omitempty"`
+	Content         any            `json:"content"` // string | []ContentBlock
+	UUID            string         `json:"uuid,omitempty"`
+	ParentToolUseID string         `json:"parent_tool_use_id,omitempty"`
+	ToolUseResult   map[string]any `json:"tool_use_result,omitempty"`
 }
 
 func (UserMessage) messageMarker() {}
@@ -239,14 +239,14 @@ type TaskNotificationMessage struct {
 
 // ResultMessage contains cost and usage information for a completed query.
 type ResultMessage struct {
-	Subtype          string         `json:"subtype"`
-	DurationMs       int            `json:"duration_ms"`
-	DurationAPIMs    int            `json:"duration_api_ms"`
-	IsError          bool           `json:"is_error"`
-	Errors           []any          `json:"errors,omitempty"`
-	NumTurns         int            `json:"num_turns"`
-	SessionID        string         `json:"session_id"`
-	StopReason       string         `json:"stop_reason,omitempty"`
+	Subtype       string `json:"subtype"`
+	DurationMs    int    `json:"duration_ms"`
+	DurationAPIMs int    `json:"duration_api_ms"`
+	IsError       bool   `json:"is_error"`
+	Errors        []any  `json:"errors,omitempty"`
+	NumTurns      int    `json:"num_turns"`
+	SessionID     string `json:"session_id"`
+	StopReason    string `json:"stop_reason,omitempty"`
 	// TerminalReason describes why the session terminated (e.g. "completed",
 	// "aborted_tools", "max_turns", "blocking_limit"). Empty when not
 	// provided by the CLI.
@@ -311,14 +311,14 @@ type ContextUsage struct {
 
 // SDKSessionInfo contains session metadata returned by ListSessions and GetSessionInfo.
 type SDKSessionInfo struct {
-	SessionID    string `json:"session_id"`
-	Summary      string `json:"summary"`
-	LastModified int64  `json:"last_modified"`
-	FileSize     *int64 `json:"file_size,omitempty"`
-	CustomTitle  string `json:"custom_title,omitempty"`
-	FirstPrompt  string `json:"first_prompt,omitempty"`
-	GitBranch    string `json:"git_branch,omitempty"`
-	Cwd          string `json:"cwd,omitempty"`
+	SessionID    string  `json:"session_id"`
+	Summary      string  `json:"summary"`
+	LastModified int64   `json:"last_modified"`
+	FileSize     *int64  `json:"file_size,omitempty"`
+	CustomTitle  string  `json:"custom_title,omitempty"`
+	FirstPrompt  string  `json:"first_prompt,omitempty"`
+	GitBranch    string  `json:"git_branch,omitempty"`
+	Cwd          string  `json:"cwd,omitempty"`
 	Tag          *string `json:"tag,omitempty"`
 	CreatedAt    *int64  `json:"created_at,omitempty"`
 }
@@ -339,4 +339,52 @@ type SessionMessage struct {
 	SessionID       string `json:"session_id"`
 	Message         any    `json:"message"`
 	ParentToolUseID string `json:"parent_tool_use_id,omitempty"`
+}
+
+// SessionKey identifies a single transcript stream in a [SessionStore].
+//
+// ProjectKey is the per-project namespace (typically derived via
+// [ProjectKeyForDirectory] from an absolute project directory). SessionID is
+// the session's UUID. Subpath is empty for the main session transcript and
+// non-empty for sibling streams such as subagent transcripts (e.g.
+// "subagents/agent-xyz").
+type SessionKey struct {
+	ProjectKey string `json:"project_key"`
+	SessionID  string `json:"session_id"`
+	Subpath    string `json:"subpath,omitempty"`
+}
+
+// SessionStoreEntry is one JSONL line from a transcript, represented as a
+// parsed JSON object. [SessionStore] adapters persist these verbatim —
+// they must round-trip through [SessionStore.Append] and [SessionStore.Load]
+// without the adapter interpreting individual fields.
+type SessionStoreEntry = map[string]any
+
+// SessionStoreListEntry is one row returned by
+// [SessionStoreLister.ListSessions]. Mtime is the adapter's storage write
+// time in Unix epoch milliseconds, and must share a clock with the mtime
+// embedded in [SessionSummaryEntry] for the same session so the fast-path
+// staleness check (summary.Mtime < list mtime) is meaningful.
+type SessionStoreListEntry struct {
+	SessionID string `json:"session_id"`
+	Mtime     int64  `json:"mtime"`
+}
+
+// SessionSummaryEntry is a per-session summary sidecar maintained by
+// adapters that implement [SessionStoreSummarizer]. Mtime is the storage
+// write time in Unix epoch milliseconds. Data is opaque state produced by
+// [FoldSessionSummary] — adapters persist it verbatim and do not interpret
+// individual keys.
+type SessionSummaryEntry struct {
+	SessionID string         `json:"session_id"`
+	Mtime     int64          `json:"mtime"`
+	Data      map[string]any `json:"data"`
+}
+
+// SessionListSubkeysKey identifies the main transcript whose sibling
+// subkeys (subagent transcripts and other sub-streams) should be listed
+// via [SessionStoreSubkeys.ListSubkeys].
+type SessionListSubkeysKey struct {
+	ProjectKey string `json:"project_key"`
+	SessionID  string `json:"session_id"`
 }
