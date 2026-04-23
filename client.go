@@ -278,6 +278,23 @@ func (c *Client) EnableMcpChannel(ctx context.Context, serverName, channel strin
 	return c.q.enableMcpChannel(serverName, channel)
 }
 
+// SupportedAgents returns the list of subagent names available in the session.
+func (c *Client) SupportedAgents(ctx context.Context) ([]string, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.supportedAgents()
+}
+
+// SupportedCommands returns the list of slash command names available in the
+// session (including plugin-provided commands).
+func (c *Client) SupportedCommands(ctx context.Context) ([]string, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.supportedCommands()
+}
+
 // ReconnectMcpServer reconnects a disconnected or failed MCP server.
 func (c *Client) ReconnectMcpServer(ctx context.Context, name string) error {
 	if c.q == nil {

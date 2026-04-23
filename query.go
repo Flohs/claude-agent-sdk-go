@@ -607,6 +607,40 @@ func (q *query) enableMcpChannel(serverName, channel string) error {
 	return err
 }
 
+func (q *query) supportedAgents() ([]string, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "supported_agents",
+	}, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return stringSliceFromResponse(resp, "agents")
+}
+
+func (q *query) supportedCommands() ([]string, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "supported_commands",
+	}, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return stringSliceFromResponse(resp, "commands")
+}
+
+func stringSliceFromResponse(resp map[string]any, key string) ([]string, error) {
+	raw, ok := resp[key].([]any)
+	if !ok {
+		return nil, nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		if s, ok := v.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out, nil
+}
+
 func (q *query) reconnectMcpServer(serverName string) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype":    "mcp_reconnect",
