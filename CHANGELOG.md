@@ -4,6 +4,7 @@
 
 ### Added
 
+- `FailIfUnavailable` field on `SandboxSettings`. When set alongside `Enabled: true`, the CLI emits an error result instead of silently running commands unsandboxed on systems without bwrap/Seatbelt. Port of TypeScript SDK v0.2.91. ([#117](https://github.com/Flohs/claude-agent-sdk-go/issues/117))
 - `Display` field on `ThinkingConfigAdaptive` and `ThinkingConfigEnabled`, plus `ThinkingDisplay` type with `ThinkingDisplaySummarized`/`ThinkingDisplayOmitted` constants. Forwarded as `--thinking-display` to let callers override Opus 4.7's default `omitted` thinking text. Port of Python SDK v0.1.65. ([#116](https://github.com/Flohs/claude-agent-sdk-go/issues/116))
 - `Options.AgentProgressSummaries` field that enables periodic AI-generated progress summaries on `task_progress` messages, forwarded as `--agent-progress-summaries`. Also adds a typed `Summary` field on `TaskProgressMessage`. Port of TypeScript SDK v0.2.72. ([#115](https://github.com/Flohs/claude-agent-sdk-go/issues/115))
 - `Options.IncludeHookEvents` field that enables hook lifecycle system messages (`hook_started`, `hook_progress`, `hook_response`) for all hook event types, forwarded as `--include-hook-events` to the CLI. Port of TypeScript SDK v0.2.89. ([#114](https://github.com/Flohs/claude-agent-sdk-go/issues/114))
