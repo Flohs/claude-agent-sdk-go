@@ -259,4 +259,14 @@ type Options struct {
 	OutputFormat map[string]any
 	// EnableFileCheckpointing enables file change tracking for rewind support.
 	EnableFileCheckpointing bool
+	// TraceParent is the W3C `traceparent` header value to propagate to the
+	// CLI subprocess (forwarded as the `TRACEPARENT` env var). Callers using
+	// OpenTelemetry can obtain it via `propagation.TraceContext{}` or format
+	// the span context manually. When empty, the parent process environment
+	// is inherited unchanged — so an externally-set `TRACEPARENT` env var
+	// still reaches the subprocess.
+	TraceParent string
+	// TraceState is the W3C `tracestate` header value paired with TraceParent.
+	// Set together with TraceParent when forwarding a specific span.
+	TraceState string
 }
