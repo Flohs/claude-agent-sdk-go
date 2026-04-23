@@ -269,6 +269,15 @@ func (c *Client) ReloadPlugins(ctx context.Context) (map[string]any, error) {
 	return c.q.reloadPlugins()
 }
 
+// EnableMcpChannel activates a capability channel on an MCP server. Available
+// channels for a given server are advertised in McpServerStatus.Capabilities.
+func (c *Client) EnableMcpChannel(ctx context.Context, serverName, channel string) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.enableMcpChannel(serverName, channel)
+}
+
 // ReconnectMcpServer reconnects a disconnected or failed MCP server.
 func (c *Client) ReconnectMcpServer(ctx context.Context, name string) error {
 	if c.q == nil {

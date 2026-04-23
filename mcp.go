@@ -136,6 +136,9 @@ type McpServerStatus struct {
 	Config     map[string]any            `json:"config,omitempty"`
 	Scope      string                    `json:"scope,omitempty"`
 	Tools      []McpToolInfo             `json:"tools,omitempty"`
+	// Capabilities lists the SDK-driven channels this MCP server can activate.
+	// Use Client.EnableChannel to activate one of the listed capabilities.
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // McpStatusResponse is the response from GetMcpStatus.

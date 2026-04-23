@@ -4,6 +4,7 @@
 
 ### Added
 
+- `Client.EnableMcpChannel(ctx, serverName, channel)` method and `Capabilities []string` field on `McpServerStatus` for activating SDK-driven MCP channels. Port of TypeScript SDK v0.2.84. ([#119](https://github.com/Flohs/claude-agent-sdk-go/issues/119))
 - `Client.ReloadPlugins(ctx)` method that reloads plugins and returns refreshed commands, agents, and MCP server status via the `reload_plugins` control request. Port of TypeScript SDK v0.2.85. ([#118](https://github.com/Flohs/claude-agent-sdk-go/issues/118))
 - New hook event constants `HookEventTeammateIdle`, `HookEventTaskCompleted`, `HookEventConfigChange` with typed input structs `TeammateIdleHookInput`, `TaskCompletedHookInput`, `ConfigChangeHookInput`. Port of TypeScript SDK v0.2.33 and v0.2.49. ([#128](https://github.com/Flohs/claude-agent-sdk-go/issues/128))
 - `TerminalReason` field on `ResultMessage` (e.g. `completed`, `aborted_tools`, `max_turns`, `blocking_limit`). Previously accessible only via `RawData`. Port of TypeScript SDK v0.2.91. ([#125](https://github.com/Flohs/claude-agent-sdk-go/issues/125))
