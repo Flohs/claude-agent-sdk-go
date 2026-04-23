@@ -3316,3 +3316,465 @@ func TestGetSubagentMessagesFromStore_LimitOffset(t *testing.T) {
 		t.Errorf("unexpected paging window: %q, %q", got[0].UUID, got[1].UUID)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// SessionStore-backed mutation helper tests (RenameSessionViaStore,
+// TagSessionViaStore, DeleteSessionViaStore, ForkSessionViaStore)
+// ---------------------------------------------------------------------------
+
+// storeDeleterOnly implements SessionStore + SessionStoreDeleter but not
+// SessionStoreSubkeys. Used to verify non-cascading delete.
+type storeDeleterOnly struct {
+	*storeBarebones
+}
+
+func newStoreDeleterOnly() *storeDeleterOnly {
+	return &storeDeleterOnly{storeBarebones: newStoreBarebones()}
+}
+
+func (s *storeDeleterOnly) Delete(_ context.Context, k SessionKey) error {
+	delete(s.entries, s.key(k))
+	return nil
+}
+
+// storeDeleterWithSubkeys implements SessionStore + SessionStoreDeleter +
+// SessionStoreSubkeys, but its Delete does NOT cascade (so the caller is
+// forced to iterate the subkey list). That way we can assert the helper's
+// own cascade loop runs.
+type storeDeleterWithSubkeys struct {
+	*storeBarebones
+}
+
+func newStoreDeleterWithSubkeys() *storeDeleterWithSubkeys {
+	return &storeDeleterWithSubkeys{storeBarebones: newStoreBarebones()}
+}
+
+func (s *storeDeleterWithSubkeys) Delete(_ context.Context, k SessionKey) error {
+	delete(s.entries, s.key(k))
+	return nil
+}
+
+func (s *storeDeleterWithSubkeys) ListSubkeys(_ context.Context, k SessionListSubkeysKey) ([]string, error) {
+	prefix := k.ProjectKey + "/" + k.SessionID + "/"
+	var out []string
+	for storeKey := range s.entries {
+		if strings.HasPrefix(storeKey, prefix) {
+			out = append(out, storeKey[len(prefix):])
+		}
+	}
+	return out, nil
+}
+
+// storeDeleterFailingSubkey is like storeDeleterWithSubkeys but Delete
+// returns an error for any key whose Subpath matches `failSubpath`. Used
+// to verify partial-failure reporting.
+type storeDeleterFailingSubkey struct {
+	*storeDeleterWithSubkeys
+	failSubpath string
+}
+
+func newStoreDeleterFailingSubkey(failSubpath string) *storeDeleterFailingSubkey {
+	return &storeDeleterFailingSubkey{
+		storeDeleterWithSubkeys: newStoreDeleterWithSubkeys(),
+		failSubpath:             failSubpath,
+	}
+}
+
+func (s *storeDeleterFailingSubkey) Delete(ctx context.Context, k SessionKey) error {
+	if k.Subpath == s.failSubpath && k.Subpath != "" {
+		return fmt.Errorf("simulated subkey delete failure")
+	}
+	return s.storeDeleterWithSubkeys.Delete(ctx, k)
+}
+
+// --- RenameSessionViaStore -------------------------------------------------
+
+func TestRenameSessionViaStore_HappyPath(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/rename-ok"
+	projectKey := ProjectKeyForDirectory(dir)
+	seedSession(t, store, projectKey, testUUID1, "original")
+
+	if err := RenameSessionViaStore(context.Background(), store, testUUID1, "  My Session  ", dir); err != nil {
+		t.Fatalf("RenameSessionViaStore: %v", err)
+	}
+
+	got, err := store.Load(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) < 1 {
+		t.Fatalf("expected >=1 entry, got %d", len(got))
+	}
+	last := got[len(got)-1]
+	if last["type"] != "custom-title" {
+		t.Errorf("expected type custom-title, got %v", last["type"])
+	}
+	if last["customTitle"] != "My Session" {
+		t.Errorf("expected customTitle 'My Session' (stripped), got %v", last["customTitle"])
+	}
+	if last["sessionId"] != testUUID1 {
+		t.Errorf("expected sessionId %s, got %v", testUUID1, last["sessionId"])
+	}
+}
+
+func TestRenameSessionViaStore_EmptyTitleErrors(t *testing.T) {
+	store := NewInMemorySessionStore()
+	if err := RenameSessionViaStore(context.Background(), store, testUUID1, "   "); err == nil {
+		t.Fatal("expected error for whitespace-only title")
+	}
+}
+
+func TestRenameSessionViaStore_InvalidUUIDErrors(t *testing.T) {
+	store := NewInMemorySessionStore()
+	if err := RenameSessionViaStore(context.Background(), store, "not-a-uuid", "title"); err == nil {
+		t.Fatal("expected error for invalid UUID")
+	}
+}
+
+func TestRenameSessionViaStore_NilStoreErrors(t *testing.T) {
+	if err := RenameSessionViaStore(context.Background(), nil, testUUID1, "title"); err == nil {
+		t.Fatal("expected error for nil store")
+	}
+}
+
+// --- TagSessionViaStore ----------------------------------------------------
+
+func TestTagSessionViaStore_NonNilTag(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/tag-ok"
+	projectKey := ProjectKeyForDirectory(dir)
+	seedSession(t, store, projectKey, testUUID1, "seed")
+
+	tag := "experiment"
+	if err := TagSessionViaStore(context.Background(), store, testUUID1, &tag, dir); err != nil {
+		t.Fatalf("TagSessionViaStore: %v", err)
+	}
+
+	got, err := store.Load(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := got[len(got)-1]
+	if last["type"] != "tag" {
+		t.Errorf("expected type tag, got %v", last["type"])
+	}
+	if last["tag"] != "experiment" {
+		t.Errorf("expected tag 'experiment', got %v", last["tag"])
+	}
+	if last["sessionId"] != testUUID1 {
+		t.Errorf("expected sessionId %s, got %v", testUUID1, last["sessionId"])
+	}
+}
+
+func TestTagSessionViaStore_NilClearsTag(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/tag-clear"
+	projectKey := ProjectKeyForDirectory(dir)
+	seedSession(t, store, projectKey, testUUID1, "seed")
+
+	// Tag, then clear.
+	existing := "x"
+	if err := TagSessionViaStore(context.Background(), store, testUUID1, &existing, dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := TagSessionViaStore(context.Background(), store, testUUID1, nil, dir); err != nil {
+		t.Fatalf("TagSessionViaStore(nil): %v", err)
+	}
+
+	got, err := store.Load(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := got[len(got)-1]
+	if last["type"] != "tag" {
+		t.Errorf("expected final entry type tag, got %v", last["type"])
+	}
+	if last["tag"] != "" {
+		t.Errorf("expected cleared (empty) tag, got %v", last["tag"])
+	}
+}
+
+func TestTagSessionViaStore_InvalidUUIDErrors(t *testing.T) {
+	store := NewInMemorySessionStore()
+	tag := "x"
+	if err := TagSessionViaStore(context.Background(), store, "not-a-uuid", &tag); err == nil {
+		t.Fatal("expected error for invalid UUID")
+	}
+}
+
+func TestTagSessionViaStore_EmptyAfterSanitizationErrors(t *testing.T) {
+	store := NewInMemorySessionStore()
+	// Only whitespace + zero-width chars (U+200B, U+200C) => sanitizes
+	// to empty. Must error. Escape sequences are used here (instead of
+	// literal code points) so the source stays ASCII for linters that
+	// flag invisible characters.
+	empty := "  \u200b\u200c  "
+	if err := TagSessionViaStore(context.Background(), store, testUUID1, &empty); err == nil {
+		t.Fatal("expected error for tag that sanitizes to empty")
+	}
+}
+
+func TestTagSessionViaStore_NilStoreErrors(t *testing.T) {
+	tag := "x"
+	if err := TagSessionViaStore(context.Background(), nil, testUUID1, &tag); err == nil {
+		t.Fatal("expected error for nil store")
+	}
+}
+
+// --- DeleteSessionViaStore -------------------------------------------------
+
+func TestDeleteSessionViaStore_DeleterOnlyNoCascade(t *testing.T) {
+	store := newStoreDeleterOnly()
+	dir := "/test/del-plain"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	// Seed main + a subkey under the same session. The helper should NOT
+	// cascade because the store doesn't implement SessionStoreSubkeys.
+	mainKey := SessionKey{ProjectKey: projectKey, SessionID: testUUID1}
+	subKey := SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-abc"}
+	if err := store.Append(context.Background(), mainKey, []SessionStoreEntry{{"type": "user", "uuid": "u1"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(context.Background(), subKey, []SessionStoreEntry{{"type": "user", "uuid": "s1"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := DeleteSessionViaStore(context.Background(), store, testUUID1, dir); err != nil {
+		t.Fatalf("DeleteSessionViaStore: %v", err)
+	}
+
+	if mainLoaded, _ := store.Load(context.Background(), mainKey); len(mainLoaded) != 0 {
+		t.Errorf("expected main session deleted, got %d entries", len(mainLoaded))
+	}
+	// Without SessionStoreSubkeys the subkey must remain (the helper cannot
+	// enumerate it). This documents the adapter-dependent cascade contract.
+	if subLoaded, _ := store.Load(context.Background(), subKey); len(subLoaded) == 0 {
+		t.Errorf("expected subkey to remain when store lacks SessionStoreSubkeys")
+	}
+}
+
+func TestDeleteSessionViaStore_DeleterPlusSubkeysCascades(t *testing.T) {
+	store := newStoreDeleterWithSubkeys()
+	dir := "/test/del-cascade"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	mainKey := SessionKey{ProjectKey: projectKey, SessionID: testUUID1}
+	subKeys := []SessionKey{
+		{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-a"},
+		{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-b"},
+		{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/workflows/run-1/agent-c"},
+	}
+	if err := store.Append(context.Background(), mainKey, []SessionStoreEntry{{"type": "user", "uuid": "u1"}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range subKeys {
+		if err := store.Append(context.Background(), k, []SessionStoreEntry{{"type": "user", "uuid": "s"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := DeleteSessionViaStore(context.Background(), store, testUUID1, dir); err != nil {
+		t.Fatalf("DeleteSessionViaStore: %v", err)
+	}
+
+	if loaded, _ := store.Load(context.Background(), mainKey); len(loaded) != 0 {
+		t.Errorf("expected main deleted, got %d entries", len(loaded))
+	}
+	for _, k := range subKeys {
+		if loaded, _ := store.Load(context.Background(), k); len(loaded) != 0 {
+			t.Errorf("expected subkey %s deleted, got %d entries", k.Subpath, len(loaded))
+		}
+	}
+}
+
+func TestDeleteSessionViaStore_WithoutDeleterErrors(t *testing.T) {
+	store := newStoreBarebones()
+	err := DeleteSessionViaStore(context.Background(), store, testUUID1)
+	if err == nil {
+		t.Fatal("expected error for store without SessionStoreDeleter")
+	}
+	if !strings.Contains(err.Error(), "SessionStoreDeleter") {
+		t.Errorf("expected error to mention SessionStoreDeleter, got %q", err.Error())
+	}
+}
+
+func TestDeleteSessionViaStore_PartialSubkeyFailureReported(t *testing.T) {
+	store := newStoreDeleterFailingSubkey("subagents/agent-b")
+	dir := "/test/del-partial"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	mainKey := SessionKey{ProjectKey: projectKey, SessionID: testUUID1}
+	goodSub := SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-a"}
+	badSub := SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-b"}
+
+	if err := store.Append(context.Background(), mainKey, []SessionStoreEntry{{"type": "user", "uuid": "u1"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(context.Background(), goodSub, []SessionStoreEntry{{"type": "user", "uuid": "a"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(context.Background(), badSub, []SessionStoreEntry{{"type": "user", "uuid": "b"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	err := DeleteSessionViaStore(context.Background(), store, testUUID1, dir)
+	if err == nil {
+		t.Fatal("expected error describing subkey failure")
+	}
+	if !strings.Contains(err.Error(), "subagents/agent-b") {
+		t.Errorf("expected error to name failing subkey, got %q", err.Error())
+	}
+
+	// Main delete still succeeded.
+	if loaded, _ := store.Load(context.Background(), mainKey); len(loaded) != 0 {
+		t.Errorf("expected main session deleted despite subkey failure, got %d entries", len(loaded))
+	}
+	// Good subkey still deleted.
+	if loaded, _ := store.Load(context.Background(), goodSub); len(loaded) != 0 {
+		t.Errorf("expected good subkey deleted, got %d entries", len(loaded))
+	}
+	// Bad subkey still present (the adapter refused).
+	if loaded, _ := store.Load(context.Background(), badSub); len(loaded) == 0 {
+		t.Errorf("expected bad subkey to remain (delete refused)")
+	}
+}
+
+func TestDeleteSessionViaStore_InvalidUUIDErrors(t *testing.T) {
+	store := NewInMemorySessionStore()
+	if err := DeleteSessionViaStore(context.Background(), store, "not-a-uuid"); err == nil {
+		t.Fatal("expected error for invalid UUID")
+	}
+}
+
+func TestDeleteSessionViaStore_NilStoreErrors(t *testing.T) {
+	if err := DeleteSessionViaStore(context.Background(), nil, testUUID1); err == nil {
+		t.Fatal("expected error for nil store")
+	}
+}
+
+// --- ForkSessionViaStore ---------------------------------------------------
+
+func TestForkSessionViaStore_HappyPath(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/fork-ok"
+	projectKey := ProjectKeyForDirectory(dir)
+	seedSession(t, store, projectKey, testUUID1, "hello")
+
+	// Snapshot source entries before fork so we can assert they were not
+	// mutated (deep-copy requirement).
+	srcBefore, err := store.Load(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ForkSessionViaStore(context.Background(), store, testUUID1, testUUID2, dir); err != nil {
+		t.Fatalf("ForkSessionViaStore: %v", err)
+	}
+
+	forked, err := store.Load(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(forked) != len(srcBefore) {
+		t.Fatalf("expected %d forked entries, got %d", len(srcBefore), len(forked))
+	}
+	for i, e := range forked {
+		if sid, ok := e["sessionId"].(string); ok && sid != testUUID2 {
+			t.Errorf("forked entry %d: expected sessionId %s, got %q", i, testUUID2, sid)
+		}
+	}
+
+	// Source must still reference its original sessionId.
+	srcAfter, err := store.Load(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, e := range srcAfter {
+		if sid, ok := e["sessionId"].(string); ok && sid != testUUID1 {
+			t.Errorf("source entry %d mutated: sessionId=%q want %q", i, sid, testUUID1)
+		}
+	}
+}
+
+func TestForkSessionViaStore_DeepCopyNestedMaps(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/fork-deep"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	// Entry carries a nested map — the fork must NOT alias it between
+	// source and destination.
+	original := SessionStoreEntry{
+		"type":      "user",
+		"uuid":      "u1",
+		"sessionId": testUUID1,
+		"message": map[string]any{
+			"role":    "user",
+			"content": []any{map[string]any{"type": "text", "text": "hi"}},
+		},
+	}
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1}, []SessionStoreEntry{original}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ForkSessionViaStore(context.Background(), store, testUUID1, testUUID2, dir); err != nil {
+		t.Fatal(err)
+	}
+
+	forked, err := store.Load(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(forked) != 1 {
+		t.Fatalf("expected 1 forked entry, got %d", len(forked))
+	}
+	// Mutate the forked nested map — the source must stay untouched.
+	forkedMsg, _ := forked[0]["message"].(map[string]any)
+	if forkedMsg == nil {
+		t.Fatal("forked entry missing message map")
+	}
+	forkedMsg["role"] = "MUTATED"
+
+	src, err := store.Load(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srcMsg, _ := src[0]["message"].(map[string]any)
+	if srcMsg == nil {
+		t.Fatal("source entry missing message map")
+	}
+	if srcMsg["role"] != "user" {
+		t.Errorf("source nested map was aliased — mutation leaked: role=%v", srcMsg["role"])
+	}
+}
+
+func TestForkSessionViaStore_InvalidSourceUUIDErrors(t *testing.T) {
+	store := NewInMemorySessionStore()
+	if err := ForkSessionViaStore(context.Background(), store, "not-a-uuid", testUUID2); err == nil {
+		t.Fatal("expected error for invalid source UUID")
+	}
+}
+
+func TestForkSessionViaStore_InvalidNewUUIDErrors(t *testing.T) {
+	store := NewInMemorySessionStore()
+	if err := ForkSessionViaStore(context.Background(), store, testUUID1, "not-a-uuid"); err == nil {
+		t.Fatal("expected error for invalid new UUID")
+	}
+}
+
+func TestForkSessionViaStore_EmptySourceErrors(t *testing.T) {
+	store := NewInMemorySessionStore()
+	err := ForkSessionViaStore(context.Background(), store, testUUID1, testUUID2)
+	if err == nil {
+		t.Fatal("expected error for empty source session")
+	}
+	if !strings.Contains(err.Error(), "no entries") {
+		t.Errorf("expected 'no entries' message, got %q", err.Error())
+	}
+}
+
+func TestForkSessionViaStore_NilStoreErrors(t *testing.T) {
+	if err := ForkSessionViaStore(context.Background(), nil, testUUID1, testUUID2); err == nil {
+		t.Fatal("expected error for nil store")
+	}
+}
