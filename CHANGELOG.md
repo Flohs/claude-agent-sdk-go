@@ -4,6 +4,7 @@
 
 ### Added
 
+- `ListSubagents(sessionID, opts)` and `GetSubagentMessages(sessionID, agentID, opts)` session helpers for reading subagent transcripts from the sibling `{session_id}/subagents/` directory (supports nested layouts such as `workflows/<runId>/`). Port of Python SDK v0.1.60 / PR #825. ([#126](https://github.com/Flohs/claude-agent-sdk-go/issues/126))
 - `IncludeSystemMessages` field on `GetSessionMessagesOptions`. When set, system-subtype transcript entries (task notifications, hook events, etc.) are included in the returned slice. Port of TypeScript SDK v0.2.89. ([#127](https://github.com/Flohs/claude-agent-sdk-go/issues/127))
 - `ServerToolUseBlock` and `ServerToolResultBlock` content block types and `ServerToolName` enum constants (`advisor`, `web_search`, `web_fetch`, `code_execution`, `bash_code_execution`, `text_editor_code_execution`, `tool_search_tool_regex`, `tool_search_tool_bm25`). Port of Python SDK v0.1.65 / PR #836. ([#109](https://github.com/Flohs/claude-agent-sdk-go/issues/109))
 - `Client.SeedReadState(ctx, entries)` method and `ReadStateEntry` type. Sends the `seed_read_state` control request to populate the CLI's `readFileState` with path/mtime pairs so Edit-style tools work across context compactions. Port of TypeScript SDK v0.2.83. ([#123](https://github.com/Flohs/claude-agent-sdk-go/issues/123))

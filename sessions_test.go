@@ -1006,6 +1006,88 @@ func TestGetSessionMessages_NonexistentSession(t *testing.T) {
 	}
 }
 
+func TestListSubagents_AndGetSubagentMessages(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/subagents")
+
+	// Write parent session file
+	parentContent := makeUserLine("u1", "", "parent") + "\n"
+	writeSessionFile(t, projDir, testUUID1, parentContent)
+
+	// Write subagent transcripts
+	subagentsDir := filepath.Join(projDir, testUUID1, "subagents")
+	if err := os.MkdirAll(subagentsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	agentA := filepath.Join(subagentsDir, "agent-abc.jsonl")
+	agentAContent := strings.Join([]string{
+		makeUserLine("au1", "", "sub Q"),
+		makeAssistantLine("aa1", "au1", "sub A"),
+	}, "\n") + "\n"
+	if err := os.WriteFile(agentA, []byte(agentAContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Nested agent
+	nestedDir := filepath.Join(subagentsDir, "workflows", "run-1")
+	if err := os.MkdirAll(nestedDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	agentB := filepath.Join(nestedDir, "agent-xyz.jsonl")
+	agentBContent := strings.Join([]string{
+		makeUserLine("bu1", "", "nested Q"),
+		makeAssistantLine("ba1", "bu1", "nested A"),
+	}, "\n") + "\n"
+	if err := os.WriteFile(agentB, []byte(agentBContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("list discovers nested agent files", func(t *testing.T) {
+		ids := ListSubagents(testUUID1, ListSubagentsOptions{Directory: "/test/subagents"})
+		if len(ids) != 2 {
+			t.Fatalf("expected 2 agent IDs, got %d: %v", len(ids), ids)
+		}
+		has := map[string]bool{}
+		for _, id := range ids {
+			has[id] = true
+		}
+		if !has["abc"] || !has["xyz"] {
+			t.Errorf("expected agent IDs abc+xyz, got %v", ids)
+		}
+	})
+
+	t.Run("get messages for a named agent", func(t *testing.T) {
+		msgs, err := GetSubagentMessages(testUUID1, "abc", GetSubagentMessagesOptions{
+			Directory: "/test/subagents",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(msgs) != 2 {
+			t.Fatalf("expected 2 messages, got %d", len(msgs))
+		}
+	})
+
+	t.Run("invalid UUID returns empty", func(t *testing.T) {
+		ids := ListSubagents("not-a-uuid", ListSubagentsOptions{})
+		if ids != nil {
+			t.Errorf("expected nil for invalid UUID, got %v", ids)
+		}
+	})
+
+	t.Run("unknown agent returns nil", func(t *testing.T) {
+		msgs, err := GetSubagentMessages(testUUID1, "missing", GetSubagentMessagesOptions{
+			Directory: "/test/subagents",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if msgs != nil {
+			t.Errorf("expected nil for missing agent, got %d messages", len(msgs))
+		}
+	})
+}
+
 func TestGetSessionMessages_IncludeSystemMessages(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/system")
 
