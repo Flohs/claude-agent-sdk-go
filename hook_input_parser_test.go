@@ -19,6 +19,9 @@ var (
 	_ TypedHookInput = (*SubagentStartHookInput)(nil)
 	_ TypedHookInput = (*PreCompactHookInput)(nil)
 	_ TypedHookInput = (*NotificationHookInput)(nil)
+	_ TypedHookInput = (*TeammateIdleHookInput)(nil)
+	_ TypedHookInput = (*TaskCompletedHookInput)(nil)
+	_ TypedHookInput = (*ConfigChangeHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -638,6 +641,67 @@ func TestPostToolUseFailureHookInput_JSONRoundTrip(t *testing.T) {
 	}
 	if typed.AgentID != "agent-99" {
 		t.Errorf("AgentID = %q, want %q", typed.AgentID, "agent-99")
+	}
+}
+
+func TestParseHookInput_TeammateIdle(t *testing.T) {
+	input := merge(base("TeammateIdle"), HookInput{
+		"agent_id":   "agent-7",
+		"agent_type": "researcher",
+	})
+	got, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	typed, ok := got.(*TeammateIdleHookInput)
+	if !ok {
+		t.Fatalf("expected *TeammateIdleHookInput, got %T", got)
+	}
+	assertBase(t, typed.BaseHookInput, "TeammateIdle")
+	if typed.AgentID != "agent-7" {
+		t.Errorf("AgentID = %q, want agent-7", typed.AgentID)
+	}
+}
+
+func TestParseHookInput_TaskCompleted(t *testing.T) {
+	input := merge(base("TaskCompleted"), HookInput{
+		"task_id":     "task-1",
+		"tool_use_id": "toolu_x",
+		"agent_id":    "agent-7",
+	})
+	got, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	typed, ok := got.(*TaskCompletedHookInput)
+	if !ok {
+		t.Fatalf("expected *TaskCompletedHookInput, got %T", got)
+	}
+	if typed.TaskID != "task-1" {
+		t.Errorf("TaskID = %q, want task-1", typed.TaskID)
+	}
+	if typed.ToolUseID != "toolu_x" {
+		t.Errorf("ToolUseID = %q, want toolu_x", typed.ToolUseID)
+	}
+}
+
+func TestParseHookInput_ConfigChange(t *testing.T) {
+	input := merge(base("ConfigChange"), HookInput{
+		"changes": map[string]any{
+			"permission_mode": "acceptEdits",
+			"model":           "claude-opus-4-7",
+		},
+	})
+	got, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	typed, ok := got.(*ConfigChangeHookInput)
+	if !ok {
+		t.Fatalf("expected *ConfigChangeHookInput, got %T", got)
+	}
+	if typed.Changes["permission_mode"] != "acceptEdits" {
+		t.Errorf("Changes[permission_mode] = %v, want acceptEdits", typed.Changes["permission_mode"])
 	}
 }
 
