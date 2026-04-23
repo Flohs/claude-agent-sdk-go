@@ -99,6 +99,12 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	if t.options.EnableFileCheckpointing {
 		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
 	}
+	if t.options.TraceParent != "" {
+		env = append(env, "TRACEPARENT="+t.options.TraceParent)
+	}
+	if t.options.TraceState != "" {
+		env = append(env, "TRACESTATE="+t.options.TraceState)
+	}
 	if t.cwd != "" {
 		env = append(env, "PWD="+t.cwd)
 	}

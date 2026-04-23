@@ -4,6 +4,7 @@
 
 ### Added
 
+- `Options.TraceParent` and `Options.TraceState` fields for W3C trace context propagation to the CLI subprocess (forwarded as `TRACEPARENT` / `TRACESTATE` env vars). OpenTelemetry users can inject the active span context; when unset, externally-set trace env vars still flow through the inherited environment. Port of Python SDK v0.1.60 / PR #821 and TypeScript SDK v0.2.113. ([#129](https://github.com/Flohs/claude-agent-sdk-go/issues/129))
 - `ListSubagents(sessionID, opts)` and `GetSubagentMessages(sessionID, agentID, opts)` session helpers for reading subagent transcripts from the sibling `{session_id}/subagents/` directory (supports nested layouts such as `workflows/<runId>/`). Port of Python SDK v0.1.60 / PR #825. ([#126](https://github.com/Flohs/claude-agent-sdk-go/issues/126))
 - `IncludeSystemMessages` field on `GetSessionMessagesOptions`. When set, system-subtype transcript entries (task notifications, hook events, etc.) are included in the returned slice. Port of TypeScript SDK v0.2.89. ([#127](https://github.com/Flohs/claude-agent-sdk-go/issues/127))
 - `ServerToolUseBlock` and `ServerToolResultBlock` content block types and `ServerToolName` enum constants (`advisor`, `web_search`, `web_fetch`, `code_execution`, `bash_code_execution`, `text_editor_code_execution`, `tool_search_tool_regex`, `tool_search_tool_bm25`). Port of Python SDK v0.1.65 / PR #836. ([#109](https://github.com/Flohs/claude-agent-sdk-go/issues/109))
