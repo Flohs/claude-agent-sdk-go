@@ -146,6 +146,12 @@ type SandboxSettings struct {
 	Network                    *SandboxNetworkConfig    `json:"network,omitempty"`
 	IgnoreViolations           *SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
 	EnableWeakerNestedSandbox  *bool                    `json:"enableWeakerNestedSandbox,omitempty"`
+	// FailIfUnavailable controls behavior when sandboxing is requested but the
+	// platform's sandbox mechanism is unavailable (no bwrap on Linux, no
+	// Seatbelt on macOS, etc). When true (the CLI default when Enabled is
+	// true), the CLI emits an error result message instead of silently running
+	// commands unsandboxed.
+	FailIfUnavailable *bool `json:"failIfUnavailable,omitempty"`
 }
 
 // Options configures a Claude SDK query or client.

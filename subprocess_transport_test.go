@@ -401,6 +401,23 @@ func TestBuildCommand_Skills(t *testing.T) {
 	})
 }
 
+func TestBuildSettingsValue_SandboxFailIfUnavailable(t *testing.T) {
+	trueVal := true
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			Sandbox: &SandboxSettings{
+				Enabled:           &trueVal,
+				FailIfUnavailable: &trueVal,
+			},
+		},
+	}
+	value := transport.buildSettingsValue()
+	if !strings.Contains(value, `"failIfUnavailable":true`) {
+		t.Errorf("expected failIfUnavailable in settings JSON, got %s", value)
+	}
+}
+
 func TestBuildCommand_ThinkingDisplay(t *testing.T) {
 	t.Run("no display omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{cliPath: "claude", options: &Options{
