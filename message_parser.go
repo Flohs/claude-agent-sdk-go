@@ -184,14 +184,15 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 
 func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 	msg := &ResultMessage{
-		Subtype:       stringField(data, "subtype"),
-		DurationMs:    intField(data, "duration_ms"),
-		DurationAPIMs: intField(data, "duration_api_ms"),
-		IsError:       boolField(data, "is_error"),
-		NumTurns:      intField(data, "num_turns"),
-		SessionID:     stringField(data, "session_id"),
-		StopReason:    stringField(data, "stop_reason"),
-		Result:        stringField(data, "result"),
+		Subtype:        stringField(data, "subtype"),
+		DurationMs:     intField(data, "duration_ms"),
+		DurationAPIMs:  intField(data, "duration_api_ms"),
+		IsError:        boolField(data, "is_error"),
+		NumTurns:       intField(data, "num_turns"),
+		SessionID:      stringField(data, "session_id"),
+		StopReason:     stringField(data, "stop_reason"),
+		TerminalReason: stringField(data, "terminal_reason"),
+		Result:         stringField(data, "result"),
 	}
 
 	if errors, ok := data["errors"].([]any); ok {
