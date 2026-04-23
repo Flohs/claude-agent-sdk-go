@@ -1,7 +1,9 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -2630,5 +2632,687 @@ func TestDeleteSession_MissingSessionStillErrors(t *testing.T) {
 	err := DeleteSession(testUUID1, "/test/delete-missing")
 	if err == nil {
 		t.Fatal("expected error for missing session, got nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SessionStore-backed read helper tests (ListSessionsFromStore,
+// GetSessionMessagesFromStore, ListSubagentsFromStore,
+// GetSubagentMessagesFromStore)
+// ---------------------------------------------------------------------------
+
+// storeBarebones implements the core SessionStore interface only — no
+// Lister, Summarizer, or Subkeys. Used to verify error paths.
+type storeBarebones struct {
+	entries map[string][]SessionStoreEntry
+}
+
+func newStoreBarebones() *storeBarebones {
+	return &storeBarebones{entries: map[string][]SessionStoreEntry{}}
+}
+
+func (s *storeBarebones) key(k SessionKey) string {
+	if k.Subpath == "" {
+		return k.ProjectKey + "/" + k.SessionID
+	}
+	return k.ProjectKey + "/" + k.SessionID + "/" + k.Subpath
+}
+
+func (s *storeBarebones) Append(_ context.Context, k SessionKey, entries []SessionStoreEntry) error {
+	s.entries[s.key(k)] = append(s.entries[s.key(k)], entries...)
+	return nil
+}
+
+func (s *storeBarebones) Load(_ context.Context, k SessionKey) ([]SessionStoreEntry, error) {
+	if e, ok := s.entries[s.key(k)]; ok {
+		out := make([]SessionStoreEntry, len(e))
+		copy(out, e)
+		return out, nil
+	}
+	return nil, nil
+}
+
+// storeListerOnly implements SessionStore + SessionStoreLister but does NOT
+// implement SessionStoreSummarizer. Used to exercise the Load-per-session
+// fallback path of ListSessionsFromStore.
+type storeListerOnly struct {
+	*storeBarebones
+	mtimes map[string]int64
+}
+
+func newStoreListerOnly() *storeListerOnly {
+	return &storeListerOnly{storeBarebones: newStoreBarebones(), mtimes: map[string]int64{}}
+}
+
+func (s *storeListerOnly) Append(ctx context.Context, k SessionKey, entries []SessionStoreEntry) error {
+	if err := s.storeBarebones.Append(ctx, k, entries); err != nil {
+		return err
+	}
+	s.mtimes[s.key(k)] = time.Now().UnixMilli()
+	return nil
+}
+
+func (s *storeListerOnly) ListSessions(_ context.Context, projectKey string) ([]SessionStoreListEntry, error) {
+	prefix := projectKey + "/"
+	var out []SessionStoreListEntry
+	for k := range s.entries {
+		if !strings.HasPrefix(k, prefix) {
+			continue
+		}
+		rest := k[len(prefix):]
+		if strings.Contains(rest, "/") {
+			continue
+		}
+		out = append(out, SessionStoreListEntry{SessionID: rest, Mtime: s.mtimes[k]})
+	}
+	return out, nil
+}
+
+// storeSummarizerOnly implements SessionStore + SessionStoreSummarizer but
+// NOT SessionStoreLister — used to confirm the fast path runs without
+// gap-fill.
+type storeSummarizerOnly struct {
+	*storeBarebones
+	summaries map[summaryKey]SessionSummaryEntry
+	mtimes    map[string]int64
+	lastMtime int64
+}
+
+func newStoreSummarizerOnly() *storeSummarizerOnly {
+	return &storeSummarizerOnly{
+		storeBarebones: newStoreBarebones(),
+		summaries:      map[summaryKey]SessionSummaryEntry{},
+		mtimes:         map[string]int64{},
+	}
+}
+
+func (s *storeSummarizerOnly) Append(ctx context.Context, k SessionKey, entries []SessionStoreEntry) error {
+	if err := s.storeBarebones.Append(ctx, k, entries); err != nil {
+		return err
+	}
+	now := time.Now().UnixMilli()
+	if now <= s.lastMtime {
+		now = s.lastMtime + 1
+	}
+	s.lastMtime = now
+	s.mtimes[s.key(k)] = now
+	if k.Subpath == "" {
+		sk := summaryKey{projectKey: k.ProjectKey, sessionID: k.SessionID}
+		var prev *SessionSummaryEntry
+		if existing, ok := s.summaries[sk]; ok {
+			prevCopy := existing
+			prev = &prevCopy
+		}
+		folded := FoldSessionSummary(prev, k, entries)
+		folded.Mtime = now
+		s.summaries[sk] = *folded
+	}
+	return nil
+}
+
+func (s *storeSummarizerOnly) ListSessionSummaries(_ context.Context, projectKey string) ([]SessionSummaryEntry, error) {
+	var out []SessionSummaryEntry
+	for sk, sum := range s.summaries {
+		if sk.projectKey != projectKey {
+			continue
+		}
+		cp := sum
+		cp.Data = cloneStringAnyMap(sum.Data)
+		out = append(out, cp)
+	}
+	return out, nil
+}
+
+// seedSession appends a basic main-transcript for sessionID to store under
+// projectKey. Each call waits a tick so mtimes are strictly monotonic.
+func seedSession(t *testing.T, store SessionStore, projectKey, sessionID, prompt string) {
+	t.Helper()
+	entries := []SessionStoreEntry{
+		{
+			"type":       "user",
+			"uuid":       sessionID + "-u1",
+			"sessionId":  sessionID,
+			"message":    map[string]any{"content": prompt},
+			"timestamp":  "2026-04-23T10:00:00.000Z",
+			"cwd":        "/seed-cwd",
+			"gitBranch":  "main",
+		},
+		{
+			"type":       "assistant",
+			"uuid":       sessionID + "-a1",
+			"parentUuid": sessionID + "-u1",
+			"sessionId":  sessionID,
+			"message":    map[string]any{"content": "ack " + prompt},
+		},
+	}
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: sessionID}, entries); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListSessionsFromStore_SummarizerFastPath(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/list-fast"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	seedSession(t, store, projectKey, testUUID1, "first prompt")
+	seedSession(t, store, projectKey, testUUID2, "second prompt")
+	seedSession(t, store, projectKey, testUUID3, "third prompt")
+
+	got, err := ListSessionsFromStore(context.Background(), store, ListSessionsOptions{Directory: dir})
+	if err != nil {
+		t.Fatalf("ListSessionsFromStore: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected 3 sessions, got %d", len(got))
+	}
+	// Sorted by LastModified desc. testUUID3 was appended last.
+	if got[0].SessionID != testUUID3 {
+		t.Errorf("expected first session %s, got %s", testUUID3, got[0].SessionID)
+	}
+	// Summary should come from the folded first_prompt.
+	if got[0].Summary != "third prompt" {
+		t.Errorf("expected summary 'third prompt', got %q", got[0].Summary)
+	}
+	if got[0].FirstPrompt != "third prompt" {
+		t.Errorf("expected first_prompt 'third prompt', got %q", got[0].FirstPrompt)
+	}
+	// FileSize must be nil on the store path (no byte count).
+	if got[0].FileSize != nil {
+		t.Errorf("expected FileSize nil on store path, got %v", *got[0].FileSize)
+	}
+	if got[0].Cwd != "/seed-cwd" {
+		t.Errorf("expected cwd '/seed-cwd', got %q", got[0].Cwd)
+	}
+	if got[0].GitBranch != "main" {
+		t.Errorf("expected git_branch 'main', got %q", got[0].GitBranch)
+	}
+}
+
+func TestListSessionsFromStore_SummarizerFastPath_OffsetLimit(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/list-fast-paging"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	seedSession(t, store, projectKey, testUUID1, "one")
+	seedSession(t, store, projectKey, testUUID2, "two")
+	seedSession(t, store, projectKey, testUUID3, "three")
+	seedSession(t, store, projectKey, testUUID4, "four")
+
+	limit := 2
+	got, err := ListSessionsFromStore(context.Background(), store, ListSessionsOptions{
+		Directory: dir,
+		Offset:    1,
+		Limit:     &limit,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 sessions after offset/limit, got %d", len(got))
+	}
+	// desc order: testUUID4, testUUID3, testUUID2, testUUID1. Offset 1 skips
+	// testUUID4; limit 2 keeps testUUID3 and testUUID2.
+	if got[0].SessionID != testUUID3 {
+		t.Errorf("expected first after offset %s, got %s", testUUID3, got[0].SessionID)
+	}
+	if got[1].SessionID != testUUID2 {
+		t.Errorf("expected second after offset %s, got %s", testUUID2, got[1].SessionID)
+	}
+}
+
+func TestListSessionsFromStore_ListerFallback(t *testing.T) {
+	store := newStoreListerOnly()
+	dir := "/test/list-fallback"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	seedSession(t, store, projectKey, testUUID1, "fallback alpha")
+	// Small jitter so mtimes differ.
+	time.Sleep(2 * time.Millisecond)
+	seedSession(t, store, projectKey, testUUID2, "fallback beta")
+
+	got, err := ListSessionsFromStore(context.Background(), store, ListSessionsOptions{Directory: dir})
+	if err != nil {
+		t.Fatalf("ListSessionsFromStore: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(got))
+	}
+	if got[0].SessionID != testUUID2 {
+		t.Errorf("expected newest-first %s, got %s", testUUID2, got[0].SessionID)
+	}
+	if got[0].Summary != "fallback beta" {
+		t.Errorf("expected summary 'fallback beta', got %q", got[0].Summary)
+	}
+}
+
+func TestListSessionsFromStore_NoListerNoSummarizer_Errors(t *testing.T) {
+	store := newStoreBarebones()
+	_, err := ListSessionsFromStore(context.Background(), store, ListSessionsOptions{Directory: "/whatever"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "SessionStoreSummarizer") || !strings.Contains(err.Error(), "SessionStoreLister") {
+		t.Errorf("expected error mentioning both extensions, got %q", err.Error())
+	}
+}
+
+func TestListSessionsFromStore_EmptyStore(t *testing.T) {
+	store := NewInMemorySessionStore()
+	got, err := ListSessionsFromStore(context.Background(), store, ListSessionsOptions{Directory: "/empty"})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected zero-length result, got %d", len(got))
+	}
+}
+
+func TestListSessionsFromStore_NilStore(t *testing.T) {
+	_, err := ListSessionsFromStore(context.Background(), nil, ListSessionsOptions{})
+	if err == nil {
+		t.Fatal("expected error for nil store")
+	}
+}
+
+func TestListSessionsFromStore_SummarizerOnly_FastPathWithoutGapFill(t *testing.T) {
+	// Confirms the fast path works even when the store lacks ListSessions.
+	store := newStoreSummarizerOnly()
+	dir := "/test/summarizer-only"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	seedSession(t, store, projectKey, testUUID1, "only-fast one")
+	seedSession(t, store, projectKey, testUUID2, "only-fast two")
+
+	got, err := ListSessionsFromStore(context.Background(), store, ListSessionsOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(got))
+	}
+}
+
+func TestListSessionsFromStore_StaleSummaryRoutedThroughGapFill(t *testing.T) {
+	// A stale sidecar (summary.mtime < list.mtime) should be re-folded via
+	// gap-fill Load — verify by hand-forging a stale summary in the store's
+	// internals.
+	store := NewInMemorySessionStore()
+	dir := "/test/stale-summary"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	seedSession(t, store, projectKey, testUUID1, "fresh content")
+
+	// Force the stored summary to be stale relative to list.mtime.
+	sk := summaryKey{projectKey: projectKey, sessionID: testUUID1}
+	existing := store.summaries[sk]
+	existing.Mtime = 0 // older than any list mtime
+	store.summaries[sk] = existing
+
+	got, err := ListSessionsFromStore(context.Background(), store, ListSessionsOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 session after gap-fill, got %d", len(got))
+	}
+	if got[0].Summary != "fresh content" {
+		t.Errorf("expected gap-filled summary 'fresh content', got %q", got[0].Summary)
+	}
+}
+
+func TestGetSessionMessagesFromStore_Basic(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/get-msgs"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	entries := []SessionStoreEntry{
+		{"type": "user", "uuid": "u1", "sessionId": testUUID1, "message": map[string]any{"content": "Q1"}},
+		{"type": "assistant", "uuid": "a1", "parentUuid": "u1", "sessionId": testUUID1, "message": map[string]any{"content": "A1"}},
+		{"type": "user", "uuid": "u2", "parentUuid": "a1", "sessionId": testUUID1, "message": map[string]any{"content": "Q2"}},
+		{"type": "assistant", "uuid": "a2", "parentUuid": "u2", "sessionId": testUUID1, "message": map[string]any{"content": "A2"}},
+	}
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1}, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := GetSessionMessagesFromStore(context.Background(), store, testUUID1, GetSessionMessagesOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 4 {
+		t.Fatalf("expected 4 messages, got %d", len(got))
+	}
+	wantOrder := []string{"u1", "a1", "u2", "a2"}
+	for i, uuid := range wantOrder {
+		if got[i].UUID != uuid {
+			t.Errorf("position %d: expected UUID %q, got %q", i, uuid, got[i].UUID)
+		}
+	}
+	if got[0].Type != "user" || got[1].Type != "assistant" {
+		t.Errorf("unexpected type order: %q/%q", got[0].Type, got[1].Type)
+	}
+}
+
+func TestGetSessionMessagesFromStore_IncludeSystemMessages(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/get-msgs-system"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	entries := []SessionStoreEntry{
+		{"type": "user", "uuid": "u1", "sessionId": testUUID1, "message": map[string]any{"content": "Q"}},
+		{"type": "assistant", "uuid": "a1", "parentUuid": "u1", "sessionId": testUUID1, "message": map[string]any{"content": "A"}},
+		{"type": "system", "uuid": "s1", "parentUuid": "a1", "subtype": "task_notification"},
+		{"type": "user", "uuid": "u2", "parentUuid": "s1", "sessionId": testUUID1, "message": map[string]any{"content": "Q2"}},
+	}
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1}, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	// Default: no system messages.
+	got, err := GetSessionMessagesFromStore(context.Background(), store, testUUID1, GetSessionMessagesOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range got {
+		if m.Type == "system" {
+			t.Errorf("unexpected system message in default output: %+v", m)
+		}
+	}
+
+	// With IncludeSystemMessages.
+	got, err = GetSessionMessagesFromStore(context.Background(), store, testUUID1, GetSessionMessagesOptions{
+		Directory:             dir,
+		IncludeSystemMessages: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundSystem := false
+	for _, m := range got {
+		if m.Type == "system" {
+			foundSystem = true
+		}
+	}
+	if !foundSystem {
+		t.Error("expected at least one system message when IncludeSystemMessages=true")
+	}
+}
+
+func TestGetSessionMessagesFromStore_LimitOffset(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/get-msgs-paging"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	entries := []SessionStoreEntry{
+		{"type": "user", "uuid": "u1", "sessionId": testUUID1, "message": map[string]any{"content": "Q1"}},
+		{"type": "assistant", "uuid": "a1", "parentUuid": "u1", "sessionId": testUUID1, "message": map[string]any{"content": "A1"}},
+		{"type": "user", "uuid": "u2", "parentUuid": "a1", "sessionId": testUUID1, "message": map[string]any{"content": "Q2"}},
+		{"type": "assistant", "uuid": "a2", "parentUuid": "u2", "sessionId": testUUID1, "message": map[string]any{"content": "A2"}},
+	}
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1}, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	limit := 2
+	got, err := GetSessionMessagesFromStore(context.Background(), store, testUUID1, GetSessionMessagesOptions{
+		Directory: dir,
+		Offset:    1,
+		Limit:     &limit,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 messages after offset/limit, got %d", len(got))
+	}
+	if got[0].UUID != "a1" || got[1].UUID != "u2" {
+		t.Errorf("unexpected offset/limit window: got %q and %q", got[0].UUID, got[1].UUID)
+	}
+}
+
+func TestGetSessionMessagesFromStore_InvalidUUID(t *testing.T) {
+	store := NewInMemorySessionStore()
+	got, err := GetSessionMessagesFromStore(context.Background(), store, "not-a-uuid", GetSessionMessagesOptions{})
+	if err != nil {
+		t.Fatalf("expected nil error for invalid UUID, got %v", err)
+	}
+	if got != nil {
+		t.Errorf("expected nil result for invalid UUID, got %v", got)
+	}
+}
+
+func TestGetSessionMessagesFromStore_MissingSession(t *testing.T) {
+	store := NewInMemorySessionStore()
+	got, err := GetSessionMessagesFromStore(context.Background(), store, testUUID1, GetSessionMessagesOptions{Directory: "/nope"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Errorf("expected nil result for missing session, got %d messages", len(got))
+	}
+}
+
+func TestGetSessionMessagesFromStore_ContextCanceled(t *testing.T) {
+	store := NewInMemorySessionStore()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := GetSessionMessagesFromStore(ctx, store, testUUID1, GetSessionMessagesOptions{})
+	if err == nil || !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled, got %v", err)
+	}
+}
+
+func TestListSubagentsFromStore_HappyPath(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/sub-list"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	// Main transcript.
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1}, []SessionStoreEntry{
+		{"type": "user", "uuid": "u1", "sessionId": testUUID1, "message": map[string]any{"content": "parent"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Subagent abc directly under subagents/.
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-abc"}, []SessionStoreEntry{
+		{"type": "user", "uuid": "sub-u1", "message": map[string]any{"content": "sub Q"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// Nested subagent xyz under subagents/workflows/run-1/.
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/workflows/run-1/agent-xyz"}, []SessionStoreEntry{
+		{"type": "user", "uuid": "sub-u2", "message": map[string]any{"content": "nested Q"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	ids, err := ListSubagentsFromStore(context.Background(), store, testUUID1, ListSubagentsOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	has := map[string]bool{}
+	for _, id := range ids {
+		has[id] = true
+	}
+	if !has["abc"] || !has["xyz"] {
+		t.Errorf("expected abc + xyz agent IDs, got %v", ids)
+	}
+	if len(ids) != 2 {
+		t.Errorf("expected 2 IDs, got %d: %v", len(ids), ids)
+	}
+}
+
+func TestListSubagentsFromStore_InvalidUUID(t *testing.T) {
+	store := NewInMemorySessionStore()
+	ids, err := ListSubagentsFromStore(context.Background(), store, "not-a-uuid", ListSubagentsOptions{})
+	if err != nil {
+		t.Fatalf("expected nil error for invalid UUID, got %v", err)
+	}
+	if ids != nil {
+		t.Errorf("expected nil IDs for invalid UUID, got %v", ids)
+	}
+}
+
+func TestListSubagentsFromStore_NoSubkeysSupport_Errors(t *testing.T) {
+	store := newStoreListerOnly() // no SessionStoreSubkeys
+	_, err := ListSubagentsFromStore(context.Background(), store, testUUID1, ListSubagentsOptions{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "SessionStoreSubkeys") {
+		t.Errorf("expected error mentioning SessionStoreSubkeys, got %q", err.Error())
+	}
+}
+
+func TestListSubagentsFromStore_IgnoresNonSubagentSubpaths(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/sub-filter"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	// An unrelated sub-stream under a different top-level folder.
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "attachments/foo"}, []SessionStoreEntry{
+		{"type": "user", "uuid": "x", "message": map[string]any{"content": "unrelated"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// A real subagent.
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-good"}, []SessionStoreEntry{
+		{"type": "user", "uuid": "y", "message": map[string]any{"content": "real"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	ids, err := ListSubagentsFromStore(context.Background(), store, testUUID1, ListSubagentsOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 1 || ids[0] != "good" {
+		t.Errorf("expected exactly one id 'good', got %v", ids)
+	}
+}
+
+func TestGetSubagentMessagesFromStore_HappyPath(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/sub-get"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	entries := []SessionStoreEntry{
+		{"type": "user", "uuid": "su1", "sessionId": testUUID1, "message": map[string]any{"content": "sub Q"}},
+		{"type": "assistant", "uuid": "sa1", "parentUuid": "su1", "sessionId": testUUID1, "message": map[string]any{"content": "sub A"}},
+		// Synthetic agent_metadata entry — must be dropped.
+		{"type": "agent_metadata", "agent": "abc"},
+	}
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-abc"}, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := GetSubagentMessagesFromStore(context.Background(), store, testUUID1, "abc", GetSubagentMessagesOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(got))
+	}
+	if got[0].UUID != "su1" || got[1].UUID != "sa1" {
+		t.Errorf("unexpected UUID order: %q, %q", got[0].UUID, got[1].UUID)
+	}
+}
+
+func TestGetSubagentMessagesFromStore_Nested(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/sub-nested"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	entries := []SessionStoreEntry{
+		{"type": "user", "uuid": "nu1", "message": map[string]any{"content": "nested Q"}},
+		{"type": "assistant", "uuid": "na1", "parentUuid": "nu1", "message": map[string]any{"content": "nested A"}},
+	}
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/workflows/run-1/agent-xyz"}, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := GetSubagentMessagesFromStore(context.Background(), store, testUUID1, "xyz", GetSubagentMessagesOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 nested messages, got %d", len(got))
+	}
+}
+
+func TestGetSubagentMessagesFromStore_InvalidUUID(t *testing.T) {
+	store := NewInMemorySessionStore()
+	got, err := GetSubagentMessagesFromStore(context.Background(), store, "not-a-uuid", "abc", GetSubagentMessagesOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Errorf("expected nil for invalid UUID, got %v", got)
+	}
+}
+
+func TestGetSubagentMessagesFromStore_EmptyAgentID(t *testing.T) {
+	store := NewInMemorySessionStore()
+	got, err := GetSubagentMessagesFromStore(context.Background(), store, testUUID1, "", GetSubagentMessagesOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Errorf("expected nil for empty agent ID, got %v", got)
+	}
+}
+
+func TestGetSubagentMessagesFromStore_UnknownAgent(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/sub-unknown"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	// Unrelated subagent exists.
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-good"}, []SessionStoreEntry{
+		{"type": "user", "uuid": "x", "message": map[string]any{"content": "sub"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := GetSubagentMessagesFromStore(context.Background(), store, testUUID1, "missing", GetSubagentMessagesOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Errorf("expected nil for missing agent, got %v", got)
+	}
+}
+
+func TestGetSubagentMessagesFromStore_LimitOffset(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/sub-paging"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	entries := []SessionStoreEntry{
+		{"type": "user", "uuid": "su1", "message": map[string]any{"content": "Q1"}},
+		{"type": "assistant", "uuid": "sa1", "parentUuid": "su1", "message": map[string]any{"content": "A1"}},
+		{"type": "user", "uuid": "su2", "parentUuid": "sa1", "message": map[string]any{"content": "Q2"}},
+		{"type": "assistant", "uuid": "sa2", "parentUuid": "su2", "message": map[string]any{"content": "A2"}},
+	}
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-abc"}, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	limit := 2
+	got, err := GetSubagentMessagesFromStore(context.Background(), store, testUUID1, "abc", GetSubagentMessagesOptions{
+		Directory: dir,
+		Offset:    2,
+		Limit:     &limit,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(got))
+	}
+	if got[0].UUID != "su2" || got[1].UUID != "sa2" {
+		t.Errorf("unexpected paging window: %q, %q", got[0].UUID, got[1].UUID)
 	}
 }
