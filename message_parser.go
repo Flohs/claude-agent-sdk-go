@@ -100,6 +100,10 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		Content:         blocks,
 		Model:           model,
 		ParentToolUseID: stringField(data, "parent_tool_use_id"),
+		MessageID:       stringField(message, "id"),
+		SessionID:       stringField(data, "session_id"),
+		UUID:            stringField(data, "uuid"),
+		StopReason:      stringField(message, "stop_reason"),
 	}
 
 	if errStr := stringField(data, "error"); errStr != "" {
