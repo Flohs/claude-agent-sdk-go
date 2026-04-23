@@ -209,6 +209,24 @@ func makeUserLine(uuid, parentUUID, content string, extra ...map[string]any) str
 	return makeSessionLine(m)
 }
 
+// makeSystemLine creates a system message transcript line.
+func makeSystemLine(uuid, parentUUID, subtype string, extra ...map[string]any) string {
+	m := map[string]any{
+		"type":    "system",
+		"uuid":    uuid,
+		"subtype": subtype,
+	}
+	if parentUUID != "" {
+		m["parentUuid"] = parentUUID
+	}
+	for _, e := range extra {
+		for k, v := range e {
+			m[k] = v
+		}
+	}
+	return makeSessionLine(m)
+}
+
 // makeAssistantLine creates an assistant message transcript line.
 func makeAssistantLine(uuid, parentUUID, content string, extra ...map[string]any) string {
 	m := map[string]any{
@@ -986,6 +1004,54 @@ func TestGetSessionMessages_NonexistentSession(t *testing.T) {
 	if messages != nil {
 		t.Errorf("expected nil for nonexistent session, got %v", messages)
 	}
+}
+
+func TestGetSessionMessages_IncludeSystemMessages(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/system")
+
+	// Chain: u1 -> a1 -> s1 (system) -> u2 -> a2
+	content := strings.Join([]string{
+		makeUserLine("u1", "", "Q1"),
+		makeAssistantLine("a1", "u1", "A1"),
+		makeSystemLine("s1", "a1", "task_notification"),
+		makeUserLine("u2", "s1", "Q2"),
+		makeAssistantLine("a2", "u2", "A2"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, testUUID1, content)
+
+	t.Run("default excludes system messages", func(t *testing.T) {
+		messages, err := GetSessionMessages(testUUID1, GetSessionMessagesOptions{Directory: "/test/system"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(messages) != 4 {
+			t.Fatalf("expected 4 user+assistant messages, got %d", len(messages))
+		}
+		for _, m := range messages {
+			if m.Type == "system" {
+				t.Errorf("did not expect system message in default output, got %+v", m)
+			}
+		}
+	})
+
+	t.Run("IncludeSystemMessages includes them", func(t *testing.T) {
+		messages, err := GetSessionMessages(testUUID1, GetSessionMessagesOptions{
+			Directory:             "/test/system",
+			IncludeSystemMessages: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var foundSystem bool
+		for _, m := range messages {
+			if m.Type == "system" {
+				foundSystem = true
+			}
+		}
+		if !foundSystem {
+			t.Errorf("expected at least one system message in output, got %d messages", len(messages))
+		}
+	})
 }
 
 func TestGetSessionMessages_WithOffset(t *testing.T) {

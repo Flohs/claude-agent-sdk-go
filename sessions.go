@@ -47,6 +47,11 @@ type GetSessionMessagesOptions struct {
 	Directory string
 	Limit     *int
 	Offset    int
+	// IncludeSystemMessages includes system-subtype transcript entries
+	// (hooks, summaries, status updates, etc.) in the returned slice.
+	// Default is false, which matches the prior user+assistant-only
+	// behavior.
+	IncludeSystemMessages bool
 }
 
 // ListSessions lists sessions with metadata extracted from stat + head/tail reads.
@@ -75,6 +80,10 @@ func GetSessionMessages(sessionID string, opts GetSessionMessagesOptions) ([]Ses
 	var visible []transcriptEntry
 	for _, e := range chain {
 		if isVisibleMessage(e) {
+			visible = append(visible, e)
+			continue
+		}
+		if opts.IncludeSystemMessages && isVisibleSystemMessage(e) {
 			visible = append(visible, e)
 		}
 	}
@@ -999,11 +1008,28 @@ func isVisibleMessage(entry transcriptEntry) bool {
 	return !hasTeam
 }
 
+func isVisibleSystemMessage(entry transcriptEntry) bool {
+	entryType, _ := entry["type"].(string)
+	if entryType != "system" {
+		return false
+	}
+	if isMeta, _ := entry["isMeta"].(bool); isMeta {
+		return false
+	}
+	if isSidechain, _ := entry["isSidechain"].(bool); isSidechain {
+		return false
+	}
+	return true
+}
+
 func toSessionMessage(entry transcriptEntry) SessionMessage {
 	entryType, _ := entry["type"].(string)
 	msgType := "user"
-	if entryType == "assistant" {
+	switch entryType {
+	case "assistant":
 		msgType = "assistant"
+	case "system":
+		msgType = "system"
 	}
 	uuid, _ := entry["uuid"].(string)
 	sessionID, _ := entry["sessionId"].(string)
