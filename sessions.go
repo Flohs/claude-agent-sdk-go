@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,6 +41,143 @@ type ListSessionsOptions struct {
 	Limit            *int
 	Offset           int
 	IncludeWorktrees bool // defaults to true
+}
+
+// ListSubagentsOptions configures subagent listing.
+type ListSubagentsOptions struct {
+	// Directory scopes the search to a specific project directory (and its
+	// worktrees). When empty, all project directories are searched.
+	Directory string
+}
+
+// GetSubagentMessagesOptions configures subagent transcript retrieval.
+type GetSubagentMessagesOptions struct {
+	Directory             string
+	Limit                 *int
+	Offset                int
+	IncludeSystemMessages bool
+}
+
+// ListSubagents returns the agent IDs of subagents that wrote transcripts
+// during the given session. Subagent transcripts live at
+// `<projectDir>/<sessionId>/subagents/agent-<agentId>.jsonl` (and may be
+// nested under subdirectories such as `workflows/<runId>/`).
+//
+// Returns an empty slice when the session is not found, the sessionID is
+// not a valid UUID, or the session has no subagents.
+func ListSubagents(sessionID string, opts ListSubagentsOptions) []string {
+	if !isValidUUID(sessionID) {
+		return nil
+	}
+	subagentsDir := resolveSubagentsDir(sessionID, opts.Directory)
+	if subagentsDir == "" {
+		return nil
+	}
+	files := collectAgentFiles(subagentsDir)
+	ids := make([]string, 0, len(files))
+	for _, af := range files {
+		ids = append(ids, af.agentID)
+	}
+	return ids
+}
+
+// GetSubagentMessages reads a single subagent's conversation from its JSONL
+// transcript. Messages are returned in chronological order with the same
+// filtering behavior as GetSessionMessages (user/assistant by default;
+// system entries added when IncludeSystemMessages is set).
+func GetSubagentMessages(sessionID, agentID string, opts GetSubagentMessagesOptions) ([]SessionMessage, error) {
+	if !isValidUUID(sessionID) {
+		return nil, nil
+	}
+	subagentsDir := resolveSubagentsDir(sessionID, opts.Directory)
+	if subagentsDir == "" {
+		return nil, nil
+	}
+	var agentFile string
+	for _, af := range collectAgentFiles(subagentsDir) {
+		if af.agentID == agentID {
+			agentFile = af.path
+			break
+		}
+	}
+	if agentFile == "" {
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(agentFile)
+	if err != nil {
+		return nil, err
+	}
+
+	entries := parseTranscriptEntries(string(data))
+	chain := buildConversationChain(entries)
+
+	var visible []transcriptEntry
+	for _, e := range chain {
+		if isVisibleMessage(e) {
+			visible = append(visible, e)
+			continue
+		}
+		if opts.IncludeSystemMessages && isVisibleSystemMessage(e) {
+			visible = append(visible, e)
+		}
+	}
+
+	messages := make([]SessionMessage, len(visible))
+	for i, e := range visible {
+		messages[i] = toSessionMessage(e)
+	}
+
+	if opts.Offset > 0 {
+		if opts.Offset >= len(messages) {
+			return nil, nil
+		}
+		messages = messages[opts.Offset:]
+	}
+	if opts.Limit != nil && *opts.Limit > 0 && *opts.Limit < len(messages) {
+		messages = messages[:*opts.Limit]
+	}
+	return messages, nil
+}
+
+// resolveSubagentsDir returns the on-disk path of the `subagents/` folder
+// for a given session, or "" if the session file cannot be located.
+func resolveSubagentsDir(sessionID, directory string) string {
+	filePath := findSessionFilePath(sessionID, directory)
+	if filePath == "" {
+		return ""
+	}
+	// Strip the .jsonl suffix to derive the session directory.
+	sessionDir := strings.TrimSuffix(filePath, ".jsonl")
+	return filepath.Join(sessionDir, "subagents")
+}
+
+type agentFile struct {
+	agentID string
+	path    string
+}
+
+// collectAgentFiles walks a subagents directory tree and returns every
+// `agent-<id>.jsonl` file it finds. Agent IDs are extracted from the
+// filename. Results are sorted by filename for deterministic ordering.
+func collectAgentFiles(baseDir string) []agentFile {
+	var result []agentFile
+	_ = filepath.WalkDir(baseDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		name := d.Name()
+		if !strings.HasPrefix(name, "agent-") || !strings.HasSuffix(name, ".jsonl") {
+			return nil
+		}
+		id := strings.TrimSuffix(strings.TrimPrefix(name, "agent-"), ".jsonl")
+		result = append(result, agentFile{agentID: id, path: path})
+		return nil
+	})
+	return result
 }
 
 // GetSessionMessagesOptions configures session message retrieval.
