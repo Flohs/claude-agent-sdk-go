@@ -3505,8 +3505,11 @@ func TestTagSessionViaStore_InvalidUUIDErrors(t *testing.T) {
 
 func TestTagSessionViaStore_EmptyAfterSanitizationErrors(t *testing.T) {
 	store := NewInMemorySessionStore()
-	// Only whitespace + zero-width chars => sanitizes to empty. Must error.
-	empty := "  ​‌  "
+	// Only whitespace + zero-width chars (U+200B, U+200C) => sanitizes
+	// to empty. Must error. Escape sequences are used here (instead of
+	// literal code points) so the source stays ASCII for linters that
+	// flag invisible characters.
+	empty := "  \u200b\u200c  "
 	if err := TagSessionViaStore(context.Background(), store, testUUID1, &empty); err == nil {
 		t.Fatal("expected error for tag that sanitizes to empty")
 	}
