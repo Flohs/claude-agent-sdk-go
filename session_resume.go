@@ -342,7 +342,7 @@ func writeJSONL(path string, entries []SessionStoreEntry) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	enc := json.NewEncoder(f)
 	// Default SetEscapeHTML(true) is fine — the CLI reads the JSONL with
@@ -571,12 +571,12 @@ func copyIfPresent(src, dst string) {
 	if err != nil {
 		return
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	_, _ = io.Copy(out, in)
 }
 
