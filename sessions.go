@@ -1940,3 +1940,232 @@ func GetSubagentMessagesFromStore(ctx context.Context, store SessionStore, sessi
 	filtered := filterTranscriptEntries(transcript)
 	return entriesToSessionMessages(filtered, opts.IncludeSystemMessages, opts.Limit, opts.Offset), nil
 }
+
+// ---------------------------------------------------------------------------
+// SessionStore-backed mutation helpers
+// ---------------------------------------------------------------------------
+
+// storeMutationProjectKey resolves the project_key for store-backed
+// mutators. If directory is empty, the current working directory is used
+// (matching the Python reference's project_key_for_directory default).
+func storeMutationProjectKey(directory ...string) string {
+	dir := ""
+	if len(directory) > 0 {
+		dir = directory[0]
+	}
+	return ProjectKeyForDirectory(dir)
+}
+
+// RenameSessionViaStore renames a session by appending a custom-title entry
+// to the target [SessionStore]. Store-backed counterpart to [RenameSession].
+//
+// The entry shape is identical to the filesystem mutator so a disk-backed
+// session and a store-backed session are interchangeable. Because the entry
+// is append-only, repeated calls are safe; readers pick up the most recent
+// custom-title from the tail.
+//
+// title is stripped of leading/trailing whitespace and must be non-empty
+// after stripping. sessionID must be a valid UUID.
+//
+// The optional directory argument selects the project the session lives
+// under and is used to compute the project_key via [ProjectKeyForDirectory]
+// (defaults to the current working directory when omitted).
+func RenameSessionViaStore(ctx context.Context, store SessionStore, sessionID, title string, directory ...string) error {
+	if store == nil {
+		return fmt.Errorf("session store is nil")
+	}
+	if !isValidUUID(sessionID) {
+		return fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+	trimmedTitle := strings.TrimSpace(title)
+	if trimmedTitle == "" {
+		return fmt.Errorf("title cannot be empty or whitespace-only")
+	}
+	projectKey := storeMutationProjectKey(directory...)
+	entry := SessionStoreEntry{
+		"type":        "custom-title",
+		"customTitle": trimmedTitle,
+		"sessionId":   sessionID,
+	}
+	return store.Append(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionID}, []SessionStoreEntry{entry})
+}
+
+// TagSessionViaStore tags a session by appending a tag entry to the target
+// [SessionStore]. Store-backed counterpart to [TagSession].
+//
+// Pass a nil tag to clear the tag (appends an empty-string tag entry which
+// the list helpers treat as cleared). When non-nil, the tag is Unicode
+// sanitized via the same helper used by [TagSession] and must remain
+// non-empty after sanitization and whitespace trimming.
+//
+// The entry shape mirrors [TagSession] exactly so disk and store paths are
+// interchangeable. sessionID must be a valid UUID.
+//
+// The optional directory argument selects the project the session lives
+// under and is used to compute the project_key via [ProjectKeyForDirectory]
+// (defaults to the current working directory when omitted).
+func TagSessionViaStore(ctx context.Context, store SessionStore, sessionID string, tag *string, directory ...string) error {
+	if store == nil {
+		return fmt.Errorf("session store is nil")
+	}
+	if !isValidUUID(sessionID) {
+		return fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+	sanitized := ""
+	if tag != nil {
+		sanitized = sanitizeTag(*tag)
+		if sanitized == "" {
+			return fmt.Errorf("tag cannot be empty after sanitization (use nil to clear)")
+		}
+	}
+	projectKey := storeMutationProjectKey(directory...)
+	entry := SessionStoreEntry{
+		"type":      "tag",
+		"tag":       sanitized,
+		"sessionId": sessionID,
+	}
+	return store.Append(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionID}, []SessionStoreEntry{entry})
+}
+
+// DeleteSessionViaStore deletes a session from a [SessionStore]. Store-backed
+// counterpart to [DeleteSession].
+//
+// Requires store to implement [SessionStoreDeleter]; returns an error
+// otherwise. When store also implements [SessionStoreSubkeys], every listed
+// subkey (subagent transcript, etc.) is deleted in addition to the main
+// transcript. Adapters whose [SessionStoreDeleter.Delete] already cascades
+// (e.g. [InMemorySessionStore]) need not also implement
+// [SessionStoreSubkeys] for cascade to work — the main delete alone will
+// wipe them.
+//
+// If the main delete succeeds but one or more subkey deletes fail, the
+// returned error aggregates the subkey failures; the session is left in
+// whatever partial state the adapter produced. Callers that require
+// transactional semantics should implement them in the adapter.
+//
+// sessionID must be a valid UUID. The optional directory argument selects
+// the project the session lives under and is used to compute the
+// project_key via [ProjectKeyForDirectory] (defaults to the current working
+// directory when omitted).
+func DeleteSessionViaStore(ctx context.Context, store SessionStore, sessionID string, directory ...string) error {
+	if store == nil {
+		return fmt.Errorf("session store is nil")
+	}
+	if !isValidUUID(sessionID) {
+		return fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+	deleter, ok := store.(SessionStoreDeleter)
+	if !ok {
+		return fmt.Errorf("session store does not implement SessionStoreDeleter -- cannot delete sessions")
+	}
+	projectKey := storeMutationProjectKey(directory...)
+
+	// Discover subkeys up front (before main delete) so adapters that wipe
+	// subkey indexes during the main delete still expose the list.
+	var subpaths []string
+	if sub, ok := store.(SessionStoreSubkeys); ok {
+		discovered, err := sub.ListSubkeys(ctx, SessionListSubkeysKey{ProjectKey: projectKey, SessionID: sessionID})
+		if err != nil {
+			return fmt.Errorf("failed to list subkeys for cascade delete: %w", err)
+		}
+		subpaths = discovered
+	}
+
+	if err := deleter.Delete(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionID}); err != nil {
+		return fmt.Errorf("failed to delete session %s: %w", sessionID, err)
+	}
+
+	// Best-effort subkey cascade — collect individual failures and return
+	// a combined error at the end so a single bad subpath does not mask
+	// the others (and does not roll back the main delete).
+	var subErrs []string
+	for _, subpath := range subpaths {
+		if subpath == "" {
+			continue
+		}
+		if err := deleter.Delete(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionID, Subpath: subpath}); err != nil {
+			subErrs = append(subErrs, fmt.Sprintf("%s: %v", subpath, err))
+		}
+	}
+	if len(subErrs) > 0 {
+		return fmt.Errorf("session %s main-transcript deleted but %d subkey delete(s) failed: %s",
+			sessionID, len(subErrs), strings.Join(subErrs, "; "))
+	}
+	return nil
+}
+
+// ForkSessionViaStore creates a copy of a session's transcript under a new
+// session ID in a [SessionStore]. Store-backed counterpart to [ForkSession].
+//
+// Every entry from the source session is loaded, deep-copied, and its
+// "sessionId" field is rewritten to newSessionID. The rewritten entries are
+// then appended under a fresh [SessionKey] that shares the source's
+// project_key. Source entries are not mutated.
+//
+// Both sessionID and newSessionID must be valid UUIDs. Returns an error if
+// the source session has no entries. The optional directory argument
+// selects the project both sessions live under and is used to compute the
+// project_key via [ProjectKeyForDirectory] (defaults to the current working
+// directory when omitted).
+//
+// Only the main transcript is copied — subagent and other sub-streams
+// under the source [SessionKey] are not cloned. Callers that need those
+// cloned should iterate via [SessionStoreSubkeys] and copy each subkey
+// explicitly.
+func ForkSessionViaStore(ctx context.Context, store SessionStore, sessionID, newSessionID string, directory ...string) error {
+	if store == nil {
+		return fmt.Errorf("session store is nil")
+	}
+	if !isValidUUID(sessionID) {
+		return fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+	if !isValidUUID(newSessionID) {
+		return fmt.Errorf("invalid new session ID: %s", newSessionID)
+	}
+	projectKey := storeMutationProjectKey(directory...)
+
+	srcEntries, err := store.Load(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionID})
+	if err != nil {
+		return fmt.Errorf("failed to load source session %s: %w", sessionID, err)
+	}
+	if len(srcEntries) == 0 {
+		return fmt.Errorf("source session %s has no entries to fork", sessionID)
+	}
+
+	forked, err := deepCopyEntriesRewritingSessionID(srcEntries, newSessionID)
+	if err != nil {
+		return fmt.Errorf("failed to copy source entries: %w", err)
+	}
+
+	return store.Append(ctx, SessionKey{ProjectKey: projectKey, SessionID: newSessionID}, forked)
+}
+
+// deepCopyEntriesRewritingSessionID returns a deep copy of entries with
+// every "sessionId" field rewritten to newSessionID. Uses a JSON round-trip
+// to ensure no map or slice aliasing between source and destination,
+// matching the spec's "don't mutate source entries" requirement for both
+// top-level and nested values.
+func deepCopyEntriesRewritingSessionID(entries []SessionStoreEntry, newSessionID string) ([]SessionStoreEntry, error) {
+	out := make([]SessionStoreEntry, 0, len(entries))
+	for _, e := range entries {
+		if e == nil {
+			continue
+		}
+		data, err := json.Marshal(e)
+		if err != nil {
+			return nil, fmt.Errorf("marshal entry: %w", err)
+		}
+		var clone SessionStoreEntry
+		if err := json.Unmarshal(data, &clone); err != nil {
+			return nil, fmt.Errorf("unmarshal entry: %w", err)
+		}
+		// Only rewrite when the source entry had a sessionId at all —
+		// avoids synthesizing the field onto metadata entries that did
+		// not carry it (e.g. type=summary without sessionId).
+		if _, ok := clone["sessionId"]; ok {
+			clone["sessionId"] = newSessionID
+		}
+		out = append(out, clone)
+	}
+	return out, nil
+}
