@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // Client provides bidirectional, interactive conversations with Claude Code.
@@ -15,6 +16,11 @@ type Client struct {
 	options   *Options
 	transport Transport
 	q         *query
+	// resumeCleanup removes the ephemeral CLAUDE_CONFIG_DIR created by
+	// materializeResumeSession when Options.SessionStore is combined with
+	// Resume/ContinueConversation. Nil when no materialization happened.
+	// Invoked once on Close (and before returning from Connect on error).
+	resumeCleanup func()
 }
 
 // NewClient creates a new Claude SDK client.
@@ -50,13 +56,40 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		return err
 	}
 
+	// If the caller paired a SessionStore with Resume/ContinueConversation,
+	// materialize the requested session from the store into an ephemeral
+	// CLAUDE_CONFIG_DIR before spawning the CLI. The CLI then resolves
+	// --resume against that temp dir via its normal on-disk path. Cleanup
+	// happens on teardown (Close) with Windows-safe retries.
+	materialized, err := materializeResumeSession(ctx, &configuredOpts)
+	if err != nil {
+		return err
+	}
+	// projectsDir passed to the mirror batcher must match where the CLI
+	// writes its JSONL. When we've redirected CLAUDE_CONFIG_DIR, the
+	// CLI's projects dir lives under the temp dir.
+	projectsDir := getProjectsDir()
+	if materialized != nil {
+		configuredOpts = *applyMaterializedOptions(&configuredOpts, materialized)
+		projectsDir = filepath.Join(materialized.configDir, "projects")
+		c.resumeCleanup = materialized.cleanup
+	}
+
 	// Create transport
 	transport, err := NewSubprocessTransport(&configuredOpts)
 	if err != nil {
+		if c.resumeCleanup != nil {
+			c.resumeCleanup()
+			c.resumeCleanup = nil
+		}
 		return err
 	}
 
 	if err := transport.Connect(ctx); err != nil {
+		if c.resumeCleanup != nil {
+			c.resumeCleanup()
+			c.resumeCleanup = nil
+		}
 		return err
 	}
 	c.transport = transport
@@ -79,7 +112,7 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		agents:                 configuredOpts.Agents,
 		excludeDynamicSections: excludeDynamic,
 		sessionStore:           configuredOpts.SessionStore,
-		projectsDir:            getProjectsDir(),
+		projectsDir:            projectsDir,
 		loadTimeoutMs:          configuredOpts.LoadTimeoutMs,
 		stderr:                 configuredOpts.Stderr,
 	})
@@ -376,17 +409,22 @@ func (c *Client) GetServerInfo() map[string]any {
 }
 
 // Close disconnects from Claude Code and cleans up resources.
+//
+// When Connect materialized a SessionStore-backed session into an ephemeral
+// CLAUDE_CONFIG_DIR, Close also removes that temp dir (Windows-safe retries).
 func (c *Client) Close() error {
+	var err error
 	if c.q != nil {
-		err := c.q.close()
+		err = c.q.close()
 		c.q = nil
 		c.transport = nil
-		return err
-	}
-	if c.transport != nil {
-		err := c.transport.Close()
+	} else if c.transport != nil {
+		err = c.transport.Close()
 		c.transport = nil
-		return err
 	}
-	return nil
+	if c.resumeCleanup != nil {
+		c.resumeCleanup()
+		c.resumeCleanup = nil
+	}
+	return err
 }
