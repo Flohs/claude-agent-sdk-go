@@ -353,6 +353,27 @@ func TestParseMessage_ResultMessage(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_TerminalReason(t *testing.T) {
+	data := map[string]any{
+		"type":            "result",
+		"subtype":         "success",
+		"duration_ms":     1000,
+		"duration_api_ms": 900,
+		"is_error":        false,
+		"num_turns":       1,
+		"session_id":      "s",
+		"terminal_reason": "max_turns",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := msg.(*ResultMessage)
+	if result.TerminalReason != "max_turns" {
+		t.Errorf("TerminalReason = %q, want max_turns", result.TerminalReason)
+	}
+}
+
 func TestParseMessage_ResultMessage_StopReasonPresent(t *testing.T) {
 	data := map[string]any{
 		"type":        "result",

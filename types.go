@@ -210,6 +210,10 @@ type ResultMessage struct {
 	NumTurns         int            `json:"num_turns"`
 	SessionID        string         `json:"session_id"`
 	StopReason       string         `json:"stop_reason,omitempty"`
+	// TerminalReason describes why the session terminated (e.g. "completed",
+	// "aborted_tools", "max_turns", "blocking_limit"). Empty when not
+	// provided by the CLI.
+	TerminalReason   string         `json:"terminal_reason,omitempty"`
 	TotalCostUSD     *float64       `json:"total_cost_usd,omitempty"`
 	Usage            map[string]any `json:"usage,omitempty"`
 	Result           string         `json:"result,omitempty"`

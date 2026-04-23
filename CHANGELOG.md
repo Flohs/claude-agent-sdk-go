@@ -4,6 +4,7 @@
 
 ### Added
 
+- `TerminalReason` field on `ResultMessage` (e.g. `completed`, `aborted_tools`, `max_turns`, `blocking_limit`). Previously accessible only via `RawData`. Port of TypeScript SDK v0.2.91. ([#125](https://github.com/Flohs/claude-agent-sdk-go/issues/125))
 - Typed `MessageID`, `SessionID`, `UUID`, and `StopReason` fields on `AssistantMessage`. Previously accessible only via `RawData`. Port of Python SDK PRs #619/#685/#718. ([#124](https://github.com/Flohs/claude-agent-sdk-go/issues/124))
 - `FailIfUnavailable` field on `SandboxSettings`. When set alongside `Enabled: true`, the CLI emits an error result instead of silently running commands unsandboxed on systems without bwrap/Seatbelt. Port of TypeScript SDK v0.2.91. ([#117](https://github.com/Flohs/claude-agent-sdk-go/issues/117))
 - `Display` field on `ThinkingConfigAdaptive` and `ThinkingConfigEnabled`, plus `ThinkingDisplay` type with `ThinkingDisplaySummarized`/`ThinkingDisplayOmitted` constants. Forwarded as `--thinking-display` to let callers override Opus 4.7's default `omitted` thinking text. Port of Python SDK v0.1.65. ([#116](https://github.com/Flohs/claude-agent-sdk-go/issues/116))
