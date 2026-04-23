@@ -4,6 +4,7 @@
 
 ### Added
 
+- `Options.Title` field that sets the session title and skips auto-generation, forwarded as `--title` to the CLI. Port of TypeScript SDK v0.2.113. ([#111](https://github.com/Flohs/claude-agent-sdk-go/issues/111))
 - `ExcludeDynamicSections` field on `PresetPrompt` for cross-user prompt caching. When set, the SDK sends `excludeDynamicSections` in the initialize request to tell Claude Code to omit user-specific dynamic sections from the system prompt. ([#98](https://github.com/Flohs/claude-agent-sdk-go/issues/98))
 
 ### Changed

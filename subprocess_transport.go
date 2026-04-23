@@ -419,6 +419,10 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--session-id", opts.SessionID)
 	}
 
+	if opts.Title != "" {
+		cmd = append(cmd, "--title", opts.Title)
+	}
+
 	// Settings and sandbox
 	settingsValue := t.buildSettingsValue()
 	if settingsValue != "" {

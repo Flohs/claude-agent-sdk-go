@@ -158,6 +158,8 @@ type Options struct {
 	Resume string
 	// SessionID specifies a custom session ID for the conversation.
 	SessionID string
+	// Title sets the session title and skips auto-generation.
+	Title string
 	// MaxTurns limits the number of conversation turns.
 	MaxTurns *int
 	// MaxBudgetUSD limits the total cost.
