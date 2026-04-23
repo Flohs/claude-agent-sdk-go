@@ -4,6 +4,7 @@
 
 ### Added
 
+- `SessionStore` interface + 4 optional extension interfaces (`SessionStoreLister`, `SessionStoreSummarizer`, `SessionStoreDeleter`, `SessionStoreSubkeys`), `InMemorySessionStore` reference adapter, and foundational types/helpers (`SessionKey`, `SessionStoreEntry`, `SessionStoreListEntry`, `SessionSummaryEntry`, `SessionListSubkeysKey`, `ProjectKeyForDirectory`, `FilePathToSessionKey`, `FoldSessionSummary`). Foundation for SessionStore support (umbrella #110). Port of Python SDK v0.1.64 (PR #837). No runtime effect yet — wiring lands in Sub B. ([#152](https://github.com/Flohs/claude-agent-sdk-go/issues/152))
 - `examples/skills` demonstrating the top-level `Options.Skills` shortcut (`"all"`, named list, and mixing with explicit `AllowedTools` / `SettingSources`). ([#150](https://github.com/Flohs/claude-agent-sdk-go/issues/150))
 - `examples/hooks` extended with a `lifecycleEventsExample` that wires up the new `HookEventTaskCompleted` and `HookEventConfigChange` hooks. ([#150](https://github.com/Flohs/claude-agent-sdk-go/issues/150))
 - `Options.TraceParent` and `Options.TraceState` fields for W3C trace context propagation to the CLI subprocess (forwarded as `TRACEPARENT` / `TRACESTATE` env vars). OpenTelemetry users can inject the active span context; when unset, externally-set trace env vars still flow through the inherited environment. Port of Python SDK v0.1.60 / PR #821 and TypeScript SDK v0.2.113. ([#129](https://github.com/Flohs/claude-agent-sdk-go/issues/129))
