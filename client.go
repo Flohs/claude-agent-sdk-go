@@ -43,6 +43,13 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		configuredOpts.PermissionPromptToolName = "stdio"
 	}
 
+	// Pre-flight SessionStore validation — fail fast on mutually-exclusive
+	// combinations (e.g. SessionStore + EnableFileCheckpointing) instead of
+	// letting a misconfiguration surface mid-session.
+	if err := validateSessionStoreOptions(&configuredOpts); err != nil {
+		return err
+	}
+
 	// Create transport
 	transport, err := NewSubprocessTransport(&configuredOpts)
 	if err != nil {
@@ -71,6 +78,10 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		mcpServers:             sdkServers,
 		agents:                 configuredOpts.Agents,
 		excludeDynamicSections: excludeDynamic,
+		sessionStore:           configuredOpts.SessionStore,
+		projectsDir:            getProjectsDir(),
+		loadTimeoutMs:          configuredOpts.LoadTimeoutMs,
+		stderr:                 configuredOpts.Stderr,
 	})
 
 	c.q.start()

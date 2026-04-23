@@ -529,6 +529,10 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--fork-session")
 	}
 
+	if opts.SessionStore != nil {
+		cmd = append(cmd, "--session-mirror")
+	}
+
 	// Setting sources
 	if effectiveSettingSources != nil {
 		sources := make([]string, len(effectiveSettingSources))

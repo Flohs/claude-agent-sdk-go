@@ -588,3 +588,23 @@ func TestBuildCommand_SettingSources(t *testing.T) {
 		t.Error("--setting-sources flag not found")
 	})
 }
+
+func TestBuildCommand_SessionMirrorFlag(t *testing.T) {
+	t.Run("absent when SessionStore is nil", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{},
+		}
+		cmd := transport.buildCommand()
+		assertNotContainsFlag(t, cmd, "--session-mirror")
+	})
+
+	t.Run("present when SessionStore is set", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{SessionStore: NewInMemorySessionStore()},
+		}
+		cmd := transport.buildCommand()
+		assertContainsFlag(t, cmd, "--session-mirror")
+	})
+}

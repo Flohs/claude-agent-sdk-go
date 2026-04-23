@@ -159,6 +159,22 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Summary:       stringField(data, "summary"),
 		}, nil
 
+	case "mirror_error":
+		msg := &MirrorErrorMessage{
+			SystemMessage: base,
+			Error:         stringField(data, "error"),
+			UUID:          stringField(data, "uuid"),
+			SessionID:     stringField(data, "session_id"),
+		}
+		if keyMap, ok := data["key"].(map[string]any); ok {
+			msg.Key = &SessionKey{
+				ProjectKey: stringField(keyMap, "project_key"),
+				SessionID:  stringField(keyMap, "session_id"),
+				Subpath:    stringField(keyMap, "subpath"),
+			}
+		}
+		return msg, nil
+
 	case "task_notification":
 		var usage *TaskUsage
 		if u := data["usage"]; u != nil {

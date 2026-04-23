@@ -237,6 +237,24 @@ type TaskNotificationMessage struct {
 	Usage      *TaskUsage             `json:"usage,omitempty"`
 }
 
+// MirrorErrorMessage is an SDK-synthesized system message emitted when the
+// transcript mirror batcher exhausts its retry budget for a pending
+// [SessionStore.Append]. It never originates from the CLI — the SDK injects
+// it into the inbound message stream so callers can react to mirror
+// failures through the normal [Client.ReceiveMessages] channel.
+//
+// Key identifies the transcript stream that failed; Error is the
+// underlying adapter error (or a timeout sentinel); UUID is a fresh
+// identifier the caller can use for correlation; SessionID duplicates
+// Key.SessionID for parity with other typed system messages.
+type MirrorErrorMessage struct {
+	SystemMessage
+	Key       *SessionKey `json:"key,omitempty"`
+	Error     string      `json:"error"`
+	UUID      string      `json:"uuid,omitempty"`
+	SessionID string      `json:"session_id,omitempty"`
+}
+
 // ResultMessage contains cost and usage information for a completed query.
 type ResultMessage struct {
 	Subtype       string `json:"subtype"`
