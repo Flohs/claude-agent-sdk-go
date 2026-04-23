@@ -4,6 +4,8 @@
 
 ### Added
 
+- `examples/skills` demonstrating the top-level `Options.Skills` shortcut (`"all"`, named list, and mixing with explicit `AllowedTools` / `SettingSources`). ([#150](https://github.com/Flohs/claude-agent-sdk-go/issues/150))
+- `examples/hooks` extended with a `lifecycleEventsExample` that wires up the new `HookEventTaskCompleted` and `HookEventConfigChange` hooks. ([#150](https://github.com/Flohs/claude-agent-sdk-go/issues/150))
 - `Options.TraceParent` and `Options.TraceState` fields for W3C trace context propagation to the CLI subprocess (forwarded as `TRACEPARENT` / `TRACESTATE` env vars). OpenTelemetry users can inject the active span context; when unset, externally-set trace env vars still flow through the inherited environment. Port of Python SDK v0.1.60 / PR #821 and TypeScript SDK v0.2.113. ([#129](https://github.com/Flohs/claude-agent-sdk-go/issues/129))
 - `ListSubagents(sessionID, opts)` and `GetSubagentMessages(sessionID, agentID, opts)` session helpers for reading subagent transcripts from the sibling `{session_id}/subagents/` directory (supports nested layouts such as `workflows/<runId>/`). Port of Python SDK v0.1.60 / PR #825. ([#126](https://github.com/Flohs/claude-agent-sdk-go/issues/126))
 - `IncludeSystemMessages` field on `GetSessionMessagesOptions`. When set, system-subtype transcript entries (task notifications, hook events, etc.) are included in the returned slice. Port of TypeScript SDK v0.2.89. ([#127](https://github.com/Flohs/claude-agent-sdk-go/issues/127))
@@ -33,6 +35,7 @@
 ### Fixed
 
 - Assistant messages containing server-side tool blocks (`web_search`, `web_fetch`, `advisor`, etc.) previously had those blocks silently dropped by the content parser, which could produce `AssistantMessage{Content: []}` for messages that only carried server-tool blocks. The parser now emits typed `ServerToolUseBlock` / `ServerToolResultBlock` blocks. ([#109](https://github.com/Flohs/claude-agent-sdk-go/issues/109))
+- Test helper `buildTestEnv` was out of sync with `Connect()`'s env-building logic after the trace-propagation change. The helper now mirrors the `TRACEPARENT` / `TRACESTATE` forwarding and a new `TestConnectEnv_TraceContext` covers all three cases (unset, TraceParent only, both headers). Also adds `TestParseMessage_TaskProgress_Summary` for the `Summary` field introduced with `AgentProgressSummaries`. ([#150](https://github.com/Flohs/claude-agent-sdk-go/issues/150))
 
 - `ThinkingConfigAdaptive` and `ThinkingConfigDisabled` now correctly map to `--thinking adaptive` / `--thinking disabled` CLI flags instead of incorrectly using `--max-thinking-tokens`. `ThinkingConfigEnabled` and the deprecated `MaxThinkingTokens` field continue to use `--max-thinking-tokens`. ([#99](https://github.com/Flohs/claude-agent-sdk-go/issues/99))
 

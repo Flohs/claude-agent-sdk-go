@@ -263,6 +263,12 @@ func buildTestEnv(opts *Options) []string {
 	if opts.EnableFileCheckpointing {
 		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
 	}
+	if opts.TraceParent != "" {
+		env = append(env, "TRACEPARENT="+opts.TraceParent)
+	}
+	if opts.TraceState != "" {
+		env = append(env, "TRACESTATE="+opts.TraceState)
+	}
 	return env
 }
 
@@ -275,6 +281,42 @@ func assertEnvNotContainsKey(t *testing.T, env []string, key string) {
 			return
 		}
 	}
+}
+
+func assertEnvContains(t *testing.T, env []string, key, value string) {
+	t.Helper()
+	target := key + "=" + value
+	for _, e := range env {
+		if e == target {
+			return
+		}
+	}
+	t.Errorf("env missing %s", target)
+}
+
+func TestConnectEnv_TraceContext(t *testing.T) {
+	t.Run("unset omits both env vars", func(t *testing.T) {
+		env := buildTestEnv(&Options{})
+		assertEnvNotContainsKey(t, env, "TRACEPARENT")
+		assertEnvNotContainsKey(t, env, "TRACESTATE")
+	})
+
+	t.Run("TraceParent only", func(t *testing.T) {
+		env := buildTestEnv(&Options{
+			TraceParent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+		})
+		assertEnvContains(t, env, "TRACEPARENT", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")
+		assertEnvNotContainsKey(t, env, "TRACESTATE")
+	})
+
+	t.Run("TraceParent and TraceState", func(t *testing.T) {
+		env := buildTestEnv(&Options{
+			TraceParent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+			TraceState:  "vendor1=value1,vendor2=value2",
+		})
+		assertEnvContains(t, env, "TRACEPARENT", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")
+		assertEnvContains(t, env, "TRACESTATE", "vendor1=value1,vendor2=value2")
+	})
 }
 
 func TestCompareVersions(t *testing.T) {

@@ -366,6 +366,61 @@ func TestParseMessage_TaskStarted(t *testing.T) {
 	}
 }
 
+func TestParseMessage_TaskProgress_Summary(t *testing.T) {
+	data := map[string]any{
+		"type":        "system",
+		"subtype":     "task_progress",
+		"task_id":     "t1",
+		"description": "Reading files",
+		"usage": map[string]any{
+			"total_tokens": float64(1234),
+			"tool_uses":    float64(5),
+			"duration_ms":  float64(4200),
+		},
+		"uuid":           "u1",
+		"session_id":     "s1",
+		"last_tool_name": "Read",
+		"summary":        "Inspecting the transport layer to diagnose the stdin close race.",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	progress, ok := msg.(*TaskProgressMessage)
+	if !ok {
+		t.Fatalf("expected *TaskProgressMessage, got %T", msg)
+	}
+	if progress.Summary != "Inspecting the transport layer to diagnose the stdin close race." {
+		t.Errorf("Summary = %q, want the full summary", progress.Summary)
+	}
+	if progress.LastToolName != "Read" {
+		t.Errorf("LastToolName = %q, want Read", progress.LastToolName)
+	}
+	if progress.Usage.TotalTokens != 1234 {
+		t.Errorf("Usage.TotalTokens = %d, want 1234", progress.Usage.TotalTokens)
+	}
+}
+
+func TestParseMessage_TaskProgress_SummaryAbsent(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "task_progress",
+		"task_id":    "t1",
+		"uuid":       "u1",
+		"session_id": "s1",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	progress := msg.(*TaskProgressMessage)
+	if progress.Summary != "" {
+		t.Errorf("Summary = %q, want empty when absent", progress.Summary)
+	}
+}
+
 func TestParseMessage_ResultMessage(t *testing.T) {
 	cost := 0.05
 	data := map[string]any{
