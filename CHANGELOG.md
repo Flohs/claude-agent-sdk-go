@@ -4,6 +4,7 @@
 
 ### Added
 
+- `ServerToolUseBlock` and `ServerToolResultBlock` content block types and `ServerToolName` enum constants (`advisor`, `web_search`, `web_fetch`, `code_execution`, `bash_code_execution`, `text_editor_code_execution`, `tool_search_tool_regex`, `tool_search_tool_bm25`). Port of Python SDK v0.1.65 / PR #836. ([#109](https://github.com/Flohs/claude-agent-sdk-go/issues/109))
 - `Client.SeedReadState(ctx, entries)` method and `ReadStateEntry` type. Sends the `seed_read_state` control request to populate the CLI's `readFileState` with path/mtime pairs so Edit-style tools work across context compactions. Port of TypeScript SDK v0.2.83. ([#123](https://github.com/Flohs/claude-agent-sdk-go/issues/123))
 - `Client.StopAsyncMessage(ctx, uuid)` method that drops a queued user message by UUID before it reaches execution via the `cancel_async_message` control request. Port of TypeScript SDK v0.2.76. ([#122](https://github.com/Flohs/claude-agent-sdk-go/issues/122))
 - `Client.PromptSuggestion(ctx)` method that requests prompt suggestions based on the current conversation context. Port of TypeScript SDK v0.2.47. ([#121](https://github.com/Flohs/claude-agent-sdk-go/issues/121))
@@ -27,6 +28,8 @@
 - `DeleteSession` now also removes the sibling `{session_id}/` directory (where subagent transcripts live) on a best-effort basis, matching the Python SDK and TypeScript SDK. Failures removing the sibling directory are swallowed so the primary `.jsonl` delete still counts. Port of Python SDK [anthropics/claude-agent-sdk-python#805](https://github.com/anthropics/claude-agent-sdk-python/pull/805). ([#105](https://github.com/Flohs/claude-agent-sdk-go/issues/105))
 
 ### Fixed
+
+- Assistant messages containing server-side tool blocks (`web_search`, `web_fetch`, `advisor`, etc.) previously had those blocks silently dropped by the content parser, which could produce `AssistantMessage{Content: []}` for messages that only carried server-tool blocks. The parser now emits typed `ServerToolUseBlock` / `ServerToolResultBlock` blocks. ([#109](https://github.com/Flohs/claude-agent-sdk-go/issues/109))
 
 - `ThinkingConfigAdaptive` and `ThinkingConfigDisabled` now correctly map to `--thinking adaptive` / `--thinking disabled` CLI flags instead of incorrectly using `--max-thinking-tokens`. `ThinkingConfigEnabled` and the deprecated `MaxThinkingTokens` field continue to use `--max-thinking-tokens`. ([#99](https://github.com/Flohs/claude-agent-sdk-go/issues/99))
 

@@ -91,6 +91,43 @@ type ToolResultBlock struct {
 
 func (ToolResultBlock) contentBlockMarker() {}
 
+// ServerToolName names one of the server-side tools the API can invoke on
+// the model's behalf. Callers branch on Name to know which tool was used.
+type ServerToolName string
+
+const (
+	ServerToolAdvisor                 ServerToolName = "advisor"
+	ServerToolWebSearch               ServerToolName = "web_search"
+	ServerToolWebFetch                ServerToolName = "web_fetch"
+	ServerToolCodeExecution           ServerToolName = "code_execution"
+	ServerToolBashCodeExecution       ServerToolName = "bash_code_execution"
+	ServerToolTextEditorCodeExecution ServerToolName = "text_editor_code_execution"
+	ServerToolSearchRegex             ServerToolName = "tool_search_tool_regex"
+	ServerToolSearchBM25              ServerToolName = "tool_search_tool_bm25"
+)
+
+// ServerToolUseBlock represents a server-side tool use (e.g. advisor,
+// web_search, web_fetch). These tools execute server-side on the model's
+// behalf; the caller never needs to return a result.
+type ServerToolUseBlock struct {
+	ID    string         `json:"id"`
+	Name  ServerToolName `json:"name"`
+	Input map[string]any `json:"input"`
+}
+
+func (ServerToolUseBlock) contentBlockMarker() {}
+
+// ServerToolResultBlock represents the result of a server-side tool call
+// (e.g. advisor_tool_result). Content is the raw payload from the API;
+// callers that care about a specific tool's result schema can inspect
+// Content["type"].
+type ServerToolResultBlock struct {
+	ToolUseID string         `json:"tool_use_id"`
+	Content   map[string]any `json:"content,omitempty"`
+}
+
+func (ServerToolResultBlock) contentBlockMarker() {}
+
 // UserMessage represents a user message.
 type UserMessage struct {
 	Content          any            `json:"content"`                      // string | []ContentBlock
