@@ -328,6 +328,26 @@ func assertNotContainsFlag(t *testing.T, cmd []string, flag string) {
 	}
 }
 
+func TestBuildCommand_ManagedSettings(t *testing.T) {
+	t.Run("empty omits flag", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{},
+		}
+		cmd := transport.buildCommand()
+		assertNotContainsFlag(t, cmd, "--managed-settings")
+	})
+
+	t.Run("sets flag", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{ManagedSettings: `{"policy":true}`},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--managed-settings", `{"policy":true}`)
+	})
+}
+
 func TestBuildCommand_Title(t *testing.T) {
 	t.Run("empty title omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{

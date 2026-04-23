@@ -183,6 +183,9 @@ type Options struct {
 	CLIPath string
 	// Settings is a JSON string or file path for settings.
 	Settings string
+	// ManagedSettings is a JSON string of policy-tier settings forwarded to the
+	// spawned CLI in-memory. Honored below IT-controlled managed sources.
+	ManagedSettings string
 	// AddDirs adds additional directories.
 	AddDirs []string
 	// Env sets additional environment variables for the CLI process.
