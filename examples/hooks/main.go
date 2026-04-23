@@ -73,6 +73,40 @@ func addCustomInstructions(ctx context.Context, input claude.HookInput, toolUseI
 	}, nil
 }
 
+// logTaskCompletion fires when a Task-spawned sub-agent finishes.
+// Demonstrates the TaskCompleted hook event (TypeScript SDK v0.2.33, ported
+// to the Go SDK as HookEventTaskCompleted).
+func logTaskCompletion(ctx context.Context, input claude.HookInput, toolUseID string, hookCtx claude.HookContext) (claude.HookJSONOutput, error) {
+	typed, err := claude.ParseHookInput(input)
+	if err != nil {
+		return claude.HookJSONOutput{}, err
+	}
+	task, ok := typed.(*claude.TaskCompletedHookInput)
+	if !ok {
+		return claude.HookJSONOutput{}, nil
+	}
+	fmt.Printf("  [Hook] Task completed: task_id=%s agent_id=%s agent_type=%s\n",
+		task.TaskID, task.AgentID, task.AgentType)
+	return claude.HookJSONOutput{}, nil
+}
+
+// logConfigChange fires when session config (permission mode, model, …) changes.
+// Demonstrates the ConfigChange hook event (TypeScript SDK v0.2.49).
+func logConfigChange(ctx context.Context, input claude.HookInput, toolUseID string, hookCtx claude.HookContext) (claude.HookJSONOutput, error) {
+	typed, err := claude.ParseHookInput(input)
+	if err != nil {
+		return claude.HookJSONOutput{}, err
+	}
+	cfg, ok := typed.(*claude.ConfigChangeHookInput)
+	if !ok {
+		return claude.HookJSONOutput{}, nil
+	}
+	for k, v := range cfg.Changes {
+		fmt.Printf("  [Hook] Config change: %s -> %v\n", k, v)
+	}
+	return claude.HookJSONOutput{}, nil
+}
+
 // reviewToolOutput provides feedback after tool execution.
 func reviewToolOutput(ctx context.Context, input claude.HookInput, toolUseID string, hookCtx claude.HookContext) (claude.HookJSONOutput, error) {
 	toolResponse := fmt.Sprintf("%v", input["tool_response"])
@@ -160,6 +194,48 @@ func userPromptSubmitExample(ctx context.Context) {
 	fmt.Println()
 }
 
+// lifecycleEventsExample wires up TaskCompleted and ConfigChange hooks so
+// the user sees that the new hook events in the Go SDK are end-to-end usable.
+// These fire when Claude spawns a sub-agent via the Task tool or when the
+// session's runtime config changes (e.g. via Client.SetPermissionMode).
+func lifecycleEventsExample(ctx context.Context) {
+	fmt.Println("=== Lifecycle Events: TaskCompleted + ConfigChange ===")
+	fmt.Println("TaskCompleted fires when a Task-spawned sub-agent finishes.")
+	fmt.Println("ConfigChange fires on runtime config transitions.")
+
+	client := claude.NewClient(&claude.Options{
+		AllowedTools: []string{"Task"},
+		Hooks: map[claude.HookEvent][]claude.HookMatcher{
+			claude.HookEventTaskCompleted: {
+				{Hooks: []claude.HookCallback{logTaskCompletion}},
+			},
+			claude.HookEventConfigChange: {
+				{Hooks: []claude.HookCallback{logConfigChange}},
+			},
+		},
+	})
+
+	if err := client.Connect(ctx); err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Trigger a ConfigChange by switching the permission mode mid-session.
+	if err := client.SetPermissionMode(ctx, string(claude.PermissionModeAcceptEdits)); err != nil {
+		log.Println("SetPermissionMode error:", err)
+	}
+
+	// Ask Claude to spawn a Task so TaskCompleted has a chance to fire.
+	fmt.Println("User: Using the Task tool, spawn a tiny general-purpose subagent that says hello.")
+	if err := client.SendQuery(ctx, "Using the Task tool, spawn a tiny general-purpose subagent that says hello and returns."); err != nil {
+		log.Fatal(err)
+	}
+	for msg := range client.ReceiveResponse(ctx) {
+		displayMessage(msg)
+	}
+	fmt.Println()
+}
+
 func postToolUseExample(ctx context.Context) {
 	fmt.Println("=== PostToolUse Example ===")
 	fmt.Println("Shows how PostToolUse can provide feedback.")
@@ -196,4 +272,6 @@ func main() {
 	userPromptSubmitExample(ctx)
 	fmt.Println(strings.Repeat("-", 50))
 	postToolUseExample(ctx)
+	fmt.Println(strings.Repeat("-", 50))
+	lifecycleEventsExample(ctx)
 }
