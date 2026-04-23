@@ -549,17 +549,23 @@ func (t *SubprocessTransport) buildCommand() []string {
 	}
 
 	// Thinking config
+	var thinkingDisplay ThinkingDisplay
 	if opts.Thinking != nil {
 		switch tc := opts.Thinking.(type) {
 		case ThinkingConfigAdaptive:
 			cmd = append(cmd, "--thinking", "adaptive")
+			thinkingDisplay = tc.Display
 		case ThinkingConfigDisabled:
 			cmd = append(cmd, "--thinking", "disabled")
 		case ThinkingConfigEnabled:
 			cmd = append(cmd, "--max-thinking-tokens", strconv.Itoa(tc.BudgetTokens))
+			thinkingDisplay = tc.Display
 		}
 	} else if opts.MaxThinkingTokens != nil {
 		cmd = append(cmd, "--max-thinking-tokens", strconv.Itoa(*opts.MaxThinkingTokens))
+	}
+	if thinkingDisplay != "" {
+		cmd = append(cmd, "--thinking-display", string(thinkingDisplay))
 	}
 
 	if opts.Effort != "" {

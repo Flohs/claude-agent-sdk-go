@@ -84,14 +84,29 @@ type ThinkingConfig interface {
 	thinkingConfigMarker()
 }
 
+// ThinkingDisplay controls whether thinking text is shown. Opus 4.7 defaults
+// to "omitted"; callers can opt in to "summarized" to receive summarized
+// thinking text.
+type ThinkingDisplay string
+
+const (
+	ThinkingDisplaySummarized ThinkingDisplay = "summarized"
+	ThinkingDisplayOmitted    ThinkingDisplay = "omitted"
+)
+
 // ThinkingConfigAdaptive enables adaptive thinking.
-type ThinkingConfigAdaptive struct{}
+type ThinkingConfigAdaptive struct {
+	// Display overrides the default thinking display behavior.
+	Display ThinkingDisplay `json:"display,omitempty"`
+}
 
 func (ThinkingConfigAdaptive) thinkingConfigMarker() {}
 
 // ThinkingConfigEnabled enables thinking with a specific budget.
 type ThinkingConfigEnabled struct {
 	BudgetTokens int `json:"budget_tokens"`
+	// Display overrides the default thinking display behavior.
+	Display ThinkingDisplay `json:"display,omitempty"`
 }
 
 func (ThinkingConfigEnabled) thinkingConfigMarker() {}
