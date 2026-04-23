@@ -4,6 +4,7 @@
 
 ### Added
 
+- Top-level `Options.Skills` field for enabling skills on the main session without manually configuring `AllowedTools` and `SettingSources`. Accepts `"all"` for every discovered skill or `[]string` of named skills. When set, the SDK auto-injects `Skill` / `Skill(name)` entries into `AllowedTools` and defaults `SettingSources` to `[user, project]` if unset. Port of Python SDK v0.1.62. ([#113](https://github.com/Flohs/claude-agent-sdk-go/issues/113))
 - `Options.ManagedSettings` field for passing policy-tier settings to the spawned CLI in-memory, forwarded as `--managed-settings`. Honored below IT-controlled managed sources. Port of TypeScript SDK v0.2.118. ([#112](https://github.com/Flohs/claude-agent-sdk-go/issues/112))
 - `Options.Title` field that sets the session title and skips auto-generation, forwarded as `--title` to the CLI. Port of TypeScript SDK v0.2.113. ([#111](https://github.com/Flohs/claude-agent-sdk-go/issues/111))
 - `ExcludeDynamicSections` field on `PresetPrompt` for cross-user prompt caching. When set, the SDK sends `excludeDynamicSections` in the initialize request to tell Claude Code to omit user-specific dynamic sections from the system prompt. ([#98](https://github.com/Flohs/claude-agent-sdk-go/issues/98))

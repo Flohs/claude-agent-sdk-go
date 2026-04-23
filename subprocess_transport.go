@@ -304,6 +304,55 @@ func (t *SubprocessTransport) EndInput() error {
 	return nil
 }
 
+// applySkillsDefaults computes the effective AllowedTools and SettingSources
+// when Options.Skills is set. When Skills is "all", it injects the bare Skill
+// tool; when it is a []string, it injects Skill(name) for each entry. In either
+// case SettingSources defaults to [user, project] if unset so the CLI
+// discovers installed skills without the caller having to wire both options
+// manually. Returns copies — the original options are not mutated.
+func applySkillsDefaults(opts *Options) ([]string, []SettingSource) {
+	allowed := append([]string(nil), opts.AllowedTools...)
+	settingSources := opts.SettingSources
+
+	if opts.Skills == nil {
+		return allowed, settingSources
+	}
+
+	injected := false
+	switch s := opts.Skills.(type) {
+	case string:
+		if s == "all" {
+			if !stringSliceContains(allowed, "Skill") {
+				allowed = append(allowed, "Skill")
+			}
+			injected = true
+		}
+	case []string:
+		for _, name := range s {
+			pattern := "Skill(" + name + ")"
+			if !stringSliceContains(allowed, pattern) {
+				allowed = append(allowed, pattern)
+			}
+		}
+		injected = len(s) > 0
+	}
+
+	if injected && settingSources == nil {
+		settingSources = []SettingSource{SettingSourceUser, SettingSourceProject}
+	}
+
+	return allowed, settingSources
+}
+
+func stringSliceContains(s []string, target string) bool {
+	for _, v := range s {
+		if v == target {
+			return true
+		}
+	}
+	return false
+}
+
 func (t *SubprocessTransport) hasExtraArg(key string) bool {
 	if t.options.ExtraArgs == nil {
 		return false
@@ -363,8 +412,9 @@ func (t *SubprocessTransport) buildCommand() []string {
 		}
 	}
 
-	if len(opts.AllowedTools) > 0 {
-		cmd = append(cmd, "--allowedTools", strings.Join(opts.AllowedTools, ","))
+	effectiveAllowedTools, effectiveSettingSources := applySkillsDefaults(opts)
+	if len(effectiveAllowedTools) > 0 {
+		cmd = append(cmd, "--allowedTools", strings.Join(effectiveAllowedTools, ","))
 	}
 
 	if opts.MaxTurns != nil {
@@ -466,9 +516,9 @@ func (t *SubprocessTransport) buildCommand() []string {
 	}
 
 	// Setting sources
-	if opts.SettingSources != nil {
-		sources := make([]string, len(opts.SettingSources))
-		for i, s := range opts.SettingSources {
+	if effectiveSettingSources != nil {
+		sources := make([]string, len(effectiveSettingSources))
+		for i, s := range effectiveSettingSources {
 			sources[i] = string(s)
 		}
 		cmd = append(cmd, "--setting-sources", strings.Join(sources, ","))

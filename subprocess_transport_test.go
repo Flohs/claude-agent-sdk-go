@@ -328,6 +328,79 @@ func assertNotContainsFlag(t *testing.T, cmd []string, flag string) {
 	}
 }
 
+func TestBuildCommand_Skills(t *testing.T) {
+	t.Run("nil skills preserves user config", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				AllowedTools: []string{"Read"},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--allowedTools", "Read")
+		assertNotContainsFlag(t, cmd, "--setting-sources")
+	})
+
+	t.Run("skills all injects Skill tool and defaults setting sources", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{Skills: "all"},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--allowedTools", "Skill")
+		found := false
+		for i, a := range cmd {
+			if a == "--setting-sources" && i+1 < len(cmd) {
+				if !strings.Contains(cmd[i+1], "user") || !strings.Contains(cmd[i+1], "project") {
+					t.Errorf("expected user,project default, got %s", cmd[i+1])
+				}
+				found = true
+			}
+		}
+		if !found {
+			t.Error("expected --setting-sources to be defaulted when skills is set")
+		}
+	})
+
+	t.Run("skills list injects Skill(name) patterns", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{Skills: []string{"pdf-tools", "image-tools"}},
+		}
+		cmd := transport.buildCommand()
+		for i, a := range cmd {
+			if a == "--allowedTools" && i+1 < len(cmd) {
+				v := cmd[i+1]
+				if !strings.Contains(v, "Skill(pdf-tools)") || !strings.Contains(v, "Skill(image-tools)") {
+					t.Errorf("expected both Skill(name) patterns, got %s", v)
+				}
+				return
+			}
+		}
+		t.Error("--allowedTools not found")
+	})
+
+	t.Run("skills respects explicit setting sources", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Skills:         "all",
+				SettingSources: []SettingSource{SettingSourceLocal},
+			},
+		}
+		cmd := transport.buildCommand()
+		for i, a := range cmd {
+			if a == "--setting-sources" && i+1 < len(cmd) {
+				if cmd[i+1] != "local" {
+					t.Errorf("expected explicit setting-sources to be preserved, got %s", cmd[i+1])
+				}
+				return
+			}
+		}
+		t.Error("--setting-sources not found")
+	})
+}
+
 func TestBuildCommand_ManagedSettings(t *testing.T) {
 	t.Run("empty omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{
