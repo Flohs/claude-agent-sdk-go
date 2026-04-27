@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-04-27
+
+This release lands feature-parity with the Python and TypeScript SDKs across
+21 features audited against `anthropics/claude-agent-sdk-python` and
+`anthropics/claude-agent-sdk-typescript`, plus the **full SessionStore**
+adapter system (port of Python SDK v0.1.64 PR #837), one critical content-
+parser bugfix, and runnable examples. Total ~12,000 LOC across 27 merged
+PRs.
+
+> **SessionStore stability**: the SessionStore interface family
+> (`SessionStore`, `SessionStoreLister`, `SessionStoreSummarizer`,
+> `SessionStoreDeleter`, `SessionStoreSubkeys`), the `*FromStore` /
+> `*ViaStore` helpers, and `Options.SessionStore` ship under SemVer
+> compatibility but may evolve in subsequent minor releases based on
+> adapter-author feedback. Treat the API as load-bearing for embedders
+> and pin a minor version if you depend on its exact shape.
+
 ### Added
 
 - `examples/session_store/` demonstrating end-to-end SessionStore usage with `InMemorySessionStore`: mirror mode wiring, store-backed read/mutation helpers, `MirrorErrorMessage` handling, and `Client.CloseContext` deadline behavior. Plus `examples/session_store_filesystem/` showing how to write a custom adapter (pure-Go filesystem-backed implementation of `SessionStore` + `SessionStoreLister` + `SessionStoreDeleter` + `SessionStoreSubkeys`). ([#164](https://github.com/Flohs/claude-agent-sdk-go/issues/164))
@@ -47,7 +64,6 @@
 - Documentation: the `SessionStore.Append` GoDoc now states the context-honoring contract explicitly so adapters know that ignoring `ctx` causes a per-call goroutine leak in the SDK's mirror batcher. The `isSafeSubpath` GoDoc no longer claims a symlink-escape check that the lexical implementation does not perform. ([#162](https://github.com/Flohs/claude-agent-sdk-go/issues/162))
 - Assistant messages containing server-side tool blocks (`web_search`, `web_fetch`, `advisor`, etc.) previously had those blocks silently dropped by the content parser, which could produce `AssistantMessage{Content: []}` for messages that only carried server-tool blocks. The parser now emits typed `ServerToolUseBlock` / `ServerToolResultBlock` blocks. ([#109](https://github.com/Flohs/claude-agent-sdk-go/issues/109))
 - Test helper `buildTestEnv` was out of sync with `Connect()`'s env-building logic after the trace-propagation change. The helper now mirrors the `TRACEPARENT` / `TRACESTATE` forwarding and a new `TestConnectEnv_TraceContext` covers all three cases (unset, TraceParent only, both headers). Also adds `TestParseMessage_TaskProgress_Summary` for the `Summary` field introduced with `AgentProgressSummaries`. ([#150](https://github.com/Flohs/claude-agent-sdk-go/issues/150))
-
 - `ThinkingConfigAdaptive` and `ThinkingConfigDisabled` now correctly map to `--thinking adaptive` / `--thinking disabled` CLI flags instead of incorrectly using `--max-thinking-tokens`. `ThinkingConfigEnabled` and the deprecated `MaxThinkingTokens` field continue to use `--max-thinking-tokens`. ([#99](https://github.com/Flohs/claude-agent-sdk-go/issues/99))
 
 ## [1.5.0] - 2026-04-08
