@@ -442,8 +442,13 @@ func materializeSubkeys(ctx context.Context, store SessionStore, subkeyer Sessio
 }
 
 // isSafeSubpath reports whether subpath is safe to use as a path
-// component under sessionDir. Rejects empty, absolute, NUL-containing,
-// drive-prefixed, ".."-escaping, or symlink-escaping subpaths.
+// component under sessionDir. The check is purely lexical: rejects
+// empty, NUL-containing, absolute, drive-prefixed, UNC, and
+// dot/double-dot subpaths, then verifies the lexically-joined target
+// stays inside sessionDir via filepath.Rel. It does NOT call
+// filepath.EvalSymlinks — symlinks inside sessionDir that point
+// outward are not detected. In current SDK usage sessionDir is a
+// fresh tempdir with no symlinks, so a lexical check is sufficient.
 func isSafeSubpath(subpath, sessionDir string) bool {
 	if subpath == "" {
 		return false
@@ -596,17 +601,15 @@ func safeRemoveAll(path string) {
 	}
 	const retries = 3
 	const delay = 100 * time.Millisecond
-	var lastErr error
 	for i := 0; i < retries; i++ {
 		if err := os.RemoveAll(path); err == nil {
 			return
-		} else {
-			lastErr = err
 		}
 		time.Sleep(delay)
 	}
-	// Final best-effort sweep.
+	// Final best-effort sweep. Report the error from the final attempt
+	// (the most recent + actionable one), not a stale prior-retry error.
 	if err := os.RemoveAll(path); err != nil {
-		fmt.Fprintf(os.Stderr, "[SessionStore] warning: failed to remove temp dir %s: %v\n", path, lastErr)
+		fmt.Fprintf(os.Stderr, "[SessionStore] warning: failed to remove temp dir %s: %v\n", path, err)
 	}
 }

@@ -24,11 +24,18 @@ import (
 // type assertion.
 //
 // Implementations must be safe for concurrent use.
+//
+// Context contract: every method MUST honor ctx — return ctx.Err() promptly
+// when ctx is canceled or its deadline expires. The SDK wraps Append calls
+// from the mirror batcher in a per-call timeout (default 60s); an adapter
+// that ignores ctx will leak one goroutine per timed-out call. Adapters
+// performing network I/O should plumb ctx through their HTTP/RPC client.
 type SessionStore interface {
 	// Append adds entries to the transcript for key in insertion order.
+	// Must honor ctx (see context contract above).
 	Append(ctx context.Context, key SessionKey, entries []SessionStoreEntry) error
 	// Load returns every entry previously appended for key, in order.
-	// Returns (nil, nil) when the key is absent.
+	// Returns (nil, nil) when the key is absent. Must honor ctx.
 	Load(ctx context.Context, key SessionKey) ([]SessionStoreEntry, error)
 }
 

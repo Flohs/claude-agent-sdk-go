@@ -418,6 +418,21 @@ func getProjectsDir() string {
 	return filepath.Join(getClaudeConfigHomeDir(), "projects")
 }
 
+// resolveProjectsDir resolves the CLI's projects directory using the same
+// precedence the spawned subprocess will see: caller-provided
+// Options.Env["CLAUDE_CONFIG_DIR"] beats the parent process's
+// CLAUDE_CONFIG_DIR env, which beats the default $HOME/.claude. The
+// returned path is the `projects/` subdirectory under the resolved
+// CLAUDE_CONFIG_DIR. This must match where the CLI writes its JSONL —
+// otherwise the mirror frame-peel cannot map filePath back to a SessionKey
+// and silently drops every entry.
+func resolveProjectsDir(envOverride map[string]string) string {
+	if dir := envOverride["CLAUDE_CONFIG_DIR"]; dir != "" {
+		return filepath.Join(normalizeNFC(dir), "projects")
+	}
+	return getProjectsDir()
+}
+
 func getProjectDir(projectPath string) string {
 	return filepath.Join(getProjectsDir(), sanitizePath(projectPath))
 }
@@ -1945,15 +1960,19 @@ func GetSubagentMessagesFromStore(ctx context.Context, store SessionStore, sessi
 // SessionStore-backed mutation helpers
 // ---------------------------------------------------------------------------
 
-// storeMutationProjectKey resolves the project_key for store-backed
-// mutators. If directory is empty, the current working directory is used
-// (matching the Python reference's project_key_for_directory default).
-func storeMutationProjectKey(directory ...string) string {
-	dir := ""
-	if len(directory) > 0 {
-		dir = directory[0]
-	}
-	return ProjectKeyForDirectory(dir)
+// StoreMutationOptions configures the project scope for store-backed
+// session mutators ([RenameSessionViaStore], [TagSessionViaStore],
+// [DeleteSessionViaStore], [ForkSessionViaStore]).
+type StoreMutationOptions struct {
+	// Directory selects the project the session lives under. The
+	// project_key is computed via [ProjectKeyForDirectory]. When empty,
+	// the current working directory is used.
+	Directory string
+}
+
+// projectKey returns the resolved project_key for these options.
+func (o StoreMutationOptions) projectKey() string {
+	return ProjectKeyForDirectory(o.Directory)
 }
 
 // RenameSessionViaStore renames a session by appending a custom-title entry
@@ -1967,10 +1986,9 @@ func storeMutationProjectKey(directory ...string) string {
 // title is stripped of leading/trailing whitespace and must be non-empty
 // after stripping. sessionID must be a valid UUID.
 //
-// The optional directory argument selects the project the session lives
-// under and is used to compute the project_key via [ProjectKeyForDirectory]
-// (defaults to the current working directory when omitted).
-func RenameSessionViaStore(ctx context.Context, store SessionStore, sessionID, title string, directory ...string) error {
+// opts selects the project scope; pass StoreMutationOptions{} to default
+// to the current working directory.
+func RenameSessionViaStore(ctx context.Context, store SessionStore, sessionID, title string, opts StoreMutationOptions) error {
 	if store == nil {
 		return fmt.Errorf("session store is nil")
 	}
@@ -1981,7 +1999,7 @@ func RenameSessionViaStore(ctx context.Context, store SessionStore, sessionID, t
 	if trimmedTitle == "" {
 		return fmt.Errorf("title cannot be empty or whitespace-only")
 	}
-	projectKey := storeMutationProjectKey(directory...)
+	projectKey := opts.projectKey()
 	entry := SessionStoreEntry{
 		"type":        "custom-title",
 		"customTitle": trimmedTitle,
@@ -2001,10 +2019,9 @@ func RenameSessionViaStore(ctx context.Context, store SessionStore, sessionID, t
 // The entry shape mirrors [TagSession] exactly so disk and store paths are
 // interchangeable. sessionID must be a valid UUID.
 //
-// The optional directory argument selects the project the session lives
-// under and is used to compute the project_key via [ProjectKeyForDirectory]
-// (defaults to the current working directory when omitted).
-func TagSessionViaStore(ctx context.Context, store SessionStore, sessionID string, tag *string, directory ...string) error {
+// opts selects the project scope; pass StoreMutationOptions{} to default
+// to the current working directory.
+func TagSessionViaStore(ctx context.Context, store SessionStore, sessionID string, tag *string, opts StoreMutationOptions) error {
 	if store == nil {
 		return fmt.Errorf("session store is nil")
 	}
@@ -2018,7 +2035,7 @@ func TagSessionViaStore(ctx context.Context, store SessionStore, sessionID strin
 			return fmt.Errorf("tag cannot be empty after sanitization (use nil to clear)")
 		}
 	}
-	projectKey := storeMutationProjectKey(directory...)
+	projectKey := opts.projectKey()
 	entry := SessionStoreEntry{
 		"type":      "tag",
 		"tag":       sanitized,
@@ -2043,11 +2060,9 @@ func TagSessionViaStore(ctx context.Context, store SessionStore, sessionID strin
 // whatever partial state the adapter produced. Callers that require
 // transactional semantics should implement them in the adapter.
 //
-// sessionID must be a valid UUID. The optional directory argument selects
-// the project the session lives under and is used to compute the
-// project_key via [ProjectKeyForDirectory] (defaults to the current working
-// directory when omitted).
-func DeleteSessionViaStore(ctx context.Context, store SessionStore, sessionID string, directory ...string) error {
+// sessionID must be a valid UUID. opts selects the project scope; pass
+// StoreMutationOptions{} to default to the current working directory.
+func DeleteSessionViaStore(ctx context.Context, store SessionStore, sessionID string, opts StoreMutationOptions) error {
 	if store == nil {
 		return fmt.Errorf("session store is nil")
 	}
@@ -2058,7 +2073,7 @@ func DeleteSessionViaStore(ctx context.Context, store SessionStore, sessionID st
 	if !ok {
 		return fmt.Errorf("session store does not implement SessionStoreDeleter -- cannot delete sessions")
 	}
-	projectKey := storeMutationProjectKey(directory...)
+	projectKey := opts.projectKey()
 
 	// Discover subkeys up front (before main delete) so adapters that wipe
 	// subkey indexes during the main delete still expose the list.
@@ -2103,16 +2118,15 @@ func DeleteSessionViaStore(ctx context.Context, store SessionStore, sessionID st
 // project_key. Source entries are not mutated.
 //
 // Both sessionID and newSessionID must be valid UUIDs. Returns an error if
-// the source session has no entries. The optional directory argument
-// selects the project both sessions live under and is used to compute the
-// project_key via [ProjectKeyForDirectory] (defaults to the current working
-// directory when omitted).
+// the source session has no entries. opts selects the project scope for
+// both sessions; pass StoreMutationOptions{} to default to the current
+// working directory.
 //
 // Only the main transcript is copied — subagent and other sub-streams
 // under the source [SessionKey] are not cloned. Callers that need those
 // cloned should iterate via [SessionStoreSubkeys] and copy each subkey
 // explicitly.
-func ForkSessionViaStore(ctx context.Context, store SessionStore, sessionID, newSessionID string, directory ...string) error {
+func ForkSessionViaStore(ctx context.Context, store SessionStore, sessionID, newSessionID string, opts StoreMutationOptions) error {
 	if store == nil {
 		return fmt.Errorf("session store is nil")
 	}
@@ -2122,7 +2136,7 @@ func ForkSessionViaStore(ctx context.Context, store SessionStore, sessionID, new
 	if !isValidUUID(newSessionID) {
 		return fmt.Errorf("invalid new session ID: %s", newSessionID)
 	}
-	projectKey := storeMutationProjectKey(directory...)
+	projectKey := opts.projectKey()
 
 	srcEntries, err := store.Load(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionID})
 	if err != nil {

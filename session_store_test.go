@@ -340,6 +340,48 @@ func TestProjectKeyForDirectory_EmptyDefaultsToCwd(t *testing.T) {
 	}
 }
 
+func TestResolveProjectsDir(t *testing.T) {
+	// Establish a known parent-process CLAUDE_CONFIG_DIR via t.Setenv
+	// (not the user's real one) so the fallback is reproducible.
+	t.Setenv("CLAUDE_CONFIG_DIR", "/parent/.claude")
+
+	t.Run("no Options.Env falls back to parent env", func(t *testing.T) {
+		got := resolveProjectsDir(nil)
+		want := filepath.Join("/parent/.claude", "projects")
+		if got != want {
+			t.Errorf("resolveProjectsDir(nil) = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("Options.Env overrides parent env", func(t *testing.T) {
+		got := resolveProjectsDir(map[string]string{
+			"CLAUDE_CONFIG_DIR": "/from/opts",
+		})
+		want := filepath.Join("/from/opts", "projects")
+		if got != want {
+			t.Errorf("resolveProjectsDir(opts.Env) = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("empty value in Options.Env is ignored, falls back to parent", func(t *testing.T) {
+		got := resolveProjectsDir(map[string]string{
+			"CLAUDE_CONFIG_DIR": "",
+		})
+		want := filepath.Join("/parent/.claude", "projects")
+		if got != want {
+			t.Errorf("resolveProjectsDir(empty) = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("unrelated keys in Options.Env do not affect resolution", func(t *testing.T) {
+		got := resolveProjectsDir(map[string]string{"OTHER_VAR": "x"})
+		want := filepath.Join("/parent/.claude", "projects")
+		if got != want {
+			t.Errorf("resolveProjectsDir(other) = %q, want %q", got, want)
+		}
+	})
+}
+
 func TestFilePathToSessionKey_MainTranscript(t *testing.T) {
 	projectsDir := filepath.Join("home", "user", ".claude", "projects")
 	abs := filepath.Join(projectsDir, "-home-user-project", "550e8400-e29b-41d4-a716-446655440000.jsonl")
