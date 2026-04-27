@@ -183,12 +183,26 @@ func (b *transcriptMirrorBatcher) Flush(ctx context.Context) error {
 
 // Close performs a final drain flush with the same retry policy, then stops
 // the worker goroutine. It is safe to call Close more than once — subsequent
-// calls are no-ops. Close does not return until the goroutine has exited.
+// calls are no-ops. Close blocks indefinitely until the goroutine has
+// exited; for callers that need a deadline use [CloseContext].
 func (b *transcriptMirrorBatcher) Close() {
+	_ = b.CloseContext(context.Background())
+}
+
+// CloseContext is the cancellable variant of [Close]. When ctx is canceled
+// or its deadline expires before the worker drains, CloseContext returns
+// ctx.Err() but the worker goroutine is allowed to continue draining in
+// the background — pending mirror writes still get a chance to land. The
+// only thing aborted is the caller's wait. The doneCh is closed once the
+// worker actually exits, even after CloseContext has returned.
+//
+// Calling CloseContext after Close (or vice versa) is a no-op and returns
+// nil immediately.
+func (b *transcriptMirrorBatcher) CloseContext(ctx context.Context) error {
 	b.mu.Lock()
 	if b.closed {
 		b.mu.Unlock()
-		return
+		return nil
 	}
 	b.closed = true
 	b.mu.Unlock()
@@ -196,8 +210,22 @@ func (b *transcriptMirrorBatcher) Close() {
 	// Signal the worker to drain any remaining items and exit. The worker
 	// reads from flushRequests until it is closed.
 	close(b.flushRequests)
-	b.wg.Wait()
-	close(b.doneCh)
+
+	// Wait for the worker goroutine in a side goroutine so the caller's
+	// ctx can interrupt the wait without leaking the wg-watcher.
+	waitDone := make(chan struct{})
+	go func() {
+		b.wg.Wait()
+		close(b.doneCh)
+		close(waitDone)
+	}()
+
+	select {
+	case <-waitDone:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // Done returns a channel that is closed after Close has fully drained and

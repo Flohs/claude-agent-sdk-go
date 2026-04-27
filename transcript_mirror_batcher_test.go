@@ -335,6 +335,83 @@ func TestTranscriptMirrorBatcher_CloseDrainsPending(t *testing.T) {
 	b.Close()
 }
 
+// blockingStore is a SessionStore whose Append blocks forever (or until
+// the test signals release), used to exercise CloseContext deadline
+// behavior without depending on an unhealthy real adapter.
+type blockingStore struct {
+	release chan struct{}
+	called  atomic.Int64
+}
+
+func newBlockingStore() *blockingStore {
+	return &blockingStore{release: make(chan struct{})}
+}
+
+func (b *blockingStore) Append(ctx context.Context, key SessionKey, entries []SessionStoreEntry) error {
+	b.called.Add(1)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-b.release:
+		return nil
+	}
+}
+
+func (b *blockingStore) Load(ctx context.Context, key SessionKey) ([]SessionStoreEntry, error) {
+	return nil, nil
+}
+
+func TestTranscriptMirrorBatcher_CloseContext_RespectsDeadline(t *testing.T) {
+	projectsDir, pathFor := testProjectsDir(t)
+	store := newBlockingStore()
+	defer close(store.release) // unblock the worker so the test goroutine exits
+
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+
+	b.Enqueue(pathFor("cccccccc-cccc-cccc-cccc-cccccccccccc"), []SessionStoreEntry{
+		{"uuid": "z"},
+	})
+
+	// Tight deadline — Append blocks forever, so CloseContext must return
+	// ctx.Err() rather than waiting up to ~3 minutes.
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err := b.CloseContext(ctx)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected CloseContext to return ctx.Err() on deadline")
+	}
+	if elapsed > 500*time.Millisecond {
+		t.Fatalf("CloseContext blocked %v, should have honored deadline", elapsed)
+	}
+}
+
+func TestTranscriptMirrorBatcher_CloseContext_DrainsWhenAdapterHealthy(t *testing.T) {
+	projectsDir, pathFor := testProjectsDir(t)
+	store := &fakeStore{}
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+
+	b.Enqueue(pathFor("dddddddd-dddd-dddd-dddd-dddddddddddd"), []SessionStoreEntry{
+		{"uuid": "x"},
+	})
+
+	// Generous deadline — adapter is healthy so drain completes quickly.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := b.CloseContext(ctx); err != nil {
+		t.Fatalf("CloseContext: %v", err)
+	}
+
+	appends, _ := store.snapshot()
+	if len(appends) != 1 {
+		t.Fatalf("expected drain to complete, got %d Append calls", len(appends))
+	}
+}
+
 func TestTranscriptMirrorBatcher_UnresolvableFilePath_DropsWithWarning(t *testing.T) {
 	projectsDir, _ := testProjectsDir(t)
 	store := &fakeStore{}

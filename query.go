@@ -911,13 +911,22 @@ func (q *query) waitForResultAndEndInput() {
 }
 
 func (q *query) close() error {
+	return q.closeContext(context.Background())
+}
+
+// closeContext is the cancellable variant of close. The caller's ctx
+// bounds how long we wait for the mirror batcher to drain. When the
+// context fires, the batcher worker is left to finish in the background
+// and we proceed straight to subprocess teardown.
+func (q *query) closeContext(ctx context.Context) error {
 	q.closed = true
 	// Drain the batcher BEFORE cancelling the context / closing stdin so
 	// in-flight mirror writes have a chance to reach the store before the
-	// CLI subprocess is torn down. Close() performs a final Flush with the
-	// same retry policy and blocks until the worker goroutine has exited.
+	// CLI subprocess is torn down. CloseContext respects the caller's
+	// deadline; on timeout we abandon the wait but the worker keeps
+	// draining in the background.
 	if q.batcher != nil {
-		q.batcher.Close()
+		_ = q.batcher.CloseContext(ctx)
 	}
 	q.cancelFn()
 	q.wg.Wait()

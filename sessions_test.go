@@ -3395,7 +3395,7 @@ func TestRenameSessionViaStore_HappyPath(t *testing.T) {
 	projectKey := ProjectKeyForDirectory(dir)
 	seedSession(t, store, projectKey, testUUID1, "original")
 
-	if err := RenameSessionViaStore(context.Background(), store, testUUID1, "  My Session  ", dir); err != nil {
+	if err := RenameSessionViaStore(context.Background(), store, testUUID1, "  My Session  ", StoreMutationOptions{Directory: dir}); err != nil {
 		t.Fatalf("RenameSessionViaStore: %v", err)
 	}
 
@@ -3420,20 +3420,20 @@ func TestRenameSessionViaStore_HappyPath(t *testing.T) {
 
 func TestRenameSessionViaStore_EmptyTitleErrors(t *testing.T) {
 	store := NewInMemorySessionStore()
-	if err := RenameSessionViaStore(context.Background(), store, testUUID1, "   "); err == nil {
+	if err := RenameSessionViaStore(context.Background(), store, testUUID1, "   ", StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for whitespace-only title")
 	}
 }
 
 func TestRenameSessionViaStore_InvalidUUIDErrors(t *testing.T) {
 	store := NewInMemorySessionStore()
-	if err := RenameSessionViaStore(context.Background(), store, "not-a-uuid", "title"); err == nil {
+	if err := RenameSessionViaStore(context.Background(), store, "not-a-uuid", "title", StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for invalid UUID")
 	}
 }
 
 func TestRenameSessionViaStore_NilStoreErrors(t *testing.T) {
-	if err := RenameSessionViaStore(context.Background(), nil, testUUID1, "title"); err == nil {
+	if err := RenameSessionViaStore(context.Background(), nil, testUUID1, "title", StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for nil store")
 	}
 }
@@ -3447,7 +3447,7 @@ func TestTagSessionViaStore_NonNilTag(t *testing.T) {
 	seedSession(t, store, projectKey, testUUID1, "seed")
 
 	tag := "experiment"
-	if err := TagSessionViaStore(context.Background(), store, testUUID1, &tag, dir); err != nil {
+	if err := TagSessionViaStore(context.Background(), store, testUUID1, &tag, StoreMutationOptions{Directory: dir}); err != nil {
 		t.Fatalf("TagSessionViaStore: %v", err)
 	}
 
@@ -3475,10 +3475,10 @@ func TestTagSessionViaStore_NilClearsTag(t *testing.T) {
 
 	// Tag, then clear.
 	existing := "x"
-	if err := TagSessionViaStore(context.Background(), store, testUUID1, &existing, dir); err != nil {
+	if err := TagSessionViaStore(context.Background(), store, testUUID1, &existing, StoreMutationOptions{Directory: dir}); err != nil {
 		t.Fatal(err)
 	}
-	if err := TagSessionViaStore(context.Background(), store, testUUID1, nil, dir); err != nil {
+	if err := TagSessionViaStore(context.Background(), store, testUUID1, nil, StoreMutationOptions{Directory: dir}); err != nil {
 		t.Fatalf("TagSessionViaStore(nil): %v", err)
 	}
 
@@ -3498,7 +3498,7 @@ func TestTagSessionViaStore_NilClearsTag(t *testing.T) {
 func TestTagSessionViaStore_InvalidUUIDErrors(t *testing.T) {
 	store := NewInMemorySessionStore()
 	tag := "x"
-	if err := TagSessionViaStore(context.Background(), store, "not-a-uuid", &tag); err == nil {
+	if err := TagSessionViaStore(context.Background(), store, "not-a-uuid", &tag, StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for invalid UUID")
 	}
 }
@@ -3510,14 +3510,14 @@ func TestTagSessionViaStore_EmptyAfterSanitizationErrors(t *testing.T) {
 	// literal code points) so the source stays ASCII for linters that
 	// flag invisible characters.
 	empty := "  \u200b\u200c  "
-	if err := TagSessionViaStore(context.Background(), store, testUUID1, &empty); err == nil {
+	if err := TagSessionViaStore(context.Background(), store, testUUID1, &empty, StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for tag that sanitizes to empty")
 	}
 }
 
 func TestTagSessionViaStore_NilStoreErrors(t *testing.T) {
 	tag := "x"
-	if err := TagSessionViaStore(context.Background(), nil, testUUID1, &tag); err == nil {
+	if err := TagSessionViaStore(context.Background(), nil, testUUID1, &tag, StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for nil store")
 	}
 }
@@ -3540,7 +3540,7 @@ func TestDeleteSessionViaStore_DeleterOnlyNoCascade(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := DeleteSessionViaStore(context.Background(), store, testUUID1, dir); err != nil {
+	if err := DeleteSessionViaStore(context.Background(), store, testUUID1, StoreMutationOptions{Directory: dir}); err != nil {
 		t.Fatalf("DeleteSessionViaStore: %v", err)
 	}
 
@@ -3574,7 +3574,7 @@ func TestDeleteSessionViaStore_DeleterPlusSubkeysCascades(t *testing.T) {
 		}
 	}
 
-	if err := DeleteSessionViaStore(context.Background(), store, testUUID1, dir); err != nil {
+	if err := DeleteSessionViaStore(context.Background(), store, testUUID1, StoreMutationOptions{Directory: dir}); err != nil {
 		t.Fatalf("DeleteSessionViaStore: %v", err)
 	}
 
@@ -3590,7 +3590,7 @@ func TestDeleteSessionViaStore_DeleterPlusSubkeysCascades(t *testing.T) {
 
 func TestDeleteSessionViaStore_WithoutDeleterErrors(t *testing.T) {
 	store := newStoreBarebones()
-	err := DeleteSessionViaStore(context.Background(), store, testUUID1)
+	err := DeleteSessionViaStore(context.Background(), store, testUUID1, StoreMutationOptions{})
 	if err == nil {
 		t.Fatal("expected error for store without SessionStoreDeleter")
 	}
@@ -3618,7 +3618,7 @@ func TestDeleteSessionViaStore_PartialSubkeyFailureReported(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := DeleteSessionViaStore(context.Background(), store, testUUID1, dir)
+	err := DeleteSessionViaStore(context.Background(), store, testUUID1, StoreMutationOptions{Directory: dir})
 	if err == nil {
 		t.Fatal("expected error describing subkey failure")
 	}
@@ -3642,13 +3642,13 @@ func TestDeleteSessionViaStore_PartialSubkeyFailureReported(t *testing.T) {
 
 func TestDeleteSessionViaStore_InvalidUUIDErrors(t *testing.T) {
 	store := NewInMemorySessionStore()
-	if err := DeleteSessionViaStore(context.Background(), store, "not-a-uuid"); err == nil {
+	if err := DeleteSessionViaStore(context.Background(), store, "not-a-uuid", StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for invalid UUID")
 	}
 }
 
 func TestDeleteSessionViaStore_NilStoreErrors(t *testing.T) {
-	if err := DeleteSessionViaStore(context.Background(), nil, testUUID1); err == nil {
+	if err := DeleteSessionViaStore(context.Background(), nil, testUUID1, StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for nil store")
 	}
 }
@@ -3668,7 +3668,7 @@ func TestForkSessionViaStore_HappyPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ForkSessionViaStore(context.Background(), store, testUUID1, testUUID2, dir); err != nil {
+	if err := ForkSessionViaStore(context.Background(), store, testUUID1, testUUID2, StoreMutationOptions{Directory: dir}); err != nil {
 		t.Fatalf("ForkSessionViaStore: %v", err)
 	}
 
@@ -3717,7 +3717,7 @@ func TestForkSessionViaStore_DeepCopyNestedMaps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ForkSessionViaStore(context.Background(), store, testUUID1, testUUID2, dir); err != nil {
+	if err := ForkSessionViaStore(context.Background(), store, testUUID1, testUUID2, StoreMutationOptions{Directory: dir}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3750,21 +3750,21 @@ func TestForkSessionViaStore_DeepCopyNestedMaps(t *testing.T) {
 
 func TestForkSessionViaStore_InvalidSourceUUIDErrors(t *testing.T) {
 	store := NewInMemorySessionStore()
-	if err := ForkSessionViaStore(context.Background(), store, "not-a-uuid", testUUID2); err == nil {
+	if err := ForkSessionViaStore(context.Background(), store, "not-a-uuid", testUUID2, StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for invalid source UUID")
 	}
 }
 
 func TestForkSessionViaStore_InvalidNewUUIDErrors(t *testing.T) {
 	store := NewInMemorySessionStore()
-	if err := ForkSessionViaStore(context.Background(), store, testUUID1, "not-a-uuid"); err == nil {
+	if err := ForkSessionViaStore(context.Background(), store, testUUID1, "not-a-uuid", StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for invalid new UUID")
 	}
 }
 
 func TestForkSessionViaStore_EmptySourceErrors(t *testing.T) {
 	store := NewInMemorySessionStore()
-	err := ForkSessionViaStore(context.Background(), store, testUUID1, testUUID2)
+	err := ForkSessionViaStore(context.Background(), store, testUUID1, testUUID2, StoreMutationOptions{})
 	if err == nil {
 		t.Fatal("expected error for empty source session")
 	}
@@ -3774,7 +3774,7 @@ func TestForkSessionViaStore_EmptySourceErrors(t *testing.T) {
 }
 
 func TestForkSessionViaStore_NilStoreErrors(t *testing.T) {
-	if err := ForkSessionViaStore(context.Background(), nil, testUUID1, testUUID2); err == nil {
+	if err := ForkSessionViaStore(context.Background(), nil, testUUID1, testUUID2, StoreMutationOptions{}); err == nil {
 		t.Fatal("expected error for nil store")
 	}
 }

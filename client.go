@@ -66,9 +66,10 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		return err
 	}
 	// projectsDir passed to the mirror batcher must match where the CLI
-	// writes its JSONL. When we've redirected CLAUDE_CONFIG_DIR, the
-	// CLI's projects dir lives under the temp dir.
-	projectsDir := getProjectsDir()
+	// writes its JSONL — same env precedence the CLI subprocess will see:
+	// Options.Env > parent env > $HOME/.claude. When we've materialized a
+	// resume session, the CLI's projects dir lives under the temp dir.
+	projectsDir := resolveProjectsDir(configuredOpts.Env)
 	if materialized != nil {
 		configuredOpts = *applyMaterializedOptions(&configuredOpts, materialized)
 		projectsDir = filepath.Join(materialized.configDir, "projects")
@@ -412,10 +413,24 @@ func (c *Client) GetServerInfo() map[string]any {
 //
 // When Connect materialized a SessionStore-backed session into an ephemeral
 // CLAUDE_CONFIG_DIR, Close also removes that temp dir (Windows-safe retries).
+//
+// Close blocks until the mirror batcher (if any) has finished draining.
+// In pathological cases — an unhealthy SessionStore adapter, e.g. a
+// remote store that hangs — that wait can be up to ~3 minutes. Use
+// [CloseContext] to bound the wait with a caller-provided deadline.
 func (c *Client) Close() error {
+	return c.CloseContext(context.Background())
+}
+
+// CloseContext is the cancellable variant of [Close]. When ctx is canceled
+// or its deadline expires while the mirror batcher is still draining,
+// CloseContext returns immediately and the batcher worker continues in
+// the background — pending mirror writes still get a chance to land.
+// Subprocess teardown and resume cleanup proceed regardless.
+func (c *Client) CloseContext(ctx context.Context) error {
 	var err error
 	if c.q != nil {
-		err = c.q.close()
+		err = c.q.closeContext(ctx)
 		c.q = nil
 		c.transport = nil
 	} else if c.transport != nil {
