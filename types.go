@@ -148,6 +148,7 @@ const (
 	AssistantMessageErrorInvalidRequest AssistantMessageError = "invalid_request"
 	AssistantMessageErrorServer         AssistantMessageError = "server_error"
 	AssistantMessageErrorUnknown        AssistantMessageError = "unknown"
+	AssistantMessageErrorModelNotFound  AssistantMessageError = "model_not_found"
 )
 
 // AssistantMessage represents an assistant message with content blocks.
