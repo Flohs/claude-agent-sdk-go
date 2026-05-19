@@ -130,6 +130,14 @@ type SandboxNetworkConfig struct {
 	AllowLocalBinding   *bool    `json:"allowLocalBinding,omitempty"`
 	HTTPProxyPort       *int     `json:"httpProxyPort,omitempty"`
 	SOCKSProxyPort      *int     `json:"socksProxyPort,omitempty"`
+	// AllowedDomains restricts outbound connections to the listed hostnames.
+	AllowedDomains []string `json:"allowedDomains,omitempty"`
+	// DeniedDomains blocks outbound connections to the listed hostnames.
+	DeniedDomains []string `json:"deniedDomains,omitempty"`
+	// AllowManagedDomainsOnly restricts traffic to organization-managed domains.
+	AllowManagedDomainsOnly *bool `json:"allowManagedDomainsOnly,omitempty"`
+	// AllowMachLookup permits mach port lookup (macOS only).
+	AllowMachLookup *bool `json:"allowMachLookup,omitempty"`
 }
 
 // SandboxIgnoreViolations specifies violations to ignore in sandbox.
