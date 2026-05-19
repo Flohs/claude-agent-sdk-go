@@ -40,6 +40,14 @@ type query struct {
 	firstResultOnce        sync.Once
 	streamCloseTimeout     float64
 	excludeDynamicSections bool
+	// lastIsErrorResultDelivered is set when a result message with is_error:true
+	// has been delivered to messageCh. It suppresses ProcessError generation
+	// for subsequent subprocess exit failures so callers don't see both.
+	lastIsErrorResultDelivered bool
+	// processError is set when the subprocess exits with a non-zero code and
+	// no is_error result was delivered. Callers (e.g. Query) surface it after
+	// the message loop ends.
+	processError error
 
 	// Transcript mirror wiring. batcher is nil when Options.SessionStore is
 	// unset; when non-nil, transcript_mirror frames are peeled off the
@@ -342,6 +350,18 @@ func (q *query) readMessages() {
 			continue
 		}
 
+		// Subprocess exit error: suppress it if an is_error result was already
+		// delivered so callers don't see both. Otherwise record it so the
+		// caller (e.g. Query) can surface a ProcessError after the loop ends.
+		if msgType == "error" {
+			if !q.lastIsErrorResultDelivered {
+				errStr, _ := msg["error"].(string)
+				q.processError = &ProcessError{SDKError: SDKError{Message: errStr}}
+			}
+			// Don't forward to messageCh; the deferred "end" frame handles close.
+			continue
+		}
+
 		// Flush the batcher before yielding each result message so any
 		// entries emitted during the turn land in the store before the
 		// caller observes the result. Runs in a goroutine with a bounded
@@ -349,6 +369,9 @@ func (q *query) readMessages() {
 		if msgType == "result" {
 			q.flushBeforeResult()
 			q.firstResultOnce.Do(func() { close(q.firstResultCh) })
+			if isErr, _ := msg["is_error"].(bool); isErr {
+				q.lastIsErrorResultDelivered = true
+			}
 		}
 
 		// Regular SDK messages
@@ -677,9 +700,6 @@ func (q *query) receiveMessages() <-chan map[string]any {
 		for msg := range q.messageCh {
 			msgType, _ := msg["type"].(string)
 			if msgType == "end" {
-				break
-			}
-			if msgType == "error" {
 				break
 			}
 			select {
