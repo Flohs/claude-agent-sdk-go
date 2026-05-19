@@ -11,7 +11,7 @@
 ### Changed
 
 - `.github/dependabot.yml` — added `cooldown.default-days: 2` to both `gomod` and `github-actions` ecosystems so Dependabot waits at least 2 days after a release before proposing the update. ([#168](https://github.com/Flohs/claude-agent-sdk-go/issues/168))
-- `PermissionRequestHookInput.PermissionSuggestions` changed from `[]any` to `[]map[string]any` for correct type fidelity with the CLI protocol. ([#175](https://github.com/Flohs/claude-agent-sdk-go/issues/175))
+- **Breaking:** `PermissionRequestHookInput.PermissionSuggestions` changed from `[]any` to `[]map[string]any` for correct type fidelity with the CLI protocol. Callers that previously type-asserted each element to `map[string]any` can drop the assertion; callers that handled non-map entries will need to adapt. ([#175](https://github.com/Flohs/claude-agent-sdk-go/issues/175))
 
 ### Fixed
 
