@@ -142,11 +142,6 @@ func mapField(m map[string]any, key string) map[string]any {
 	return v
 }
 
-func sliceField(m map[string]any, key string) []any {
-	v, _ := m[key].([]any)
-	return v
-}
-
 func mapSliceField(m map[string]any, key string) []map[string]any {
 	raw, _ := m[key].([]any)
 	if raw == nil {
