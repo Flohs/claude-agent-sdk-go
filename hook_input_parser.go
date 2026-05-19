@@ -48,7 +48,7 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			SubagentContext: parseSubagentContext(input),
 			ToolName:        stringField(input, "tool_name"),
 			ToolInput:       mapField(input, "tool_input"),
-			PermissionSuggestions: sliceField(input, "permission_suggestions"),
+			PermissionSuggestions: mapSliceField(input, "permission_suggestions"),
 		}, nil
 
 	case HookEventUserPromptSubmit:
@@ -145,4 +145,18 @@ func mapField(m map[string]any, key string) map[string]any {
 func sliceField(m map[string]any, key string) []any {
 	v, _ := m[key].([]any)
 	return v
+}
+
+func mapSliceField(m map[string]any, key string) []map[string]any {
+	raw, _ := m[key].([]any)
+	if raw == nil {
+		return nil
+	}
+	result := make([]map[string]any, 0, len(raw))
+	for _, item := range raw {
+		if entry, ok := item.(map[string]any); ok {
+			result = append(result, entry)
+		}
+	}
+	return result
 }

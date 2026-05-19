@@ -99,7 +99,7 @@ type PermissionRequestHookInput struct {
 	SubagentContext
 	ToolName              string         `json:"tool_name"`
 	ToolInput             map[string]any `json:"tool_input"`
-	PermissionSuggestions []any          `json:"permission_suggestions,omitempty"`
+	PermissionSuggestions []map[string]any `json:"permission_suggestions,omitempty"`
 }
 
 func (*PermissionRequestHookInput) hookInputMarker() {}
