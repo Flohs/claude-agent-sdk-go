@@ -2154,6 +2154,101 @@ func ForkSessionViaStore(ctx context.Context, store SessionStore, sessionID, new
 	return store.Append(ctx, SessionKey{ProjectKey: projectKey, SessionID: newSessionID}, forked)
 }
 
+// ImportSessionToStore imports a local on-disk session (and its subagent
+// transcripts) into any [SessionStore] adapter by reading the JSONL files
+// from the Claude projects directory and appending them to the store. This
+// enables migration from local storage to a remote store.
+//
+// The project_key for the store is derived from the project directory that
+// contains the session file, matching the key the CLI would assign if the
+// session were mirrored live. Both the main transcript and any subagent
+// transcripts found under the sibling `<session_id>/subagents/` directory are
+// imported.
+//
+// sessionID must be a valid UUID. directory is the project directory used to
+// locate the session file; pass no directory (or an empty string) to search
+// all projects.
+//
+// Returns an error if the session file cannot be found, read, or if any
+// store write fails. Partial writes are possible if an error occurs mid-import.
+func ImportSessionToStore(ctx context.Context, store SessionStore, sessionID string, directory ...string) error {
+	if store == nil {
+		return fmt.Errorf("session store is nil")
+	}
+	if !isValidUUID(sessionID) {
+		return fmt.Errorf("invalid session ID: %s", sessionID)
+	}
+
+	dir := ""
+	if len(directory) > 0 {
+		dir = directory[0]
+	}
+
+	filePath := findSessionFilePath(sessionID, dir)
+	if filePath == "" {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	projectsDir := getProjectsDir()
+
+	// Import the main transcript.
+	if err := importJSONLFile(ctx, store, filePath, projectsDir); err != nil {
+		return fmt.Errorf("importing main transcript: %w", err)
+	}
+
+	// Import subagent transcripts (best-effort: errors are collected but
+	// do not mask the main import success).
+	subagentsDir := resolveSubagentsDir(sessionID, dir)
+	if subagentsDir != "" {
+		agentFiles := collectAgentFiles(subagentsDir)
+		var subErrs []string
+		for _, af := range agentFiles {
+			if err := importJSONLFile(ctx, store, af.path, projectsDir); err != nil {
+				subErrs = append(subErrs, fmt.Sprintf("%s: %v", af.agentID, err))
+			}
+		}
+		if len(subErrs) > 0 {
+			return fmt.Errorf("importing subagent transcripts for session %s: %s",
+				sessionID, strings.Join(subErrs, "; "))
+		}
+	}
+
+	return nil
+}
+
+// importJSONLFile reads a JSONL transcript file and appends all parsed entries
+// to the store under the [SessionKey] derived from the file path.
+func importJSONLFile(ctx context.Context, store SessionStore, filePath, projectsDir string) error {
+	key, ok := FilePathToSessionKey(filePath, projectsDir)
+	if !ok {
+		return fmt.Errorf("cannot derive SessionKey from path %s (not under %s)", filePath, projectsDir)
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("reading file: %w", err)
+	}
+
+	var entries []SessionStoreEntry
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var entry SessionStoreEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue // skip malformed lines
+		}
+		entries = append(entries, entry)
+	}
+
+	if len(entries) == 0 {
+		return nil
+	}
+
+	return store.Append(ctx, key, entries)
+}
+
 // deepCopyEntriesRewritingSessionID returns a deep copy of entries with
 // every "sessionId" field rewritten to newSessionID. Uses a JSON round-trip
 // to ensure no map or slice aliasing between source and destination,
