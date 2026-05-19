@@ -273,7 +273,10 @@ type ResultMessage struct {
 	// APIErrorStatus is the HTTP status code (e.g. 429, 500, 529) from a
 	// failing API call when IsError is true. Zero when not provided by the
 	// CLI (requires CLI >= v2.1.110).
-	APIErrorStatus   *int           `json:"api_error_status,omitempty"`
+	APIErrorStatus *int `json:"api_error_status,omitempty"`
+	// Origin forwards the triggering message's origin so consumers can
+	// distinguish user-prompted results from task-notification followups.
+	Origin           string         `json:"origin,omitempty"`
 	TotalCostUSD     *float64       `json:"total_cost_usd,omitempty"`
 	Usage            map[string]any `json:"usage,omitempty"`
 	Result           string         `json:"result,omitempty"`

@@ -208,6 +208,7 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		SessionID:      stringField(data, "session_id"),
 		StopReason:     stringField(data, "stop_reason"),
 		TerminalReason: stringField(data, "terminal_reason"),
+		Origin:         stringField(data, "origin"),
 		Result:         stringField(data, "result"),
 	}
 
