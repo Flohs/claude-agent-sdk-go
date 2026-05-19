@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `.github/dependabot.yml` — added `cooldown.default-days: 2` to both `gomod` and `github-actions` ecosystems so Dependabot waits at least 2 days after a release before proposing the update. ([#168](https://github.com/Flohs/claude-agent-sdk-go/issues/168))
+
 ## [1.6.0] - 2026-04-27
 
 This release lands feature-parity with the Python and TypeScript SDKs across
