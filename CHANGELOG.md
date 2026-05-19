@@ -7,6 +7,7 @@
 - `EffortXHigh` (`"xhigh"`) constant for the `Effort` type, enabling Opus 4.7's extended thinking effort level. Port of Python SDK v0.1.74 / TypeScript SDK v0.3.144. ([#170](https://github.com/Flohs/claude-agent-sdk-go/issues/170))
 - `AssistantMessageErrorModelNotFound` constant for the `AssistantMessageError` type, surfacing `"model_not_found"` errors from the API. Port of TypeScript SDK v0.3.144. ([#171](https://github.com/Flohs/claude-agent-sdk-go/issues/171))
 - `APIErrorStatus *int` field on `ResultMessage` that surfaces the underlying HTTP status code when `is_error` is true (e.g. `429`, `529`). Port of TypeScript SDK v0.3.144. ([#172](https://github.com/Flohs/claude-agent-sdk-go/issues/172))
+- `AllowedDomains`, `DeniedDomains`, `AllowManagedDomainsOnly`, and `AllowMachLookup` fields on `SandboxNetworkConfig` for fine-grained network domain control in sandboxed environments. Port of TypeScript SDK v0.3.144. ([#182](https://github.com/Flohs/claude-agent-sdk-go/issues/182))
 
 ### Changed
 
