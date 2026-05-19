@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `EffortXHigh` (`"xhigh"`) constant for the `Effort` type, enabling Opus 4.7's extended thinking effort level. Port of Python SDK v0.1.74 / TypeScript SDK v0.3.144. ([#170](https://github.com/Flohs/claude-agent-sdk-go/issues/170))
+
 ### Changed
 
 - `.github/dependabot.yml` — added `cooldown.default-days: 2` to both `gomod` and `github-actions` ecosystems so Dependabot waits at least 2 days after a release before proposing the update. ([#168](https://github.com/Flohs/claude-agent-sdk-go/issues/168))

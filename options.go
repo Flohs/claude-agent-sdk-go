@@ -36,6 +36,7 @@ const (
 	EffortMedium Effort = "medium"
 	EffortHigh   Effort = "high"
 	EffortMax    Effort = "max"
+	EffortXHigh  Effort = "xhigh"
 )
 
 // SystemPrompt is the interface for system prompt configuration.
