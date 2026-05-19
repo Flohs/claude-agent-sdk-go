@@ -378,12 +378,18 @@ func (t *SubprocessTransport) handleStderr() {
 			continue
 		}
 		if t.options.Stderr != nil {
-			func() {
-				defer func() { recover() }()
-				t.options.Stderr(line)
-			}()
+			t.callStderr(line)
 		}
 	}
+}
+
+func (t *SubprocessTransport) callStderr(line string) {
+	defer func() {
+		if r := recover(); r != nil {
+			_ = r
+		}
+	}()
+	t.options.Stderr(line)
 }
 
 func (t *SubprocessTransport) buildCommand() []string {
