@@ -242,6 +242,10 @@ type Options struct {
 	// on task_progress messages. When set, task progress messages carry a
 	// Summary field describing the subagent's current activity.
 	AgentProgressSummaries bool
+	// StrictMcpConfig, when true, tells the CLI to only use MCP servers passed
+	// via McpServers, ignoring project, user, and global MCP configurations.
+	// Enables fully deterministic server sets for reproducible deployments.
+	StrictMcpConfig bool
 	// ForkSession forks resumed sessions to a new session ID.
 	ForkSession bool
 	// Agents defines custom agent configurations.
