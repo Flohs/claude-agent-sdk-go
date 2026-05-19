@@ -9,6 +9,7 @@
 - `APIErrorStatus *int` field on `ResultMessage` that surfaces the underlying HTTP status code when `is_error` is true (e.g. `429`, `529`). Port of TypeScript SDK v0.3.144. ([#172](https://github.com/Flohs/claude-agent-sdk-go/issues/172))
 - `AllowedDomains`, `DeniedDomains`, `AllowManagedDomainsOnly`, and `AllowMachLookup` fields on `SandboxNetworkConfig` for fine-grained network domain control in sandboxed environments. Port of TypeScript SDK v0.3.144. ([#182](https://github.com/Flohs/claude-agent-sdk-go/issues/182))
 - `Options.StrictMcpConfig bool` field forwarded as `--strict-mcp-config` to the CLI, telling it to use only MCP servers passed via `McpServers` and ignore project, user, and global MCP configurations. Enables fully deterministic server sets for reproducible deployments. Port of TypeScript SDK v0.3.128. ([#178](https://github.com/Flohs/claude-agent-sdk-go/issues/178))
+- `Options.ForwardSubagentText bool` field forwarded as `--forward-subagent-text` to the CLI, enabling forwarding of subagent text messages to the parent session stream. Port of TypeScript SDK v0.3.130. ([#179](https://github.com/Flohs/claude-agent-sdk-go/issues/179))
 
 ### Changed
 
