@@ -378,7 +378,10 @@ func (t *SubprocessTransport) handleStderr() {
 			continue
 		}
 		if t.options.Stderr != nil {
-			t.options.Stderr(line)
+			func() {
+				defer func() { recover() }()
+				t.options.Stderr(line)
+			}()
 		}
 	}
 }
