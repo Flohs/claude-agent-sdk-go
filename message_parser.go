@@ -104,6 +104,7 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		SessionID:       stringField(data, "session_id"),
 		UUID:            stringField(data, "uuid"),
 		StopReason:      stringField(message, "stop_reason"),
+		RequestID:       stringField(data, "request_id"),
 	}
 
 	if errStr := stringField(data, "error"); errStr != "" {
@@ -136,27 +137,31 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 	switch subtype {
 	case "task_started":
 		return &TaskStartedMessage{
-			SystemMessage: base,
-			TaskID:        stringField(data, "task_id"),
-			Description:   stringField(data, "description"),
-			UUID:          stringField(data, "uuid"),
-			SessionID:     stringField(data, "session_id"),
-			ToolUseID:     stringField(data, "tool_use_id"),
-			TaskType:      stringField(data, "task_type"),
+			SystemMessage:   base,
+			TaskID:          stringField(data, "task_id"),
+			Description:     stringField(data, "description"),
+			UUID:            stringField(data, "uuid"),
+			SessionID:       stringField(data, "session_id"),
+			ToolUseID:       stringField(data, "tool_use_id"),
+			TaskType:        stringField(data, "task_type"),
+			SubagentType:    stringField(data, "subagent_type"),
+			TaskDescription: stringField(data, "task_description"),
 		}, nil
 
 	case "task_progress":
 		usage := parseTaskUsage(data["usage"])
 		return &TaskProgressMessage{
-			SystemMessage: base,
-			TaskID:        stringField(data, "task_id"),
-			Description:   stringField(data, "description"),
-			Usage:         usage,
-			UUID:          stringField(data, "uuid"),
-			SessionID:     stringField(data, "session_id"),
-			ToolUseID:     stringField(data, "tool_use_id"),
-			LastToolName:  stringField(data, "last_tool_name"),
-			Summary:       stringField(data, "summary"),
+			SystemMessage:   base,
+			TaskID:          stringField(data, "task_id"),
+			Description:     stringField(data, "description"),
+			Usage:           usage,
+			UUID:            stringField(data, "uuid"),
+			SessionID:       stringField(data, "session_id"),
+			ToolUseID:       stringField(data, "tool_use_id"),
+			LastToolName:    stringField(data, "last_tool_name"),
+			Summary:         stringField(data, "summary"),
+			SubagentType:    stringField(data, "subagent_type"),
+			TaskDescription: stringField(data, "task_description"),
 		}, nil
 
 	case "mirror_error":
@@ -182,15 +187,17 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			usage = &tu
 		}
 		return &TaskNotificationMessage{
-			SystemMessage: base,
-			TaskID:        stringField(data, "task_id"),
-			Status:        TaskNotificationStatus(stringField(data, "status")),
-			OutputFile:    stringField(data, "output_file"),
-			Summary:       stringField(data, "summary"),
-			UUID:          stringField(data, "uuid"),
-			SessionID:     stringField(data, "session_id"),
-			ToolUseID:     stringField(data, "tool_use_id"),
-			Usage:         usage,
+			SystemMessage:   base,
+			TaskID:          stringField(data, "task_id"),
+			Status:          TaskNotificationStatus(stringField(data, "status")),
+			OutputFile:      stringField(data, "output_file"),
+			Summary:         stringField(data, "summary"),
+			UUID:            stringField(data, "uuid"),
+			SessionID:       stringField(data, "session_id"),
+			ToolUseID:       stringField(data, "tool_use_id"),
+			Usage:           usage,
+			SubagentType:    stringField(data, "subagent_type"),
+			TaskDescription: stringField(data, "task_description"),
 		}, nil
 
 	default:
@@ -209,6 +216,7 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		StopReason:     stringField(data, "stop_reason"),
 		TerminalReason: stringField(data, "terminal_reason"),
 		Origin:         stringField(data, "origin"),
+		RequestID:      stringField(data, "request_id"),
 		Result:         stringField(data, "result"),
 	}
 
