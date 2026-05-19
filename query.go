@@ -497,13 +497,19 @@ func (q *query) handleCanUseTool(request map[string]any) (map[string]any, error)
 	originalInput := input
 
 	permCtx := ToolPermissionContext{
-		ToolUseID: stringField(request, "tool_use_id"),
-		AgentID:   stringField(request, "agent_id"),
+		ToolUseID:      stringField(request, "tool_use_id"),
+		AgentID:        stringField(request, "agent_id"),
+		DecisionReason: stringField(request, "decision_reason"),
+		BlockedPath:    stringField(request, "blocked_path"),
+		Title:          stringField(request, "title"),
+		DisplayName:    stringField(request, "display_name"),
+		Description:    stringField(request, "description"),
 	}
 	if suggestions, ok := request["permission_suggestions"].([]any); ok {
+		permCtx.Suggestions = make([]PermissionUpdate, 0, len(suggestions))
 		for _, s := range suggestions {
 			if sm, ok := s.(map[string]any); ok {
-				_ = sm // TODO: parse permission suggestions
+				permCtx.Suggestions = append(permCtx.Suggestions, parsePermissionUpdate(sm))
 			}
 		}
 	}

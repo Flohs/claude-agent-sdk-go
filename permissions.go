@@ -115,6 +115,48 @@ type ToolPermissionContext struct {
 	ToolUseID string
 	// AgentID is the ID of the sub-agent requesting permission, if applicable.
 	AgentID string
+	// DecisionReason is the CLI's suggested reason for this permission decision,
+	// if provided (e.g. "allow_once", "deny", "allow_rule").
+	DecisionReason string
+	// BlockedPath is the filesystem path that triggered a deny decision, if any.
+	BlockedPath string
+	// Title is the human-readable display title for this permission request.
+	Title string
+	// DisplayName is the tool's display name as shown in the permission UI.
+	DisplayName string
+	// Description is additional descriptive context for this permission request.
+	Description string
+}
+
+// parsePermissionUpdate converts a raw map from the CLI protocol into a
+// PermissionUpdate value.
+func parsePermissionUpdate(m map[string]any) PermissionUpdate {
+	p := PermissionUpdate{
+		Type:        PermissionUpdateType(stringField(m, "type")),
+		Behavior:    PermissionBehavior(stringField(m, "behavior")),
+		Mode:        PermissionMode(stringField(m, "mode")),
+		Destination: PermissionUpdateDestination(stringField(m, "destination")),
+	}
+	if rawRules, ok := m["rules"].([]any); ok {
+		p.Rules = make([]PermissionRuleValue, 0, len(rawRules))
+		for _, r := range rawRules {
+			if rm, ok := r.(map[string]any); ok {
+				p.Rules = append(p.Rules, PermissionRuleValue{
+					ToolName:    stringField(rm, "toolName"),
+					RuleContent: stringField(rm, "ruleContent"),
+				})
+			}
+		}
+	}
+	if rawDirs, ok := m["directories"].([]any); ok {
+		p.Directories = make([]string, 0, len(rawDirs))
+		for _, d := range rawDirs {
+			if s, ok := d.(string); ok {
+				p.Directories = append(p.Directories, s)
+			}
+		}
+	}
+	return p
 }
 
 // CanUseToolFunc is the callback type for tool permission decisions.
