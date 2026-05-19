@@ -246,6 +246,8 @@ type Options struct {
 	// via McpServers, ignoring project, user, and global MCP configurations.
 	// Enables fully deterministic server sets for reproducible deployments.
 	StrictMcpConfig bool
+	// ForwardSubagentText, when true, streams subagent text deltas to SDK consumers.
+	ForwardSubagentText bool
 	// ForkSession forks resumed sessions to a new session ID.
 	ForkSession bool
 	// Agents defines custom agent configurations.
