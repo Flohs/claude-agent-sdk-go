@@ -12,6 +12,11 @@
 
 - `.github/dependabot.yml` — added `cooldown.default-days: 2` to both `gomod` and `github-actions` ecosystems so Dependabot waits at least 2 days after a release before proposing the update. ([#168](https://github.com/Flohs/claude-agent-sdk-go/issues/168))
 
+### Fixed
+
+- Panics inside user-supplied `Options.StderrCallback` functions are now recovered and logged, preventing a crashing callback from terminating the subprocess reader goroutine. Port of TypeScript SDK v0.3.144. ([#173](https://github.com/Flohs/claude-agent-sdk-go/issues/173))
+
+
 ## [1.6.0] - 2026-04-27
 
 This release lands feature-parity with the Python and TypeScript SDKs across
