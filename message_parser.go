@@ -215,6 +215,12 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		msg.Errors = errors
 	}
 
+	if v, ok := data["api_error_status"]; ok {
+		if status := intFromAny(v); status != 0 {
+			msg.APIErrorStatus = &status
+		}
+	}
+
 	if cost, ok := data["total_cost_usd"].(float64); ok {
 		msg.TotalCostUSD = &cost
 	}
