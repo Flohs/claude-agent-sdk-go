@@ -534,6 +534,10 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--agent-progress-summaries")
 	}
 
+	if opts.StrictMcpConfig {
+		cmd = append(cmd, "--strict-mcp-config")
+	}
+
 	if opts.ForkSession {
 		cmd = append(cmd, "--fork-session")
 	}
