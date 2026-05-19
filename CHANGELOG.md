@@ -13,6 +13,7 @@
 - `Origin string` field on `ResultMessage` that surfaces the triggering message's `SDKMessageOrigin`, allowing consumers to distinguish user-prompted results from task-notification followups. Port of TypeScript SDK v0.2.126. ([#180](https://github.com/Flohs/claude-agent-sdk-go/issues/180))
 - `RequestID string` field on `AssistantMessage` and `ResultMessage` for end-to-end request tracing. `SubagentType string` and `TaskDescription string` fields on `TaskStartedMessage`, `TaskProgressMessage`, and `TaskNotificationMessage` for richer task event context. Port of TypeScript SDK v0.3.142. ([#181](https://github.com/Flohs/claude-agent-sdk-go/issues/181))
 - `DecisionReason`, `BlockedPath`, `Title`, `DisplayName`, and `Description` fields on `ToolPermissionContext` for richer permission callback context. Permission suggestions are now fully parsed into typed `[]PermissionUpdate` values. Port of Python SDK v0.2.82. ([#176](https://github.com/Flohs/claude-agent-sdk-go/issues/176))
+- `TaskCreateInput`, `TaskCreateOutput`, `TaskGetInput`, `TaskGetOutput`, `TaskUpdateInput`, `TaskUpdateOutput`, `TaskListInput`, `TaskListOutput` typed structs in `types.go` for the Task tool input/output schemas (`TaskCreate`, `TaskUpdate`, `TaskGet`, `TaskList`). Also adds `TaskStatus` constants. Port of TypeScript SDK v0.2.141 / v0.3.142. ([#185](https://github.com/Flohs/claude-agent-sdk-go/issues/185))
 
 ### Changed
 

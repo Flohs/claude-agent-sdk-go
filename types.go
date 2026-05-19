@@ -252,6 +252,90 @@ type TaskNotificationMessage struct {
 	TaskDescription string `json:"task_description,omitempty"`
 }
 
+// TaskStatus represents the lifecycle state of a task managed by the Task tools.
+type TaskStatus string
+
+const (
+	TaskStatusPending    TaskStatus = "pending"
+	TaskStatusInProgress TaskStatus = "in_progress"
+	TaskStatusCompleted  TaskStatus = "completed"
+	TaskStatusDeleted    TaskStatus = "deleted"
+)
+
+// TaskCreateInput is the input schema for the TaskCreate tool.
+type TaskCreateInput struct {
+	Subject     string         `json:"subject"`
+	Description string         `json:"description"`
+	ActiveForm  string         `json:"activeForm,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+}
+
+// TaskCreateOutput is the output schema for the TaskCreate tool.
+type TaskCreateOutput struct {
+	Task struct {
+		ID      string `json:"id"`
+		Subject string `json:"subject"`
+	} `json:"task"`
+}
+
+// TaskGetInput is the input schema for the TaskGet tool.
+type TaskGetInput struct {
+	TaskID string `json:"taskId"`
+}
+
+// TaskGetOutput is the output schema for the TaskGet tool. Task is nil when
+// no task matches the requested ID.
+type TaskGetOutput struct {
+	Task *struct {
+		ID          string     `json:"id"`
+		Subject     string     `json:"subject"`
+		Description string     `json:"description"`
+		Status      TaskStatus `json:"status"`
+		Blocks      []string   `json:"blocks"`
+		BlockedBy   []string   `json:"blockedBy"`
+	} `json:"task"`
+}
+
+// TaskUpdateInput is the input schema for the TaskUpdate tool.
+type TaskUpdateInput struct {
+	TaskID       string     `json:"taskId"`
+	Subject      string     `json:"subject,omitempty"`
+	Description  string     `json:"description,omitempty"`
+	ActiveForm   string     `json:"activeForm,omitempty"`
+	Status       TaskStatus `json:"status,omitempty"`
+	AddBlocks    []string   `json:"addBlocks,omitempty"`
+	AddBlockedBy []string   `json:"addBlockedBy,omitempty"`
+	Owner        string     `json:"owner,omitempty"`
+}
+
+// TaskUpdateOutput is the output schema for the TaskUpdate tool.
+type TaskUpdateOutput struct {
+	Success       bool     `json:"success"`
+	TaskID        string   `json:"taskId"`
+	UpdatedFields []string `json:"updatedFields"`
+	Error         string   `json:"error,omitempty"`
+	StatusChange  *struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	} `json:"statusChange,omitempty"`
+}
+
+// TaskListInput is the input schema for the TaskList tool. The CLI accepts
+// no parameters; the struct exists for symmetry with the other Task tool
+// schemas.
+type TaskListInput struct{}
+
+// TaskListOutput is the output schema for the TaskList tool.
+type TaskListOutput struct {
+	Tasks []struct {
+		ID        string     `json:"id"`
+		Subject   string     `json:"subject"`
+		Status    TaskStatus `json:"status"`
+		Owner     string     `json:"owner,omitempty"`
+		BlockedBy []string   `json:"blockedBy"`
+	} `json:"tasks"`
+}
+
 // MirrorErrorMessage is an SDK-synthesized system message emitted when the
 // transcript mirror batcher exhausts its retry budget for a pending
 // [SessionStore.Append]. It never originates from the CLI — the SDK injects
