@@ -148,6 +148,11 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			}
 		}
 
+		// Surface a subprocess error only when no is_error result was already
+		// delivered, so callers don't see both the error result and a ProcessError.
+		if q.processError != nil {
+			errs <- q.processError
+		}
 		_ = q.close()
 	}()
 

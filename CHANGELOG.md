@@ -21,6 +21,7 @@
 ### Fixed
 
 - Panics inside user-supplied `Options.StderrCallback` functions are now recovered and logged, preventing a crashing callback from terminating the subprocess reader goroutine. Port of TypeScript SDK v0.3.144. ([#173](https://github.com/Flohs/claude-agent-sdk-go/issues/173))
+- `Query()` now surfaces a `*ProcessError` on the errors channel when the CLI subprocess exits with a non-zero code and no `is_error: true` result was already delivered. When an error result was delivered, the subprocess exit error is suppressed so callers don't receive both. Port of Python SDK v0.2.82. ([#174](https://github.com/Flohs/claude-agent-sdk-go/issues/174))
 
 
 ## [1.6.0] - 2026-04-27
