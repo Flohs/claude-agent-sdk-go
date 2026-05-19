@@ -69,6 +69,7 @@ type transcriptMirrorBatcher struct {
 	onError     mirrorErrorFunc
 	stderr      func(string)
 	sendTimeout time.Duration
+	eager       bool
 
 	mu            sync.Mutex
 	pending       []mirrorBatchItem
@@ -94,6 +95,7 @@ func newTranscriptMirrorBatcher(
 	projectsDir string,
 	onError mirrorErrorFunc,
 	stderr func(string),
+	eager bool,
 ) *transcriptMirrorBatcher {
 	b := &transcriptMirrorBatcher{
 		store:         store,
@@ -101,6 +103,7 @@ func newTranscriptMirrorBatcher(
 		onError:       onError,
 		stderr:        stderr,
 		sendTimeout:   MirrorSendTimeout,
+		eager:         eager,
 		flushRequests: make(chan flushRequest, 64),
 		doneCh:        make(chan struct{}),
 	}
@@ -139,7 +142,7 @@ func (b *transcriptMirrorBatcher) Enqueue(filePath string, entries []SessionStor
 	})
 	b.pendingItems += len(entries)
 	b.pendingBytes += size
-	shouldFlush := b.pendingItems > MirrorMaxPendingEntries || b.pendingBytes > MirrorMaxPendingBytes
+	shouldFlush := b.eager || b.pendingItems > MirrorMaxPendingEntries || b.pendingBytes > MirrorMaxPendingBytes
 	b.mu.Unlock()
 
 	if shouldFlush {

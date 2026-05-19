@@ -115,6 +115,7 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		sessionStore:           configuredOpts.SessionStore,
 		projectsDir:            projectsDir,
 		loadTimeoutMs:          configuredOpts.LoadTimeoutMs,
+		sessionStoreFlush:      configuredOpts.SessionStoreFlush,
 		stderr:                 configuredOpts.Stderr,
 	})
 
