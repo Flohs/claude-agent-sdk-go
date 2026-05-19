@@ -28,6 +28,15 @@
 
 - Panics inside user-supplied `Options.StderrCallback` functions are now recovered and logged, preventing a crashing callback from terminating the subprocess reader goroutine. Port of TypeScript SDK v0.3.144. ([#173](https://github.com/Flohs/claude-agent-sdk-go/issues/173))
 - `Query()` now surfaces a `*ProcessError` on the errors channel when the CLI subprocess exits with a non-zero code and no `is_error: true` result was already delivered. When an error result was delivered, the subprocess exit error is suppressed so callers don't receive both. Port of Python SDK v0.2.82. ([#174](https://github.com/Flohs/claude-agent-sdk-go/issues/174))
+- `ResolveSettings` no longer silently swallows JSON parse errors. Corrupt `settings.json` files now surface a wrapped error identifying the source (`user` / `project` / `local`); invalid `ManagedSettings` JSON also returns an error since the caller explicitly opted in. File-not-found is still treated as a non-error skip. ([#204](https://github.com/Flohs/claude-agent-sdk-go/issues/204))
+
+### Documentation
+
+- `ImportSessionToStore`: added inline rationale for the `directory ...string` variadic signature, distinguishing it from the `*ViaStore` mutators that migrated to `StoreMutationOptions` in #162. The variadic is intentional here because `directory` is genuinely consumed to locate the on-disk JSONL source — the silent-discard foot-gun that motivated the v1.6.0 fix does not apply. ([#204](https://github.com/Flohs/claude-agent-sdk-go/issues/204))
+
+### Tests
+
+- Added coverage for the [Unreleased] additions: `ResolveSettings` (cascade, shallow merge, corrupt-file and managed-settings parse errors), `ImportSessionToStore` (main transcript, subagent transcripts, error paths, zero-arg variadic), the new message-parser fields on `AssistantMessage` and `ResultMessage` (`RequestID`, `Origin`, `APIErrorStatus`, `DeferredToolUse`) and on `TaskStartedMessage` / `TaskProgressMessage` / `TaskNotificationMessage` (`SubagentType`, `TaskDescription`), the `*ProcessError` suppression branch in the query loop, and the `parsePermissionUpdate` typed-parser helper. ([#204](https://github.com/Flohs/claude-agent-sdk-go/issues/204))
 
 
 ## [1.6.0] - 2026-04-27

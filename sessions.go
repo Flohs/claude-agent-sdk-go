@@ -2171,6 +2171,16 @@ func ForkSessionViaStore(ctx context.Context, store SessionStore, sessionID, new
 //
 // Returns an error if the session file cannot be found, read, or if any
 // store write fails. Partial writes are possible if an error occurs mid-import.
+//
+// API shape note (do not migrate to StoreMutationOptions): the variadic
+// `directory ...string` mirrors the filesystem-helper convention used by
+// [DeleteSession], [ForkSession], and [GetSessionInfo]. This is intentionally
+// different from the `*ViaStore` mutators (RenameSessionViaStore, etc.) which
+// take a [StoreMutationOptions] struct: that switch was made in #162 because
+// the directory argument on those mutators was silently discarded by the
+// store write path — a foot-gun that does not apply here. ImportSessionToStore
+// genuinely consumes `directory` to locate the on-disk JSONL source before
+// any store write happens, so the variadic remains the correct shape.
 func ImportSessionToStore(ctx context.Context, store SessionStore, sessionID string, directory ...string) error {
 	if store == nil {
 		return fmt.Errorf("session store is nil")

@@ -730,3 +730,226 @@ func TestParseMessage_MirrorErrorMessage_NullKey(t *testing.T) {
 		t.Errorf("Error = %q", me.Error)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Coverage for [Unreleased] message-parser additions (#204):
+// AssistantMessage.RequestID, ResultMessage.Origin / RequestID /
+// APIErrorStatus / DeferredToolUse, TaskStartedMessage.SubagentType /
+// TaskDescription, TaskNotificationMessage.SubagentType / TaskDescription.
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_AssistantMessage_RequestID(t *testing.T) {
+	data := map[string]any{
+		"type":       "assistant",
+		"session_id": "sess-1",
+		"request_id": "req_abc123",
+		"message": map[string]any{
+			"model":   "claude-opus-4-7",
+			"content": []any{map[string]any{"type": "text", "text": "ok"}},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	if asst.RequestID != "req_abc123" {
+		t.Errorf("RequestID = %q, want req_abc123", asst.RequestID)
+	}
+}
+
+func TestParseMessage_ResultMessage_Origin(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+		"origin":     "task_notification",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.Origin != "task_notification" {
+		t.Errorf("Origin = %q, want task_notification", r.Origin)
+	}
+}
+
+func TestParseMessage_ResultMessage_RequestID(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+		"request_id": "req_final_xyz",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.RequestID != "req_final_xyz" {
+		t.Errorf("RequestID = %q, want req_final_xyz", r.RequestID)
+	}
+}
+
+func TestParseMessage_ResultMessage_APIErrorStatus(t *testing.T) {
+	// is_error result carries an HTTP status (e.g. 429, 529).
+	data := map[string]any{
+		"type":             "result",
+		"subtype":          "error",
+		"is_error":         true,
+		"session_id":       "s",
+		"api_error_status": float64(429),
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.APIErrorStatus == nil {
+		t.Fatal("APIErrorStatus is nil")
+	}
+	if *r.APIErrorStatus != 429 {
+		t.Errorf("*APIErrorStatus = %d, want 429", *r.APIErrorStatus)
+	}
+}
+
+func TestParseMessage_ResultMessage_APIErrorStatus_Absent(t *testing.T) {
+	// Successful result: api_error_status not emitted by the CLI.
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.APIErrorStatus != nil {
+		t.Errorf("APIErrorStatus = %v, want nil when absent", *r.APIErrorStatus)
+	}
+}
+
+func TestParseMessage_ResultMessage_DeferredToolUse(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+		"deferred_tool_use": map[string]any{
+			"tool_use_id": "tu_123",
+			"tool_name":   "Bash",
+			"tool_input":  map[string]any{"command": "rm -rf /tmp/x"},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.DeferredToolUse == nil {
+		t.Fatal("DeferredToolUse is nil")
+	}
+	if r.DeferredToolUse.ToolUseID != "tu_123" {
+		t.Errorf("DeferredToolUse.ToolUseID = %q", r.DeferredToolUse.ToolUseID)
+	}
+	if r.DeferredToolUse.ToolName != "Bash" {
+		t.Errorf("DeferredToolUse.ToolName = %q", r.DeferredToolUse.ToolName)
+	}
+	if cmd, _ := r.DeferredToolUse.ToolInput["command"].(string); cmd != "rm -rf /tmp/x" {
+		t.Errorf("DeferredToolUse.ToolInput[command] = %v", r.DeferredToolUse.ToolInput["command"])
+	}
+}
+
+func TestParseMessage_ResultMessage_DeferredToolUse_Absent(t *testing.T) {
+	// Normal (non-defer) result: DeferredToolUse stays nil.
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.DeferredToolUse != nil {
+		t.Errorf("expected nil DeferredToolUse, got %+v", r.DeferredToolUse)
+	}
+}
+
+func TestParseMessage_TaskStarted_SubagentTypeAndDescription(t *testing.T) {
+	data := map[string]any{
+		"type":             "system",
+		"subtype":          "task_started",
+		"task_id":          "t1",
+		"description":      "Running task",
+		"uuid":             "u1",
+		"session_id":       "s1",
+		"subagent_type":    "general-purpose",
+		"task_description": "Find all callers of foo()",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	task := msg.(*TaskStartedMessage)
+	if task.SubagentType != "general-purpose" {
+		t.Errorf("SubagentType = %q, want general-purpose", task.SubagentType)
+	}
+	if task.TaskDescription != "Find all callers of foo()" {
+		t.Errorf("TaskDescription = %q", task.TaskDescription)
+	}
+}
+
+func TestParseMessage_TaskProgress_SubagentTypeAndDescription(t *testing.T) {
+	data := map[string]any{
+		"type":             "system",
+		"subtype":          "task_progress",
+		"task_id":          "t1",
+		"uuid":             "u1",
+		"session_id":       "s1",
+		"subagent_type":    "explore",
+		"task_description": "Explore the codebase",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	p := msg.(*TaskProgressMessage)
+	if p.SubagentType != "explore" {
+		t.Errorf("SubagentType = %q, want explore", p.SubagentType)
+	}
+	if p.TaskDescription != "Explore the codebase" {
+		t.Errorf("TaskDescription = %q", p.TaskDescription)
+	}
+}
+
+func TestParseMessage_TaskNotification_SubagentTypeAndDescription(t *testing.T) {
+	data := map[string]any{
+		"type":             "system",
+		"subtype":          "task_notification",
+		"task_id":          "t1",
+		"status":           "completed",
+		"uuid":             "u1",
+		"session_id":       "s1",
+		"subagent_type":    "plan",
+		"task_description": "Plan the migration",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	n := msg.(*TaskNotificationMessage)
+	if n.SubagentType != "plan" {
+		t.Errorf("SubagentType = %q, want plan", n.SubagentType)
+	}
+	if n.TaskDescription != "Plan the migration" {
+		t.Errorf("TaskDescription = %q", n.TaskDescription)
+	}
+}

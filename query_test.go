@@ -484,3 +484,184 @@ func TestInitialize_ExcludeDynamicSections(t *testing.T) {
 		}
 	})
 }
+
+// ---------------------------------------------------------------------------
+// ProcessError suppression branch (#204 follow-up for #174).
+// query.readMessages must NOT generate a ProcessError when an is_error result
+// was already delivered, but MUST generate one if the subprocess exits with
+// no prior is_error result.
+// ---------------------------------------------------------------------------
+
+func TestReadMessages_ProcessErrorSuppressedAfterIsErrorResult(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+
+	frames := []map[string]any{
+		// is_error result flips the suppression flag.
+		{"type": "result", "subtype": "error", "is_error": true, "session_id": "s"},
+		// Exit-error frame that follows must be suppressed.
+		{"type": "error", "error": "exit 1"},
+	}
+	go func() {
+		for _, f := range frames {
+			mt.messages <- f
+		}
+		_ = mt.Close()
+	}()
+
+	// Drain the message channel until it closes.
+	out := q.receiveMessages()
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case _, ok := <-out:
+			if !ok {
+				goto done
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for message channel to close")
+		}
+	}
+done:
+
+	if q.processError != nil {
+		t.Errorf("processError should be suppressed after is_error result, got: %v", q.processError)
+	}
+	_ = q.close()
+}
+
+func TestReadMessages_ProcessErrorSurfacedWhenNoIsErrorResult(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+
+	frames := []map[string]any{
+		// A normal (non-error) result first.
+		{"type": "result", "subtype": "success", "is_error": false, "session_id": "s"},
+		// Then the subprocess exits with an error frame: no prior is_error,
+		// so processError must capture it.
+		{"type": "error", "error": "exec failed: signal: killed"},
+	}
+	go func() {
+		for _, f := range frames {
+			mt.messages <- f
+		}
+		_ = mt.Close()
+	}()
+
+	out := q.receiveMessages()
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case _, ok := <-out:
+			if !ok {
+				goto done
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for message channel to close")
+		}
+	}
+done:
+
+	if q.processError == nil {
+		t.Fatal("processError should be set when no is_error result preceded the exit error")
+	}
+	if !strings.Contains(q.processError.Error(), "exec failed") {
+		t.Errorf("processError.Error() = %q, want it to include 'exec failed'", q.processError.Error())
+	}
+	if _, ok := q.processError.(*ProcessError); !ok {
+		t.Errorf("processError should be *ProcessError, got %T", q.processError)
+	}
+	_ = q.close()
+}
+
+// ---------------------------------------------------------------------------
+// parsePermissionUpdate coverage (#204 follow-up for #176): exercise each
+// PermissionUpdateType branch so the typed parsing path stays correct.
+// ---------------------------------------------------------------------------
+
+func TestParsePermissionUpdate_AddRules(t *testing.T) {
+	in := map[string]any{
+		"type":     "addRules",
+		"behavior": "allow",
+		"rules": []any{
+			map[string]any{"toolName": "Bash", "ruleContent": "ls *"},
+			map[string]any{"toolName": "Read"},
+		},
+		"destination": "session",
+	}
+	p := parsePermissionUpdate(in)
+	if p.Type != PermissionUpdateAddRules {
+		t.Errorf("Type = %q", p.Type)
+	}
+	if p.Behavior != "allow" {
+		t.Errorf("Behavior = %q", p.Behavior)
+	}
+	if p.Destination != PermissionUpdateDestSession {
+		t.Errorf("Destination = %q", p.Destination)
+	}
+	if len(p.Rules) != 2 {
+		t.Fatalf("expected 2 rules, got %d", len(p.Rules))
+	}
+	if p.Rules[0].ToolName != "Bash" || p.Rules[0].RuleContent != "ls *" {
+		t.Errorf("Rules[0] = %+v", p.Rules[0])
+	}
+	if p.Rules[1].ToolName != "Read" || p.Rules[1].RuleContent != "" {
+		t.Errorf("Rules[1] = %+v", p.Rules[1])
+	}
+}
+
+func TestParsePermissionUpdate_SetMode(t *testing.T) {
+	in := map[string]any{
+		"type": "setMode",
+		"mode": "acceptEdits",
+	}
+	p := parsePermissionUpdate(in)
+	if p.Type != PermissionUpdateSetMode {
+		t.Errorf("Type = %q", p.Type)
+	}
+	if p.Mode != PermissionMode("acceptEdits") {
+		t.Errorf("Mode = %q", p.Mode)
+	}
+}
+
+func TestParsePermissionUpdate_AddDirectories(t *testing.T) {
+	in := map[string]any{
+		"type":        "addDirectories",
+		"directories": []any{"/a", "/b", "/c"},
+	}
+	p := parsePermissionUpdate(in)
+	if p.Type != PermissionUpdateAddDirectories {
+		t.Errorf("Type = %q", p.Type)
+	}
+	if len(p.Directories) != 3 || p.Directories[0] != "/a" || p.Directories[2] != "/c" {
+		t.Errorf("Directories = %v", p.Directories)
+	}
+}
+
+func TestParsePermissionUpdate_IgnoresNonStringDirectoryEntries(t *testing.T) {
+	// Defensive: directories array could contain mixed types under a buggy CLI.
+	in := map[string]any{
+		"type":        "addDirectories",
+		"directories": []any{"/a", 42, "/c"},
+	}
+	p := parsePermissionUpdate(in)
+	if len(p.Directories) != 2 {
+		t.Errorf("expected 2 valid string directories, got %v", p.Directories)
+	}
+}
+
+func TestParsePermissionUpdate_IgnoresNonMapRuleEntries(t *testing.T) {
+	in := map[string]any{
+		"type": "addRules",
+		"rules": []any{
+			map[string]any{"toolName": "Bash"},
+			"not-a-map", // should be skipped without panic.
+		},
+	}
+	p := parsePermissionUpdate(in)
+	if len(p.Rules) != 1 {
+		t.Errorf("expected 1 valid rule, got %v", p.Rules)
+	}
+}
