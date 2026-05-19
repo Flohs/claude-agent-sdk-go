@@ -2,10 +2,9 @@
 
 ## [Unreleased]
 
-
 ### Added
 
-- `EffortXHigh` (`"x-high"`) constant for the `Effort` type, enabling Opus 4.7's extended thinking effort level. Port of TypeScript SDK v0.3.144. ([#170](https://github.com/Flohs/claude-agent-sdk-go/issues/170))
+- `EffortXHigh` (`"xhigh"`) constant for the `Effort` type, enabling Opus 4.7's extended thinking effort level. Port of Python SDK v0.1.74 / TypeScript SDK v0.3.144. ([#170](https://github.com/Flohs/claude-agent-sdk-go/issues/170))
 
 ### Changed
 
