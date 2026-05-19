@@ -168,6 +168,8 @@ type AssistantMessage struct {
 	// StopReason is why the model stopped generating (e.g. "end_turn",
 	// "tool_use", "max_tokens"). Empty when not provided.
 	StopReason string `json:"stop_reason,omitempty"`
+	// RequestID is the API request identifier for this message.
+	RequestID string `json:"request_id,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
@@ -202,12 +204,16 @@ const (
 // TaskStartedMessage is emitted when a task starts.
 type TaskStartedMessage struct {
 	SystemMessage
-	TaskID      string `json:"task_id"`
-	Description string `json:"description"`
-	UUID        string `json:"uuid"`
-	SessionID   string `json:"session_id"`
-	ToolUseID   string `json:"tool_use_id,omitempty"`
-	TaskType    string `json:"task_type,omitempty"`
+	TaskID          string `json:"task_id"`
+	Description     string `json:"description"`
+	UUID            string `json:"uuid"`
+	SessionID       string `json:"session_id"`
+	ToolUseID       string `json:"tool_use_id,omitempty"`
+	TaskType        string `json:"task_type,omitempty"`
+	// SubagentType identifies the type of subagent that started this task.
+	SubagentType    string `json:"subagent_type,omitempty"`
+	// TaskDescription is a human-readable description of the task.
+	TaskDescription string `json:"task_description,omitempty"`
 }
 
 // TaskProgressMessage is emitted while a task is in progress.
@@ -223,6 +229,10 @@ type TaskProgressMessage struct {
 	// Summary is an AI-generated progress summary when AgentProgressSummaries
 	// is enabled in Options.
 	Summary string `json:"summary,omitempty"`
+	// SubagentType identifies the type of subagent that owns this task.
+	SubagentType string `json:"subagent_type,omitempty"`
+	// TaskDescription is a human-readable description of the task.
+	TaskDescription string `json:"task_description,omitempty"`
 }
 
 // TaskNotificationMessage is emitted when a task completes, fails, or is stopped.
@@ -236,6 +246,10 @@ type TaskNotificationMessage struct {
 	SessionID  string                 `json:"session_id"`
 	ToolUseID  string                 `json:"tool_use_id,omitempty"`
 	Usage      *TaskUsage             `json:"usage,omitempty"`
+	// SubagentType identifies the type of subagent that completed this task.
+	SubagentType string `json:"subagent_type,omitempty"`
+	// TaskDescription is a human-readable description of the completed task.
+	TaskDescription string `json:"task_description,omitempty"`
 }
 
 // MirrorErrorMessage is an SDK-synthesized system message emitted when the
@@ -276,7 +290,9 @@ type ResultMessage struct {
 	APIErrorStatus *int `json:"api_error_status,omitempty"`
 	// Origin forwards the triggering message's origin so consumers can
 	// distinguish user-prompted results from task-notification followups.
-	Origin           string         `json:"origin,omitempty"`
+	Origin string `json:"origin,omitempty"`
+	// RequestID is the API request identifier for the final API call.
+	RequestID        string         `json:"request_id,omitempty"`
 	TotalCostUSD     *float64       `json:"total_cost_usd,omitempty"`
 	Usage            map[string]any `json:"usage,omitempty"`
 	Result           string         `json:"result,omitempty"`

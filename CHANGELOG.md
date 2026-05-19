@@ -11,6 +11,7 @@
 - `Options.StrictMcpConfig bool` field forwarded as `--strict-mcp-config` to the CLI, telling it to use only MCP servers passed via `McpServers` and ignore project, user, and global MCP configurations. Enables fully deterministic server sets for reproducible deployments. Port of TypeScript SDK v0.3.128. ([#178](https://github.com/Flohs/claude-agent-sdk-go/issues/178))
 - `Options.ForwardSubagentText bool` field forwarded as `--forward-subagent-text` to the CLI, enabling forwarding of subagent text messages to the parent session stream. Port of TypeScript SDK v0.3.130. ([#179](https://github.com/Flohs/claude-agent-sdk-go/issues/179))
 - `Origin string` field on `ResultMessage` that surfaces the triggering message's `SDKMessageOrigin`, allowing consumers to distinguish user-prompted results from task-notification followups. Port of TypeScript SDK v0.2.126. ([#180](https://github.com/Flohs/claude-agent-sdk-go/issues/180))
+- `RequestID string` field on `AssistantMessage` and `ResultMessage` for end-to-end request tracing. `SubagentType string` and `TaskDescription string` fields on `TaskStartedMessage`, `TaskProgressMessage`, and `TaskNotificationMessage` for richer task event context. Port of TypeScript SDK v0.3.142. ([#181](https://github.com/Flohs/claude-agent-sdk-go/issues/181))
 
 ### Changed
 
