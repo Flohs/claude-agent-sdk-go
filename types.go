@@ -269,7 +269,11 @@ type ResultMessage struct {
 	// TerminalReason describes why the session terminated (e.g. "completed",
 	// "aborted_tools", "max_turns", "blocking_limit"). Empty when not
 	// provided by the CLI.
-	TerminalReason   string         `json:"terminal_reason,omitempty"`
+	TerminalReason string `json:"terminal_reason,omitempty"`
+	// APIErrorStatus is the HTTP status code (e.g. 429, 500, 529) from a
+	// failing API call when IsError is true. Zero when not provided by the
+	// CLI (requires CLI >= v2.1.110).
+	APIErrorStatus   *int           `json:"api_error_status,omitempty"`
 	TotalCostUSD     *float64       `json:"total_cost_usd,omitempty"`
 	Usage            map[string]any `json:"usage,omitempty"`
 	Result           string         `json:"result,omitempty"`
