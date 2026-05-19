@@ -378,9 +378,18 @@ func (t *SubprocessTransport) handleStderr() {
 			continue
 		}
 		if t.options.Stderr != nil {
-			t.options.Stderr(line)
+			t.callStderr(line)
 		}
 	}
+}
+
+func (t *SubprocessTransport) callStderr(line string) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "Warning: StderrCallback panicked: %v\n", r)
+		}
+	}()
+	t.options.Stderr(line)
 }
 
 func (t *SubprocessTransport) buildCommand() []string {
