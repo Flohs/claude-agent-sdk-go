@@ -3778,3 +3778,136 @@ func TestForkSessionViaStore_NilStoreErrors(t *testing.T) {
 		t.Fatal("expected error for nil store")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// ImportSessionToStore tests (#204 follow-up for #184)
+// ---------------------------------------------------------------------------
+
+func TestImportSessionToStore_MainTranscriptOnly(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/import-main")
+	sessionID := testUUID1
+
+	content := strings.Join([]string{
+		makeUserLine("u1", "", "Hello"),
+		makeAssistantLine("a1", "u1", "Hi"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, sessionID, content)
+
+	store := NewInMemorySessionStore()
+	if err := ImportSessionToStore(context.Background(), store, sessionID, "/test/import-main"); err != nil {
+		t.Fatalf("ImportSessionToStore: %v", err)
+	}
+
+	// Verify both lines landed under the derived SessionKey.
+	key := SessionKey{
+		ProjectKey: sanitizePath("/test/import-main"),
+		SessionID:  sessionID,
+	}
+	entries, err := store.Load(context.Background(), key)
+	if err != nil {
+		t.Fatalf("store.Load: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d: %+v", len(entries), entries)
+	}
+	if entries[0]["type"] != "user" || entries[1]["type"] != "assistant" {
+		t.Errorf("entry order/type mismatch: %+v", entries)
+	}
+}
+
+func TestImportSessionToStore_IncludesSubagentTranscripts(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/import-sub")
+	sessionID := testUUID1
+	mainContent := strings.Join([]string{
+		makeUserLine("u1", "", "Hello"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, sessionID, mainContent)
+
+	// Subagent transcripts live under <session_id>/subagents/agent-<id>.jsonl.
+	subDir := filepath.Join(projDir, sessionID, "subagents")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	agentLine := makeAssistantLine("agA-msg1", "", "subagent reply")
+	if err := os.WriteFile(filepath.Join(subDir, "agent-alpha.jsonl"), []byte(agentLine+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewInMemorySessionStore()
+	if err := ImportSessionToStore(context.Background(), store, sessionID, "/test/import-sub"); err != nil {
+		t.Fatalf("ImportSessionToStore: %v", err)
+	}
+
+	// Main transcript landed.
+	mainKey := SessionKey{
+		ProjectKey: sanitizePath("/test/import-sub"),
+		SessionID:  sessionID,
+	}
+	mainEntries, err := store.Load(context.Background(), mainKey)
+	if err != nil || len(mainEntries) != 1 {
+		t.Fatalf("main transcript: err=%v entries=%v", err, mainEntries)
+	}
+
+	// Subagent transcript landed under the subagents/agent-<id> subkey.
+	subKey := SessionKey{
+		ProjectKey: sanitizePath("/test/import-sub"),
+		SessionID:  sessionID,
+		Subpath:    "subagents/agent-alpha",
+	}
+	subEntries, err := store.Load(context.Background(), subKey)
+	if err != nil {
+		t.Fatalf("subagent Load: %v", err)
+	}
+	if len(subEntries) != 1 {
+		t.Fatalf("expected 1 subagent entry, got %d: %+v", len(subEntries), subEntries)
+	}
+}
+
+func TestImportSessionToStore_InvalidUUIDErrors(t *testing.T) {
+	store := NewInMemorySessionStore()
+	err := ImportSessionToStore(context.Background(), store, "not-a-uuid")
+	if err == nil {
+		t.Fatal("expected error for invalid UUID")
+	}
+	if !strings.Contains(err.Error(), "invalid session ID") {
+		t.Errorf("expected 'invalid session ID' message, got: %v", err)
+	}
+}
+
+func TestImportSessionToStore_NilStoreErrors(t *testing.T) {
+	err := ImportSessionToStore(context.Background(), nil, testUUID1)
+	if err == nil {
+		t.Fatal("expected error for nil store")
+	}
+	if !strings.Contains(err.Error(), "nil") {
+		t.Errorf("expected nil-store message, got: %v", err)
+	}
+}
+
+func TestImportSessionToStore_SessionNotFoundErrors(t *testing.T) {
+	// CLAUDE_CONFIG_DIR is set to an empty temp dir; no session files exist.
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	store := NewInMemorySessionStore()
+	err := ImportSessionToStore(context.Background(), store, testUUID1)
+	if err == nil {
+		t.Fatal("expected error when session file is missing")
+	}
+	if !strings.Contains(err.Error(), "session not found") {
+		t.Errorf("expected 'session not found' message, got: %v", err)
+	}
+}
+
+func TestImportSessionToStore_VariadicDirectoryAcceptsZeroArgs(t *testing.T) {
+	// Locks in the variadic shape called out in the inline doc comment on
+	// ImportSessionToStore: the function must accept zero directory args and
+	// search all projects. If someone later switches to a non-variadic
+	// signature this test will fail to compile.
+	projDir := setupTestProjectDir(t, "/test/import-zero-args")
+	sessionID := testUUID1
+	writeSessionFile(t, projDir, sessionID, makeUserLine("u1", "", "hi")+"\n")
+
+	store := NewInMemorySessionStore()
+	if err := ImportSessionToStore(context.Background(), store, sessionID); err != nil {
+		t.Fatalf("ImportSessionToStore with no directory arg: %v", err)
+	}
+}

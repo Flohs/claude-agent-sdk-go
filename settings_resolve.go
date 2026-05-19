@@ -2,6 +2,7 @@ package claude
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -86,7 +87,14 @@ func ResolveSettings(opts *ResolveSettingsOptions) (*ResolvedSettings, error) {
 
 	for _, src := range sources {
 		m, err := readSettingsFile(src.path)
-		if err != nil || m == nil {
+		if err != nil {
+			// File exists but is unreadable or contains invalid JSON.
+			// Surface this — a corrupt settings file is a real user-facing
+			// bug, not something to silently skip. readSettingsFile returns
+			// (nil, nil) for ENOENT, which is the path that falls through.
+			return nil, fmt.Errorf("reading %s settings (%s): %w", src.name, src.path, err)
+		}
+		if m == nil {
 			continue
 		}
 		result.BySource[src.name] = m
@@ -95,10 +103,16 @@ func ResolveSettings(opts *ResolveSettingsOptions) (*ResolvedSettings, error) {
 		}
 	}
 
-	// Managed settings have the highest precedence.
+	// Managed settings have the highest precedence. Parse errors here are
+	// returned because the caller explicitly opted in by passing a non-empty
+	// ManagedSettings string — silently dropping their input would mask a bug
+	// in whatever produced the JSON.
 	if opts.ManagedSettings != "" {
 		m, err := parseSettingsJSON(opts.ManagedSettings)
-		if err == nil && m != nil {
+		if err != nil {
+			return nil, fmt.Errorf("parsing managed settings: %w", err)
+		}
+		if m != nil {
 			result.BySource["managed"] = m
 			for k, v := range m {
 				result.Merged[k] = v
