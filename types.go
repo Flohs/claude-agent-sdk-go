@@ -354,6 +354,30 @@ type MirrorErrorMessage struct {
 	SessionID string      `json:"session_id,omitempty"`
 }
 
+// HookDecision represents a hook's permission decision value.
+type HookDecision string
+
+const (
+	// HookDecisionApprove allows the tool to proceed.
+	HookDecisionApprove HookDecision = "approve"
+	// HookDecisionBlock denies the tool.
+	HookDecisionBlock HookDecision = "block"
+	// HookDecisionDefer pauses tool execution and surfaces the pending tool use
+	// on ResultMessage.DeferredToolUse so the SDK caller can prompt the user
+	// for a decision and then continue via a follow-up query.
+	HookDecisionDefer HookDecision = "defer"
+)
+
+// DeferredToolUse holds the pending tool call when a PreToolUse hook returns
+// {"decision": "defer"}. The CLI pauses execution and echoes the pending call
+// on ResultMessage so the SDK caller can inspect it, prompt the user, and
+// continue the session.
+type DeferredToolUse struct {
+	ToolUseID string         `json:"tool_use_id"`
+	ToolName  string         `json:"tool_name"`
+	ToolInput map[string]any `json:"tool_input"`
+}
+
 // ResultMessage contains cost and usage information for a completed query.
 type ResultMessage struct {
 	Subtype       string `json:"subtype"`
@@ -381,6 +405,10 @@ type ResultMessage struct {
 	Usage            map[string]any `json:"usage,omitempty"`
 	Result           string         `json:"result,omitempty"`
 	StructuredOutput any            `json:"structured_output,omitempty"`
+	// DeferredToolUse is populated when a PreToolUse hook returned
+	// {"decision": "defer"}, surfacing the pending tool call so the caller
+	// can prompt the user and resume. Nil when no deferral occurred.
+	DeferredToolUse *DeferredToolUse `json:"deferred_tool_use,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`

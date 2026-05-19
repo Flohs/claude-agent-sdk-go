@@ -238,6 +238,14 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 	}
 	msg.StructuredOutput = data["structured_output"]
 
+	if dtu, ok := data["deferred_tool_use"].(map[string]any); ok {
+		msg.DeferredToolUse = &DeferredToolUse{
+			ToolUseID: stringField(dtu, "tool_use_id"),
+			ToolName:  stringField(dtu, "tool_name"),
+			ToolInput: mapField(dtu, "tool_input"),
+		}
+	}
+
 	msg.RawData = data
 
 	return msg, nil
