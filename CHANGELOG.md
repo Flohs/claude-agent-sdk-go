@@ -1,6 +1,23 @@
 # Changelog
 
-## [Unreleased]
+## [2.0.0] - 2026-05-19
+
+This release lands a broad set of parity ports from the Python and TypeScript
+SDKs (v0.3.x line) plus three SDK-native features: `ResolveSettings` for
+inspecting the effective merged settings without spawning the CLI,
+`ImportSessionToStore` for migrating on-disk sessions into a `SessionStore`
+adapter, and `SessionStoreFlush` for opt-in eager transcript mirroring.
+Also adds deferred-tool-use plumbing (`HookDecisionDefer` +
+`ResultMessage.DeferredToolUse`), typed structs for the Task tool
+input/output schemas, richer `ToolPermissionContext` and message-parser
+fields for end-to-end tracing, and a small but real behavior change to
+`ResolveSettings` that surfaces JSON-parse errors instead of swallowing
+them.
+
+> **Breaking changes**: a single API-shape break —
+> `PermissionRequestHookInput.PermissionSuggestions` is now
+> `[]map[string]any` (was `[]any`). Most callers can drop their per-element
+> type-assertion. See the `### Changed` section below for the migration note.
 
 ### Added
 
