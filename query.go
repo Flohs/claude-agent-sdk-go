@@ -81,9 +81,10 @@ type queryConfig struct {
 	// is the base directory the CLI emits transcript filePath values under
 	// (resolved by [getProjectsDir]). loadTimeoutMs caps the batcher's
 	// flush-before-result wait; 0 means the 10s default.
-	sessionStore  SessionStore
-	projectsDir   string
-	loadTimeoutMs int
+	sessionStore      SessionStore
+	projectsDir       string
+	loadTimeoutMs     int
+	sessionStoreFlush SessionStoreFlushMode
 	// stderr receives diagnostics emitted by the batcher when it encounters
 	// a filePath it cannot resolve to a SessionKey. Optional.
 	stderr func(string)
@@ -140,6 +141,7 @@ func newQuery(cfg queryConfig) *query {
 			cfg.projectsDir,
 			q.reportMirrorError,
 			cfg.stderr,
+			cfg.sessionStoreFlush == SessionStoreFlushModeEager,
 		)
 	}
 

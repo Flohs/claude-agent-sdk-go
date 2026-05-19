@@ -83,7 +83,7 @@ func testProjectsDir(t *testing.T) (string, func(sessionID string) string) {
 func TestTranscriptMirrorBatcher_HappyPath(t *testing.T) {
 	projectsDir, pathFor := testProjectsDir(t)
 	store := &fakeStore{}
-	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, false)
 	defer b.Close()
 
 	b.Enqueue(pathFor("11111111-1111-1111-1111-111111111111"), []SessionStoreEntry{
@@ -109,7 +109,7 @@ func TestTranscriptMirrorBatcher_HappyPath(t *testing.T) {
 func TestTranscriptMirrorBatcher_CoalesceByFilePath(t *testing.T) {
 	projectsDir, pathFor := testProjectsDir(t)
 	store := &fakeStore{}
-	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, false)
 	defer b.Close()
 
 	path := pathFor("22222222-2222-2222-2222-222222222222")
@@ -141,7 +141,7 @@ func TestTranscriptMirrorBatcher_RetryThenSuccess(t *testing.T) {
 	store := &fakeStore{}
 	store.failCount.Store(1) // fail once, succeed on retry
 
-	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, false)
 	defer b.Close()
 
 	b.Enqueue(pathFor("44444444-4444-4444-4444-444444444444"), []SessionStoreEntry{{"uuid": "a"}})
@@ -176,7 +176,7 @@ func TestTranscriptMirrorBatcher_RetryExhaustion_FiresOnError(t *testing.T) {
 		gotErr = err
 	}
 
-	b := newTranscriptMirrorBatcher(store, projectsDir, onError, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, onError, nil, false)
 	defer b.Close()
 
 	sessionID := "55555555-5555-5555-5555-555555555555"
@@ -212,7 +212,7 @@ func TestTranscriptMirrorBatcher_TimeoutIsTerminal_NoRetry(t *testing.T) {
 		errCalls.Add(1)
 	}
 
-	b := newTranscriptMirrorBatcher(store, projectsDir, onError, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, onError, nil, false)
 	// Shrink the per-append timeout so the test is fast.
 	b.sendTimeout = 20 * time.Millisecond
 	defer b.Close()
@@ -235,7 +235,7 @@ func TestTranscriptMirrorBatcher_TimeoutIsTerminal_NoRetry(t *testing.T) {
 func TestTranscriptMirrorBatcher_ThresholdAutoFlush(t *testing.T) {
 	projectsDir, pathFor := testProjectsDir(t)
 	store := &fakeStore{}
-	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, false)
 	defer b.Close()
 
 	// Enqueue > MirrorMaxPendingEntries entries in a single frame. That
@@ -264,7 +264,7 @@ func TestTranscriptMirrorBatcher_ThresholdAutoFlush(t *testing.T) {
 func TestTranscriptMirrorBatcher_ConcurrentEnqueueAndFlush(t *testing.T) {
 	projectsDir, pathFor := testProjectsDir(t)
 	store := &fakeStore{}
-	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, false)
 	defer b.Close()
 
 	const workers = 8
@@ -310,7 +310,7 @@ func TestTranscriptMirrorBatcher_ConcurrentEnqueueAndFlush(t *testing.T) {
 func TestTranscriptMirrorBatcher_CloseDrainsPending(t *testing.T) {
 	projectsDir, pathFor := testProjectsDir(t)
 	store := &fakeStore{}
-	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, false)
 
 	b.Enqueue(pathFor("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), []SessionStoreEntry{
 		{"uuid": "a"}, {"uuid": "b"},
@@ -366,7 +366,7 @@ func TestTranscriptMirrorBatcher_CloseContext_RespectsDeadline(t *testing.T) {
 	store := newBlockingStore()
 	defer close(store.release) // unblock the worker so the test goroutine exits
 
-	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, false)
 
 	b.Enqueue(pathFor("cccccccc-cccc-cccc-cccc-cccccccccccc"), []SessionStoreEntry{
 		{"uuid": "z"},
@@ -392,7 +392,7 @@ func TestTranscriptMirrorBatcher_CloseContext_RespectsDeadline(t *testing.T) {
 func TestTranscriptMirrorBatcher_CloseContext_DrainsWhenAdapterHealthy(t *testing.T) {
 	projectsDir, pathFor := testProjectsDir(t)
 	store := &fakeStore{}
-	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, false)
 
 	b.Enqueue(pathFor("dddddddd-dddd-dddd-dddd-dddddddddddd"), []SessionStoreEntry{
 		{"uuid": "x"},
@@ -420,7 +420,7 @@ func TestTranscriptMirrorBatcher_UnresolvableFilePath_DropsWithWarning(t *testin
 	stderr := func(s string) { warnings.Add(1) }
 	onError := func(key SessionKey, err error) { errCalls.Add(1) }
 
-	b := newTranscriptMirrorBatcher(store, projectsDir, onError, stderr)
+	b := newTranscriptMirrorBatcher(store, projectsDir, onError, stderr, false)
 	defer b.Close()
 
 	// Path is outside the configured projects directory — should be dropped
@@ -445,7 +445,7 @@ func TestTranscriptMirrorBatcher_UnresolvableFilePath_DropsWithWarning(t *testin
 func TestTranscriptMirrorBatcher_EmptyFrameIsNoop(t *testing.T) {
 	projectsDir, pathFor := testProjectsDir(t)
 	store := &fakeStore{}
-	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil)
+	b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, false)
 	defer b.Close()
 
 	b.Enqueue(pathFor("cccccccc-cccc-cccc-cccc-cccccccccccc"), nil)

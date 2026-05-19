@@ -19,6 +19,22 @@ const (
 	SdkBetaContext1M SdkBeta = "context-1m-2025-08-07"
 )
 
+// SessionStoreFlushMode controls how the transcript mirror batcher delivers
+// frames to a [SessionStore].
+type SessionStoreFlushMode string
+
+const (
+	// SessionStoreFlushModeBatched is the default: frames are flushed at
+	// turn boundaries (before each result message) and when internal thresholds
+	// are reached ([MirrorMaxPendingEntries] / [MirrorMaxPendingBytes]).
+	SessionStoreFlushModeBatched SessionStoreFlushMode = "batched"
+	// SessionStoreFlushModeEager delivers every frame to the store in
+	// near-real-time: each [transcriptMirrorBatcher.Enqueue] call triggers an
+	// immediate background flush. Suitable for live-tail UIs, cross-process
+	// resume, and crash-durability use cases.
+	SessionStoreFlushModeEager SessionStoreFlushMode = "eager"
+)
+
 // SettingSource indicates where a setting comes from.
 type SettingSource string
 
@@ -295,4 +311,9 @@ type Options struct {
 	// flush-before-result wait used by the transcript mirror batcher. Zero
 	// means the internal default (10s) is used.
 	LoadTimeoutMs int
+	// SessionStoreFlush controls how the transcript mirror batcher delivers
+	// frames to the [SessionStore]. Defaults to [SessionStoreFlushModeBatched]
+	// when empty. Set to [SessionStoreFlushModeEager] for near-real-time
+	// delivery. Has no effect when SessionStore is nil.
+	SessionStoreFlush SessionStoreFlushMode
 }
