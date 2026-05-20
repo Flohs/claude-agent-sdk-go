@@ -100,11 +100,12 @@ func (c McpSdkServerConfig) MarshalJSON() ([]byte, error) {
 type McpServerConnectionStatus string
 
 const (
-	McpServerConnectionStatusConnected McpServerConnectionStatus = "connected"
-	McpServerConnectionStatusFailed    McpServerConnectionStatus = "failed"
-	McpServerConnectionStatusNeedsAuth McpServerConnectionStatus = "needs-auth"
-	McpServerConnectionStatusPending   McpServerConnectionStatus = "pending"
-	McpServerConnectionStatusDisabled  McpServerConnectionStatus = "disabled"
+	McpServerConnectionStatusConnected  McpServerConnectionStatus = "connected"
+	McpServerConnectionStatusFailed     McpServerConnectionStatus = "failed"
+	McpServerConnectionStatusNeedsAuth  McpServerConnectionStatus = "needs-auth"
+	McpServerConnectionStatusPending    McpServerConnectionStatus = "pending"
+	McpServerConnectionStatusRequesting McpServerConnectionStatus = "requesting"
+	McpServerConnectionStatusDisabled   McpServerConnectionStatus = "disabled"
 )
 
 // McpToolAnnotations contains tool annotations from MCP server status.

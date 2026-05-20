@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `McpServerConnectionStatusRequesting` (`"requesting"`) constant for the `McpServerConnectionStatus` type, covering the CLI state while it is actively authenticating or connecting to a remote MCP server. Port of TypeScript SDK v0.2.108. ([#206](https://github.com/Flohs/claude-agent-sdk-go/issues/206))
+
 ## [2.0.0] - 2026-05-19
 
 This release lands a broad set of parity ports from the Python and TypeScript
