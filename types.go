@@ -486,6 +486,21 @@ type ReadStateEntry struct {
 	Mtime int64  `json:"mtime"`
 }
 
+// ServerCapabilities describes model-level capabilities reported by the CLI
+// during session initialization. These fields allow callers to dynamically
+// check which effort levels and thinking modes the currently active model
+// supports, rather than hard-coding assumptions.
+type ServerCapabilities struct {
+	// SupportsEffort is true when the current model accepts the --effort flag.
+	SupportsEffort bool `json:"supportsEffort"`
+	// SupportedEffortLevels lists the effort values the model accepts.
+	// Empty when SupportsEffort is false.
+	SupportedEffortLevels []Effort `json:"supportedEffortLevels,omitempty"`
+	// SupportsAdaptiveThinking is true when the model supports adaptive
+	// thinking mode (ThinkingConfigAdaptive).
+	SupportsAdaptiveThinking bool `json:"supportsAdaptiveThinking"`
+}
+
 // SessionMessage represents a user or assistant message from a session transcript.
 type SessionMessage struct {
 	Type            string `json:"type"` // "user" or "assistant"
