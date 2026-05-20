@@ -566,6 +566,13 @@ func (t *SubprocessTransport) buildCommand() []string {
 		}
 	}
 
+	if opts.Debug {
+		cmd = append(cmd, "--debug")
+		if opts.DebugFile != "" {
+			cmd = append(cmd, "--debug-file", opts.DebugFile)
+		}
+	}
+
 	// Extra args
 	for flag, value := range opts.ExtraArgs {
 		if value == "" {
