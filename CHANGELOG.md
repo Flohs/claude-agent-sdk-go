@@ -5,6 +5,7 @@
 ### Added
 
 - `McpServerConnectionStatusRequesting` (`"requesting"`) constant for the `McpServerConnectionStatus` type, covering the CLI state while it is actively authenticating or connecting to a remote MCP server. Port of TypeScript SDK v0.2.108. ([#206](https://github.com/Flohs/claude-agent-sdk-go/issues/206))
+- `PermissionPolicy map[string]string` field on `McpSSEServerConfig` and `McpHTTPServerConfig` for per-tool permission policies. Keys are tool names; values are `"allow"`, `"ask"`, or `"deny"`. Forwarded to the CLI via the `--mcp-config` JSON blob so the CLI applies the policy to session allow/deny rules without requiring a `CanUseTool` callback. Port of TypeScript SDK v0.2.111. ([#208](https://github.com/Flohs/claude-agent-sdk-go/issues/208))
 
 ## [2.0.0] - 2026-05-19
 
