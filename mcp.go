@@ -37,6 +37,9 @@ func (c McpStdioServerConfig) MarshalJSON() ([]byte, error) {
 type McpSSEServerConfig struct {
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers,omitempty"`
+	// PermissionPolicy sets per-tool permission decisions for this server.
+	// Keys are tool names; values are "allow", "ask", or "deny".
+	PermissionPolicy map[string]string `json:"permissionPolicy,omitempty"`
 }
 
 func (McpSSEServerConfig) mcpServerConfigMarker() {}
@@ -57,6 +60,9 @@ func (c McpSSEServerConfig) MarshalJSON() ([]byte, error) {
 type McpHTTPServerConfig struct {
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers,omitempty"`
+	// PermissionPolicy sets per-tool permission decisions for this server.
+	// Keys are tool names; values are "allow", "ask", or "deny".
+	PermissionPolicy map[string]string `json:"permissionPolicy,omitempty"`
 }
 
 func (McpHTTPServerConfig) mcpServerConfigMarker() {}
