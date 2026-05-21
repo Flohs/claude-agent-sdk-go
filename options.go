@@ -55,6 +55,11 @@ const (
 	EffortXHigh  Effort = "xhigh"
 )
 
+// EffortLevel is an alias for [Effort] for compatibility with the Python SDK
+// naming convention. Both names resolve to the same underlying type and are
+// interchangeable in all contexts.
+type EffortLevel = Effort
+
 // SystemPrompt is the interface for system prompt configuration.
 type SystemPrompt interface {
 	systemPromptMarker()
