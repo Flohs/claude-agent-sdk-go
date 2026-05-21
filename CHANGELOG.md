@@ -10,6 +10,11 @@
 - `Options.Debug bool` and `Options.DebugFile string` fields for programmatic debug logging control. When `Debug` is true, the CLI subprocess emits verbose debug output; `DebugFile` redirects that output to a file. Callers who previously used `ExtraArgs["debug"]` / `ExtraArgs["debug-file"]` can migrate to these typed fields. Port of TypeScript SDK v0.2.30. ([#207](https://github.com/Flohs/claude-agent-sdk-go/issues/207))
 - `ServerCapabilities` struct with `SupportsEffort bool`, `SupportedEffortLevels []Effort`, and `SupportsAdaptiveThinking bool` fields, exposing model capability flags from the CLI initialization result. `Client.GetServerCapabilities()` parses these from the raw init response; the full map remains accessible via `Client.GetServerInfo()`. Port of TypeScript SDK v0.2.49. ([#210](https://github.com/Flohs/claude-agent-sdk-go/issues/210))
 - `EffortLevel` type alias for [`Effort`] — provides the same type under the Python SDK naming convention so downstream wrappers that target multiple SDKs can reference it by a consistent name. Both `Effort` and `EffortLevel` resolve to the same underlying type and are interchangeable in all contexts. Port of Python SDK v0.2.82 PR #951. ([#216](https://github.com/Flohs/claude-agent-sdk-go/issues/216))
+- `examples/session_stores/redis/` — Redis-backed `SessionStore` reference adapter. Stores transcript entries in Redis lists (RPUSH/LRANGE) keyed by `SessionKey`; maintains a per-project sorted set for `ListSessions`. Implements `SessionStore` + `SessionStoreLister` + `SessionStoreDeleter` + `SessionStoreSubkeys`. Dependency: `github.com/redis/go-redis/v9`. ([#217](https://github.com/Flohs/claude-agent-sdk-go/issues/217))
+- `examples/session_stores/postgres/` — PostgreSQL-backed `SessionStore` reference adapter. Each transcript entry is stored as a JSONB row in a `claude_sessions` table ordered by auto-increment id. Includes `InitSchema` for one-time table/index creation. Implements all four extension interfaces. Dependency: `github.com/jackc/pgx/v5`. ([#217](https://github.com/Flohs/claude-agent-sdk-go/issues/217))
+- `examples/session_stores/s3/` — Amazon S3-backed `SessionStore` reference adapter. Each `Append` call writes one S3 object (`part-<unix_nano>.jsonl`); `Load` issues `ListObjectsV2` + `GetObject` per part. `ListSessions` scans the project prefix to derive session mtimes from `LastModified`; `Delete` uses `DeleteObjects` in batches of 1000. Implements all four extension interfaces. Dependencies: `github.com/aws/aws-sdk-go-v2/config` + `github.com/aws/aws-sdk-go-v2/service/s3`. ([#217](https://github.com/Flohs/claude-agent-sdk-go/issues/217))
+
+All three adapters live in standalone Go modules (`go.mod` with a `replace` directive pointing to the local SDK) so they do not pollute the root module's dependency graph. Copy the `adapter.go` file into your project and run `go get` to install the required client library. Port of TypeScript SDK PR anthropics/claude-agent-sdk-typescript#288.
 
 ## [2.0.0] - 2026-05-19
 
@@ -205,7 +210,7 @@ PRs.
 ### Changed
 
 - **Breaking:** `SDKSessionInfo.FileSize` changed from `int64` to `*int64` to align with the Python SDK. ([#46](https://github.com/Flohs/claude-agent-sdk-go/issues/46))
-- Minimum Claude CLI version bumped from `2.0.0` to `2.1.0` to ensure compatibility with features like skills, memory, mcpServers in agent definitions, typed `RateLimitEvent`, and `GetSessionInfo` with `tag/created_at`. ([#50](https://github.com/Flohs/claude-agent-sdk-go/issues/50))
+- Minimum Claude CLI version bumped from `2.1.0` to `2.1.0` to ensure compatibility with features like skills, memory, mcpServers in agent definitions, typed `RateLimitEvent`, and `GetSessionInfo` with `tag/created_at`. ([#50](https://github.com/Flohs/claude-agent-sdk-go/issues/50))
 - `sdkVersion` constant updated from `1.1.0` to `1.2.0`.
 
 ### Fixed
