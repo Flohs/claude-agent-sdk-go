@@ -187,6 +187,44 @@ func (c *Client) SendQueryWithContent(ctx context.Context, content any) error {
 	return c.transport.Write(string(data) + "\n")
 }
 
+// AppendMessage enqueues a user message without triggering an assistant
+// response turn. The message is added to the conversation context and will
+// be visible as prior history on the next SendQuery call.
+//
+// Use this to inject context — tool results, system notes, or background
+// information — into an ongoing session before the next interactive turn.
+//
+// Requires CLI >= v2.1.110.
+func (c *Client) AppendMessage(ctx context.Context, content any) error {
+	if c.q == nil || c.transport == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+
+	if !c.transport.IsReady() {
+		return &ConnectionError{SDKError: SDKError{Message: "Transport is not ready. The subprocess may have exited."}}
+	}
+
+	switch content.(type) {
+	case string:
+		// ok
+	case []any:
+		// ok
+	default:
+		return &SDKError{Message: fmt.Sprintf("content must be a string or []any, got %T", content)}
+	}
+
+	message := map[string]any{
+		"type":               "user",
+		"message":            map[string]any{"role": "user", "content": content},
+		"parent_tool_use_id": nil,
+		"session_id":         "default",
+		"shouldQuery":        false,
+	}
+
+	data, _ := json.Marshal(message)
+	return c.transport.Write(string(data) + "\n")
+}
+
 // ReceiveMessages returns a channel of all messages from Claude.
 func (c *Client) ReceiveMessages(ctx context.Context) <-chan Message {
 	out := make(chan Message, 100)
