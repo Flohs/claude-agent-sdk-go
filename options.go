@@ -236,6 +236,11 @@ type Options struct {
 	AddDirs []string
 	// Env sets additional environment variables for the CLI process.
 	Env map[string]string
+	// Debug enables verbose debug logging from the CLI subprocess.
+	Debug bool
+	// DebugFile writes debug output to the specified file path instead of stderr.
+	// Has no effect when Debug is false.
+	DebugFile string
 	// ExtraArgs passes arbitrary CLI flags. Keys are flag names, values are flag values (empty string for boolean flags).
 	ExtraArgs map[string]string
 	// MaxBufferSize sets the maximum bytes when buffering CLI stdout.
