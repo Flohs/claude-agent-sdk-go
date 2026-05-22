@@ -201,6 +201,18 @@ type HookJSONOutput map[string]any
 type HookCallback func(ctx context.Context, input HookInput, toolUseID string, hookCtx HookContext) (HookJSONOutput, error)
 
 // HookMatcher configures which hooks run for which events.
+//
+// # Dispatch order
+//
+// All matchers registered for a given event are dispatched **concurrently**
+// (in parallel). Total execution time is approximately the latency of the
+// slowest single hook, not the sum. Registration order does not determine
+// execution order, and hooks do not "gate" each other.
+//
+// This means designs that depend on sequential ordering are not supported.
+// For example, a rate-limiter placed first in the list cannot block
+// subsequent hooks from starting, because all hooks for the event begin at
+// the same time.
 type HookMatcher struct {
 	// Matcher is a tool name pattern (e.g., "Bash", "Write|MultiEdit|Edit").
 	Matcher string
