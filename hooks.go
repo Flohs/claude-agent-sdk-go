@@ -193,7 +193,54 @@ type HookContext struct {
 	Signal any // Reserved for future abort signal support
 }
 
+// Well-known keys for [HookJSONOutput].
+//
+// PreToolUse hooks may return:
+//   - [HookOutputKeyDecision] — "approve", "block", or "defer".
+//   - [HookOutputKeyReason] — human-readable reason shown to the user on block.
+//
+// PostToolUse hooks may return:
+//   - [HookOutputKeyUpdatedToolOutput] — replacement value for the tool's
+//     output before it reaches the model. Works for any tool type (Bash,
+//     Write, MCP tools, …). Supersedes [HookOutputKeyUpdatedMCPToolOutput].
+//   - [HookOutputKeyUpdatedMCPToolOutput] — deprecated; use
+//     [HookOutputKeyUpdatedToolOutput] instead.
+const (
+	// HookOutputKeyDecision is the output key for PreToolUse hook permission
+	// decisions ("approve", "block", "defer").
+	HookOutputKeyDecision = "decision"
+	// HookOutputKeyReason is the optional human-readable message shown when a
+	// PreToolUse hook blocks a tool call.
+	HookOutputKeyReason = "reason"
+	// HookOutputKeyUpdatedToolOutput is the PostToolUse output key for
+	// replacing a tool's output before the model sees it. Works for any tool
+	// type (Bash, Write, MCP servers, …).
+	// Port of TypeScript SDK v0.2.121 / Python SDK v0.1.74 PR #911.
+	HookOutputKeyUpdatedToolOutput = "updatedToolOutput"
+	// HookOutputKeyUpdatedMCPToolOutput is the legacy PostToolUse key for
+	// replacing MCP tool output. Deprecated — use
+	// [HookOutputKeyUpdatedToolOutput] instead, which works for all tools.
+	//
+	// Deprecated: use [HookOutputKeyUpdatedToolOutput].
+	HookOutputKeyUpdatedMCPToolOutput = "updatedMCPToolOutput"
+)
+
 // HookJSONOutput represents the output of a hook callback.
+//
+// Return nil (or an empty map) to take no action. Use the [HookOutputKey…]
+// constants for the well-known keys so callers avoid hard-coding strings:
+//
+//	// Block a tool call from a PreToolUse hook:
+//	return claude.HookJSONOutput{
+//	    claude.HookOutputKeyDecision: "block",
+//	    claude.HookOutputKeyReason:   "not allowed in this context",
+//	}, nil
+//
+//	// Replace tool output from a PostToolUse hook:
+//	return claude.HookJSONOutput{
+//	    claude.HookOutputKeyUpdatedToolOutput: sanitized,
+//	}, nil
+//
 // See https://code.claude.com/docs/en/hooks#advanced%3A-json-output
 type HookJSONOutput map[string]any
 
