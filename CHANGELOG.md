@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- `extractCreatedAtFromHead` now scans all lines in the head buffer when looking for a `timestamp` field, instead of stopping at the first valid JSON entry that happens to lack one. `ListSessions` and `GetSessionInfo` previously returned `CreatedAt: nil` for sessions whose first JSONL record was a metadata/summary entry without a `timestamp` key. Port of Python SDK v0.1.74 PR #907. ([#220](https://github.com/Flohs/claude-agent-sdk-go/issues/220))
 - `transcriptMirrorBatcher`: eliminated a `send on closed channel` race between `Enqueue` and `CloseContext`. The flush-request channel send in `Enqueue` and the channel close in `CloseContext` now both occur while holding the batcher mutex, making concurrent calls safe. The race was benign in normal SDK use (message-reader exits before `CloseContext` runs) but would panic in tests or embedders that exercise both concurrently. ([#221](https://github.com/Flohs/claude-agent-sdk-go/issues/221))
 
 ### Added

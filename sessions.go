@@ -1263,8 +1263,7 @@ func extractCreatedAtFromHead(head string) *int64 {
 			ms := int64(ts)
 			return &ms
 		}
-		// Only check the first valid JSON line
-		return nil
+		// No timestamp on this entry — keep scanning.
 	}
 	return nil
 }
