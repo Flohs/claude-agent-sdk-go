@@ -608,3 +608,37 @@ func TestBuildCommand_SessionMirrorFlag(t *testing.T) {
 		assertContainsFlag(t, cmd, "--session-mirror")
 	})
 }
+
+// TestHandleStderr_PanicInCallbackDoesNotAbortLoop is a regression test for
+// the stderr-callback panic-isolation guarantee (port of Python SDK v0.2.82
+// PR #932). A panicking Stderr callback must not abort the reading loop —
+// all subsequent stderr lines must still be delivered.
+func TestHandleStderr_PanicInCallbackDoesNotAbortLoop(t *testing.T) {
+	const totalLines = 5
+	const panicOnLine = 0 // panic on the very first delivery
+
+	var delivered []string
+
+	stderrFn := func(line string) {
+		delivered = append(delivered, line)
+		if len(delivered)-1 == panicOnLine {
+			panic("deliberate test panic")
+		}
+	}
+
+	// Call callStderr directly — it is the per-line panic-isolation wrapper
+	// that handleStderr invokes for every line. All lines must be delivered
+	// even when the callback panics on one of them.
+	transport := &SubprocessTransport{
+		options: &Options{Stderr: stderrFn},
+	}
+
+	for i := 0; i < totalLines; i++ {
+		transport.callStderr(strings.Repeat("x", i+1)) // unique, non-empty lines
+	}
+
+	if len(delivered) != totalLines {
+		t.Errorf("expected %d lines delivered, got %d — panic on line %d aborted the loop",
+			totalLines, len(delivered), panicOnLine)
+	}
+}
