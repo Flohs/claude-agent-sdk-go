@@ -458,3 +458,43 @@ func TestTranscriptMirrorBatcher_EmptyFrameIsNoop(t *testing.T) {
 		t.Fatalf("expected no Append calls for empty frames, got %d", got)
 	}
 }
+
+// TestTranscriptMirrorBatcher_ConcurrentEnqueueCloseContext is a race-detector
+// regression test: Enqueue and CloseContext previously had a window where
+// Enqueue could send on a closed channel (panic), because the flush-request
+// send happened outside the mutex while CloseContext closed the channel also
+// outside the mutex.
+func TestTranscriptMirrorBatcher_ConcurrentEnqueueCloseContext(t *testing.T) {
+	projectsDir, pathFor := testProjectsDir(t)
+	sid := "dddddddd-dddd-dddd-dddd-dddddddddddd"
+	entries := []SessionStoreEntry{{"type": "user"}}
+
+	// Run many iterations so the race detector (go test -race) has a good
+	// chance of catching any surviving window.
+	for i := 0; i < 200; i++ {
+		store := &fakeStore{}
+		b := newTranscriptMirrorBatcher(store, projectsDir, nil, nil, true /* eager */)
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+
+		// Goroutine 1: Enqueue a frame as soon as the start gate opens.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			b.Enqueue(pathFor(sid), entries)
+		}()
+
+		// Goroutine 2: CloseContext racing with the Enqueue above.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_ = b.CloseContext(context.Background())
+		}()
+
+		close(start) // release both goroutines simultaneously
+		wg.Wait()
+	}
+}
