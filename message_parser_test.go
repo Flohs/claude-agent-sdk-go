@@ -1029,3 +1029,28 @@ func TestParseMessage_TaskNotification_SubagentTypeAndDescription(t *testing.T) 
 		t.Errorf("TaskDescription = %q", n.TaskDescription)
 	}
 }
+
+func TestParseMessage_MemoryRecall(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "memory_recall",
+		"paths":   []any{"/home/user/.claude/memory.md", "/project/.claude/memory.md"},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*MemoryRecallMessage)
+	if !ok {
+		t.Fatalf("expected *MemoryRecallMessage, got %T", msg)
+	}
+	if len(m.Paths) != 2 {
+		t.Errorf("Paths length: got %d, want 2", len(m.Paths))
+	}
+	if m.Paths[0] != "/home/user/.claude/memory.md" {
+		t.Errorf("Paths[0]: got %q", m.Paths[0])
+	}
+	if m.Subtype != "memory_recall" {
+		t.Errorf("Subtype: got %q, want 'memory_recall'", m.Subtype)
+	}
+}

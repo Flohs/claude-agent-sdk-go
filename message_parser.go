@@ -215,6 +215,21 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 		}
 		return msg, nil
 
+	case "memory_recall":
+		var paths []string
+		if raw, ok := data["paths"].([]any); ok {
+			paths = make([]string, 0, len(raw))
+			for _, p := range raw {
+				if s, ok := p.(string); ok {
+					paths = append(paths, s)
+				}
+			}
+		}
+		return &MemoryRecallMessage{
+			SystemMessage: base,
+			Paths:         paths,
+		}, nil
+
 	default:
 		return &base, nil
 	}

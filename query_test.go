@@ -665,3 +665,46 @@ func TestParsePermissionUpdate_IgnoresNonMapRuleEntries(t *testing.T) {
 		t.Errorf("expected 1 valid rule, got %v", p.Rules)
 	}
 }
+
+func TestGetServerCapabilities_MemoryPaths(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.initializationResult = map[string]any{
+		"supportsEffort":           true,
+		"supportsAdaptiveThinking": false,
+		"supportedEffortLevels":    []any{"low", "medium", "high"},
+		"memoryPaths":              []any{"/home/user/.claude/memory.md", "/project/.claude/memory.md"},
+	}
+
+	c := &Client{q: q}
+	caps := c.GetServerCapabilities()
+	if caps == nil {
+		t.Fatal("expected non-nil ServerCapabilities")
+	}
+	if len(caps.MemoryPaths) != 2 {
+		t.Fatalf("MemoryPaths length: got %d, want 2", len(caps.MemoryPaths))
+	}
+	if caps.MemoryPaths[0] != "/home/user/.claude/memory.md" {
+		t.Errorf("MemoryPaths[0] = %q, want /home/user/.claude/memory.md", caps.MemoryPaths[0])
+	}
+	if caps.MemoryPaths[1] != "/project/.claude/memory.md" {
+		t.Errorf("MemoryPaths[1] = %q, want /project/.claude/memory.md", caps.MemoryPaths[1])
+	}
+}
+
+func TestGetServerCapabilities_MemoryPaths_Absent(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.initializationResult = map[string]any{
+		"supportsEffort": true,
+	}
+
+	c := &Client{q: q}
+	caps := c.GetServerCapabilities()
+	if caps == nil {
+		t.Fatal("expected non-nil ServerCapabilities")
+	}
+	if caps.MemoryPaths != nil {
+		t.Errorf("MemoryPaths = %v, want nil when absent", caps.MemoryPaths)
+	}
+}

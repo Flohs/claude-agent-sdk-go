@@ -381,6 +381,14 @@ type ApiRetryMessage struct {
 	ErrorMessage string `json:"error_message,omitempty"`
 }
 
+// MemoryRecallMessage is emitted when Claude loads memory files during a session.
+// Port of TypeScript SDK v0.2.105.
+type MemoryRecallMessage struct {
+	SystemMessage
+	// Paths is the list of memory file paths that were loaded.
+	Paths []string `json:"paths,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 
@@ -526,6 +534,9 @@ type ServerCapabilities struct {
 	// SupportsAdaptiveThinking is true when the model supports adaptive
 	// thinking mode (ThinkingConfigAdaptive).
 	SupportsAdaptiveThinking bool `json:"supportsAdaptiveThinking"`
+	// MemoryPaths is the list of memory file paths loaded at session initialization.
+	// Empty when no memory files are configured.
+	MemoryPaths []string `json:"memoryPaths,omitempty"`
 }
 
 // SessionMessage represents a user or assistant message from a session transcript.

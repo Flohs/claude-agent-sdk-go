@@ -469,6 +469,13 @@ func (c *Client) GetServerCapabilities() *ServerCapabilities {
 			}
 		}
 	}
+	if paths, ok := c.q.initializationResult["memoryPaths"].([]any); ok {
+		for _, p := range paths {
+			if s, ok := p.(string); ok {
+				caps.MemoryPaths = append(caps.MemoryPaths, s)
+			}
+		}
+	}
 	return caps
 }
 
