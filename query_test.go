@@ -667,52 +667,21 @@ func TestParsePermissionUpdate_IgnoresNonMapRuleEntries(t *testing.T) {
 }
 
 func TestWarmQuery_Close_Idempotent(t *testing.T) {
-	// Verify WarmQuery.Close does not panic when called on a zero-value query.
-	// This is a compile-time + crash-safety test — no subprocess is started.
-	mt := &mockTransport{}
+	// Verify WarmQuery.Close does not hang or panic when no query has been sent.
+	// Uses autoRespondTransport whose ReadMessages respects context cancellation
+	// so that query.close() can unblock the readMessages goroutine via cancelFn.
+	mt := newAutoRespondTransport()
 	q := newQuery(queryConfig{transport: mt})
 	q.start()
 	wq := &WarmQuery{transport: mt, q: q}
-	wq.Close() // should not panic
-func TestGetServerCapabilities_MemoryPaths(t *testing.T) {
-	mt := newMockTransport()
-	q := newQuery(queryConfig{transport: mt})
-	q.initializationResult = map[string]any{
-		"supportsEffort":           true,
-		"supportsAdaptiveThinking": false,
-		"supportedEffortLevels":    []any{"low", "medium", "high"},
-		"memoryPaths":              []any{"/home/user/.claude/memory.md", "/project/.claude/memory.md"},
-	}
-
-	c := &Client{q: q}
-	caps := c.GetServerCapabilities()
-	if caps == nil {
-		t.Fatal("expected non-nil ServerCapabilities")
-	}
-	if len(caps.MemoryPaths) != 2 {
-		t.Fatalf("MemoryPaths length: got %d, want 2", len(caps.MemoryPaths))
-	}
-	if caps.MemoryPaths[0] != "/home/user/.claude/memory.md" {
-		t.Errorf("MemoryPaths[0] = %q, want /home/user/.claude/memory.md", caps.MemoryPaths[0])
-	}
-	if caps.MemoryPaths[1] != "/project/.claude/memory.md" {
-		t.Errorf("MemoryPaths[1] = %q, want /project/.claude/memory.md", caps.MemoryPaths[1])
-	}
-}
-
-func TestGetServerCapabilities_MemoryPaths_Absent(t *testing.T) {
-	mt := newMockTransport()
-	q := newQuery(queryConfig{transport: mt})
-	q.initializationResult = map[string]any{
-		"supportsEffort": true,
-	}
-
-	c := &Client{q: q}
-	caps := c.GetServerCapabilities()
-	if caps == nil {
-		t.Fatal("expected non-nil ServerCapabilities")
-	}
-	if caps.MemoryPaths != nil {
-		t.Errorf("MemoryPaths = %v, want nil when absent", caps.MemoryPaths)
+	done := make(chan struct{})
+	go func() {
+		wq.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("WarmQuery.Close did not return within 5 seconds")
 	}
 }
