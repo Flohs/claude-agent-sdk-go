@@ -61,7 +61,9 @@ type SubagentContext struct {
 type PreToolUseHookInput struct {
 	BaseHookInput
 	SubagentContext
-	ToolName  string         `json:"tool_name"`
+	ToolName string `json:"tool_name"`
+	// ToolInput contains the tool call arguments. For well-known tools, dedicated
+	// typed structs are available (e.g. [ExitPlanModeToolInput] for ExitPlanMode).
 	ToolInput map[string]any `json:"tool_input"`
 	ToolUseID string         `json:"tool_use_id"`
 }

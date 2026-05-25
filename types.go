@@ -262,6 +262,16 @@ const (
 	TaskStatusDeleted    TaskStatus = "deleted"
 )
 
+// ExitPlanModeToolInput is the typed input for the ExitPlanMode tool.
+// Accessible from [PreToolUseHookInput].ToolInput when ToolName is "ExitPlanMode".
+// Port of TypeScript SDK v0.2.76.
+type ExitPlanModeToolInput struct {
+	// PlanFilePath is the filesystem path of the plan file written during plan
+	// mode, if the user requested saving the plan. Empty string when no file
+	// was written.
+	PlanFilePath string `json:"planFilePath,omitempty"`
+}
+
 // TaskCreateInput is the input schema for the TaskCreate tool.
 type TaskCreateInput struct {
 	Subject     string         `json:"subject"`

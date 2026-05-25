@@ -758,3 +758,25 @@ func TestParseHookInput_ConsistentWithJSON(t *testing.T) {
 		t.Errorf("AgentType mismatch: %q vs %q", parsed.AgentType, direct.AgentType)
 	}
 }
+
+func TestExitPlanModeToolInput_Roundtrip(t *testing.T) {
+	raw := map[string]any{
+		"planFilePath": "/tmp/plan.md",
+	}
+	// Simulate how a hook callback would decode the ToolInput map.
+	// The struct should marshal/unmarshal correctly.
+	b, _ := json.Marshal(raw)
+	var input ExitPlanModeToolInput
+	if err := json.Unmarshal(b, &input); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if input.PlanFilePath != "/tmp/plan.md" {
+		t.Errorf("PlanFilePath: got %q, want '/tmp/plan.md'", input.PlanFilePath)
+	}
+	// Empty case
+	var empty ExitPlanModeToolInput
+	b2, _ := json.Marshal(empty)
+	if string(b2) != "{}" {
+		t.Errorf("empty struct should marshal to {}, got %s", b2)
+	}
+}
