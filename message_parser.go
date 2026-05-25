@@ -228,6 +228,16 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 		return &MemoryRecallMessage{
 			SystemMessage: base,
 			Paths:         paths,
+	case "elicitation_complete":
+		var result map[string]any
+		if r, ok := data["result"].(map[string]any); ok {
+			result = r
+		}
+		return &ElicitationCompleteMessage{
+			SystemMessage: base,
+			RequestID:     stringField(data, "request_id"),
+			ServerName:    stringField(data, "server_name"),
+			Result:        result,
 		}, nil
 
 	default:
