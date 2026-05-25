@@ -200,6 +200,21 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			TaskDescription: stringField(data, "task_description"),
 		}, nil
 
+	case "api_retry":
+		msg := &ApiRetryMessage{
+			SystemMessage: base,
+			AttemptNumber: intField(data, "attempt_number"),
+			MaxAttempts:   intField(data, "max_attempts"),
+			DelayMs:       intField(data, "delay_ms"),
+			ErrorMessage:  stringField(data, "error_message"),
+		}
+		if v, ok := data["error_status"]; ok {
+			if status := intFromAny(v); status != 0 {
+				msg.ErrorStatus = &status
+			}
+		}
+		return msg, nil
+
 	default:
 		return &base, nil
 	}

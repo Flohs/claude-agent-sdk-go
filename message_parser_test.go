@@ -930,6 +930,82 @@ func TestParseMessage_TaskProgress_SubagentTypeAndDescription(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ApiRetry(t *testing.T) {
+	status := 429
+	data := map[string]any{
+		"type":           "system",
+		"subtype":        "api_retry",
+		"attempt_number": float64(2),
+		"max_attempts":   float64(5),
+		"delay_ms":       float64(1000),
+		"error_status":   float64(429),
+		"error_message":  "Too Many Requests",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*ApiRetryMessage)
+	if !ok {
+		t.Fatalf("expected *ApiRetryMessage, got %T", msg)
+	}
+	if m.AttemptNumber != 2 {
+		t.Errorf("AttemptNumber: got %d, want 2", m.AttemptNumber)
+	}
+	if m.MaxAttempts != 5 {
+		t.Errorf("MaxAttempts: got %d, want 5", m.MaxAttempts)
+	}
+	if m.DelayMs != 1000 {
+		t.Errorf("DelayMs: got %d, want 1000", m.DelayMs)
+	}
+	if m.ErrorStatus == nil || *m.ErrorStatus != status {
+		t.Errorf("ErrorStatus: got %v, want %d", m.ErrorStatus, status)
+	}
+	if m.ErrorMessage != "Too Many Requests" {
+		t.Errorf("ErrorMessage: got %q, want 'Too Many Requests'", m.ErrorMessage)
+	}
+	if m.Subtype != "api_retry" {
+		t.Errorf("Subtype: got %q, want 'api_retry'", m.Subtype)
+	}
+}
+
+func TestParseMessage_ApiRetry_NoErrorStatus(t *testing.T) {
+	data := map[string]any{
+		"type":           "system",
+		"subtype":        "api_retry",
+		"attempt_number": float64(1),
+		"max_attempts":   float64(3),
+		"delay_ms":       float64(500),
+		"error_message":  "connection reset by peer",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*ApiRetryMessage)
+	if !ok {
+		t.Fatalf("expected *ApiRetryMessage, got %T", msg)
+	}
+	if m.ErrorStatus != nil {
+		t.Errorf("ErrorStatus: got %v, want nil", m.ErrorStatus)
+	}
+	if m.AttemptNumber != 1 {
+		t.Errorf("AttemptNumber: got %d, want 1", m.AttemptNumber)
+	}
+	if m.MaxAttempts != 3 {
+		t.Errorf("MaxAttempts: got %d, want 3", m.MaxAttempts)
+	}
+	if m.DelayMs != 500 {
+		t.Errorf("DelayMs: got %d, want 500", m.DelayMs)
+	}
+	if m.ErrorMessage != "connection reset by peer" {
+		t.Errorf("ErrorMessage: got %q, want 'connection reset by peer'", m.ErrorMessage)
+	}
+	if m.Subtype != "api_retry" {
+		t.Errorf("Subtype: got %q, want 'api_retry'", m.Subtype)
+	}
+}
+
 func TestParseMessage_TaskNotification_SubagentTypeAndDescription(t *testing.T) {
 	data := map[string]any{
 		"type":             "system",
