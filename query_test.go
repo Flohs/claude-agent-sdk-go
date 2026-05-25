@@ -666,6 +666,14 @@ func TestParsePermissionUpdate_IgnoresNonMapRuleEntries(t *testing.T) {
 	}
 }
 
+func TestWarmQuery_Close_Idempotent(t *testing.T) {
+	// Verify WarmQuery.Close does not panic when called on a zero-value query.
+	// This is a compile-time + crash-safety test — no subprocess is started.
+	mt := &mockTransport{}
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	wq := &WarmQuery{transport: mt, q: q}
+	wq.Close() // should not panic
 func TestGetServerCapabilities_MemoryPaths(t *testing.T) {
 	mt := newMockTransport()
 	q := newQuery(queryConfig{transport: mt})
