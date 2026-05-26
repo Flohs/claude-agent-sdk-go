@@ -730,3 +730,25 @@ func TestParseMessage_MirrorErrorMessage_NullKey(t *testing.T) {
 		t.Errorf("Error = %q", me.Error)
 	}
 }
+
+func TestParseMessage_MemoryRecall(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "memory_recall",
+		"paths":   []any{"/home/user/.claude/CLAUDE.md", "/project/.claude/CLAUDE.md"},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	rm, ok := msg.(*MemoryRecallMessage)
+	if !ok {
+		t.Fatalf("expected *MemoryRecallMessage, got %T", msg)
+	}
+	if len(rm.Paths) != 2 {
+		t.Errorf("len(Paths) = %d, want 2", len(rm.Paths))
+	}
+	if rm.Paths[0] != "/home/user/.claude/CLAUDE.md" {
+		t.Errorf("Paths[0] = %q", rm.Paths[0])
+	}
+}

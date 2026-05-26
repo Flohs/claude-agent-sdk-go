@@ -409,6 +409,37 @@ func (c *Client) GetServerInfo() map[string]any {
 	return c.q.initializationResult
 }
 
+// GetServerCapabilities returns the model capability fields from the CLI
+// initialization result. Returns nil when the client is not yet connected.
+// The raw initialization data is also available via [Client.GetServerInfo].
+func (c *Client) GetServerCapabilities() *ServerCapabilities {
+	if c.q == nil || c.q.initializationResult == nil {
+		return nil
+	}
+	caps := &ServerCapabilities{}
+	if v, ok := c.q.initializationResult["supportsEffort"].(bool); ok {
+		caps.SupportsEffort = v
+	}
+	if v, ok := c.q.initializationResult["supportsAdaptiveThinking"].(bool); ok {
+		caps.SupportsAdaptiveThinking = v
+	}
+	if levels, ok := c.q.initializationResult["supportedEffortLevels"].([]any); ok {
+		for _, l := range levels {
+			if s, ok := l.(string); ok {
+				caps.SupportedEffortLevels = append(caps.SupportedEffortLevels, Effort(s))
+			}
+		}
+	}
+	if paths, ok := c.q.initializationResult["memoryPaths"].([]any); ok {
+		for _, p := range paths {
+			if s, ok := p.(string); ok {
+				caps.MemoryPaths = append(caps.MemoryPaths, s)
+			}
+		}
+	}
+	return caps
+}
+
 // Close disconnects from Claude Code and cleans up resources.
 //
 // When Connect materialized a SessionStore-backed session into an ephemeral

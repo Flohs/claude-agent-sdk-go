@@ -255,6 +255,15 @@ type MirrorErrorMessage struct {
 	SessionID string      `json:"session_id,omitempty"`
 }
 
+// MemoryRecallMessage is emitted when Claude loads memory files during a
+// session. Allows SDK renderers to surface memory operations to users.
+// Requires CLI >= v2.1.105.
+type MemoryRecallMessage struct {
+	SystemMessage
+	// Paths is the list of memory file paths that were loaded.
+	Paths []string `json:"paths,omitempty"`
+}
+
 // ResultMessage contains cost and usage information for a completed query.
 type ResultMessage struct {
 	Subtype       string `json:"subtype"`
@@ -348,6 +357,24 @@ type SDKSessionInfo struct {
 type ReadStateEntry struct {
 	Path  string `json:"path"`
 	Mtime int64  `json:"mtime"`
+}
+
+// ServerCapabilities describes model-level capabilities reported by the CLI
+// during session initialization. These fields allow callers to dynamically
+// check which effort levels and thinking modes the currently active model
+// supports, rather than hard-coding assumptions.
+type ServerCapabilities struct {
+	// SupportsEffort is true when the current model accepts the --effort flag.
+	SupportsEffort bool `json:"supportsEffort"`
+	// SupportedEffortLevels lists the effort values the model accepts.
+	// Empty when SupportsEffort is false.
+	SupportedEffortLevels []Effort `json:"supportedEffortLevels,omitempty"`
+	// SupportsAdaptiveThinking is true when the model supports adaptive
+	// thinking mode (ThinkingConfigAdaptive).
+	SupportsAdaptiveThinking bool `json:"supportsAdaptiveThinking"`
+	// MemoryPaths lists the memory file paths loaded at session initialization.
+	// Populated from the memoryPaths field in the CLI initialization response.
+	MemoryPaths []string `json:"memoryPaths,omitempty"`
 }
 
 // SessionMessage represents a user or assistant message from a session transcript.

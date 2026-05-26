@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- `MemoryRecallMessage` system message type emitted when Claude loads memory files during a session, exposing the `Paths []string` of loaded memory files. Port of TypeScript SDK v0.2.105. ([#235](https://github.com/Flohs/claude-agent-sdk-go/issues/235))
+- `ServerCapabilities.MemoryPaths []string` field populated from `memoryPaths` in the CLI initialization response. Port of TypeScript SDK v0.2.105. ([#235](https://github.com/Flohs/claude-agent-sdk-go/issues/235))
+
 ### Changed
 
 - `.github/dependabot.yml` — added `cooldown.default-days: 2` to both `gomod` and `github-actions` ecosystems so Dependabot waits at least 2 days after a release before proposing the update. ([#168](https://github.com/Flohs/claude-agent-sdk-go/issues/168))
