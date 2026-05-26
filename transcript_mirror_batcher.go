@@ -143,17 +143,16 @@ func (b *transcriptMirrorBatcher) Enqueue(filePath string, entries []SessionStor
 	b.pendingItems += len(entries)
 	b.pendingBytes += size
 	shouldFlush := b.eager || b.pendingItems > MirrorMaxPendingEntries || b.pendingBytes > MirrorMaxPendingBytes
-	b.mu.Unlock()
-
+	// Send the flush request while still holding the mutex so it can never
+	// race with CloseContext closing the channel. The send is non-blocking
+	// (default case) so the mutex is never held while waiting on I/O.
 	if shouldFlush {
-		// Fire-and-forget auto-flush. Send is non-blocking: if the worker
-		// is busy and the request buffer is full, the next explicit Flush /
-		// the next threshold-cross will pick up the still-pending items.
 		select {
 		case b.flushRequests <- flushRequest{}:
 		default:
 		}
 	}
+	b.mu.Unlock()
 }
 
 // Flush blocks until all currently-pending entries are flushed (or fail
@@ -208,11 +207,10 @@ func (b *transcriptMirrorBatcher) CloseContext(ctx context.Context) error {
 		return nil
 	}
 	b.closed = true
-	b.mu.Unlock()
-
-	// Signal the worker to drain any remaining items and exit. The worker
-	// reads from flushRequests until it is closed.
+	// Close the channel while holding the mutex so it cannot race with the
+	// non-blocking send in Enqueue (which also runs under the mutex).
 	close(b.flushRequests)
+	b.mu.Unlock()
 
 	// Wait for the worker goroutine in a side goroutine so the caller's
 	// ctx can interrupt the wait without leaking the wg-watcher.

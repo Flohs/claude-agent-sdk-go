@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `transcriptMirrorBatcher`: eliminated a `send on closed channel` race between `Enqueue` and `CloseContext`. The flush-request channel send in `Enqueue` and the channel close in `CloseContext` now both occur while holding the batcher mutex, making concurrent calls safe. The race was benign in normal SDK use (message-reader exits before `CloseContext` runs) but would panic in tests or embedders that exercise both concurrently. ([#221](https://github.com/Flohs/claude-agent-sdk-go/issues/221))
+
 ### Added
 
 - `McpServerConnectionStatusRequesting` (`"requesting"`) constant for the `McpServerConnectionStatus` type, covering the CLI state while it is actively authenticating or connecting to a remote MCP server. Port of TypeScript SDK v0.2.108. ([#206](https://github.com/Flohs/claude-agent-sdk-go/issues/206))
