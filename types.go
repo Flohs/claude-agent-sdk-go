@@ -354,6 +354,23 @@ type MirrorErrorMessage struct {
 	SessionID string      `json:"session_id,omitempty"`
 }
 
+// ApiRetryMessage is emitted before each API retry attempt when the CLI
+// encounters a transient API error. Port of TypeScript SDK v0.2.77.
+type ApiRetryMessage struct {
+	SystemMessage
+	// AttemptNumber is the current attempt (1-based; 1 = first retry after the initial failure).
+	AttemptNumber int `json:"attempt_number"`
+	// MaxAttempts is the maximum number of attempts, including the initial one.
+	MaxAttempts int `json:"max_attempts"`
+	// DelayMs is the delay in milliseconds before this attempt.
+	DelayMs int `json:"delay_ms"`
+	// ErrorStatus is the HTTP status code that triggered the retry (e.g. 429, 529).
+	// Nil when the error was not an HTTP error.
+	ErrorStatus *int `json:"error_status,omitempty"`
+	// ErrorMessage is a human-readable description of the error that triggered the retry.
+	ErrorMessage string `json:"error_message,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 
