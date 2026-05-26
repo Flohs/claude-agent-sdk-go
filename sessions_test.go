@@ -2584,6 +2584,24 @@ func TestExtractCreatedAtFromHead_NoTimestamp(t *testing.T) {
 	}
 }
 
+func TestExtractCreatedAtFromHead_TimestampOnSecondLine(t *testing.T) {
+	// Regression: first JSON entry lacks "timestamp"; second entry has it.
+	// The function must continue scanning instead of returning nil early.
+	head := strings.Join([]string{
+		`{"type":"summary","content":"session metadata without timestamp"}`,
+		`{"type":"user","uuid":"u1","timestamp":"2025-01-15T10:30:00.000Z","message":{"role":"user","content":"Hello"}}`,
+		`{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":"Hi"}}`,
+	}, "\n") + "\n"
+	result := extractCreatedAtFromHead(head)
+	if result == nil {
+		t.Fatal("expected non-nil CreatedAt when timestamp is on second line")
+	}
+	expected := int64(1736937000000) // 2025-01-15T10:30:00.000Z
+	if *result != expected {
+		t.Errorf("expected %d, got %d", expected, *result)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // DeleteSession
 // ---------------------------------------------------------------------------
