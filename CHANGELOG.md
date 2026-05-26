@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-05-26
+
 ### Documentation
 
 - `HookMatcher`: added a **"Dispatch order"** GoDoc section clarifying that all matchers registered for a given event are dispatched concurrently (in parallel), not sequentially. Hook latency is bounded by the slowest single hook, and registration order does not determine execution order. Ordering-dependent designs (e.g. rate-limiters gating subsequent hooks) are not supported. Port of Python SDK v0.2.82 PR #956. ([#222](https://github.com/Flohs/claude-agent-sdk-go/issues/222))
