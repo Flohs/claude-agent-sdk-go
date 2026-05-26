@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Documentation
+
+- `HookMatcher`: added a **"Dispatch order"** GoDoc section clarifying that all matchers registered for a given event are dispatched concurrently (in parallel), not sequentially. Hook latency is bounded by the slowest single hook, and registration order does not determine execution order. Ordering-dependent designs (e.g. rate-limiters gating subsequent hooks) are not supported. Port of Python SDK v0.2.82 PR #956. ([#222](https://github.com/Flohs/claude-agent-sdk-go/issues/222))
+
 ### Tests
 
 - `TestHandleStderr_PanicInCallbackDoesNotAbortLoop`: regression test verifying that a panicking `Options.Stderr` callback does not abort the stderr-reader loop — all subsequent lines are still delivered. The behaviour was already correct (per-call `recover()` in `callStderr`), but there was no test to guard against a future regression. Port of Python SDK v0.2.82 PR #932. ([#223](https://github.com/Flohs/claude-agent-sdk-go/issues/223))
