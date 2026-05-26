@@ -244,6 +244,35 @@ const (
 // See https://code.claude.com/docs/en/hooks#advanced%3A-json-output
 type HookJSONOutput map[string]any
 
+// PostToolUseHookOutput is the typed output for [HookEventPostToolUse] callbacks.
+// Use [PostToolUseHookOutput.ToHookJSONOutput] to convert to the [HookJSONOutput] map
+// that [HookCallback] must return.
+//
+// Port of TypeScript SDK v0.2.121.
+type PostToolUseHookOutput struct {
+	// UpdatedToolOutput, when non-nil, replaces the tool's output that the model sees.
+	// Applies to all tool types (Bash, Write, MCP tools, etc.). Port of TypeScript SDK v0.2.121.
+	UpdatedToolOutput any
+	// UpdatedMCPToolOutput is deprecated: use UpdatedToolOutput instead.
+	// When non-nil and UpdatedToolOutput is nil, replaces the output for MCP tools only.
+	//
+	// Deprecated: Use UpdatedToolOutput.
+	UpdatedMCPToolOutput any
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map suitable for
+// returning from a [HookCallback]. Fields with a nil value are omitted.
+func (o PostToolUseHookOutput) ToHookJSONOutput() HookJSONOutput {
+	out := HookJSONOutput{}
+	if o.UpdatedToolOutput != nil {
+		out["updatedToolOutput"] = o.UpdatedToolOutput
+	}
+	if o.UpdatedMCPToolOutput != nil {
+		out["updatedMCPToolOutput"] = o.UpdatedMCPToolOutput
+	}
+	return out
+}
+
 // HookCallback is the function type for hook callbacks.
 //
 // When multiple callbacks match the same event — either via multiple [HookMatcher]
