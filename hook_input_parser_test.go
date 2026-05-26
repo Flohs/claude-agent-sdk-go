@@ -22,6 +22,7 @@ var (
 	_ TypedHookInput = (*TeammateIdleHookInput)(nil)
 	_ TypedHookInput = (*TaskCompletedHookInput)(nil)
 	_ TypedHookInput = (*ConfigChangeHookInput)(nil)
+	_ TypedHookInput = (*ElicitationHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -778,5 +779,71 @@ func TestExitPlanModeToolInput_Roundtrip(t *testing.T) {
 	b2, _ := json.Marshal(empty)
 	if string(b2) != "{}" {
 		t.Errorf("empty struct should marshal to {}, got %s", b2)
+}
+
+func TestParseHookInput_Elicitation(t *testing.T) {
+	input := HookInput{
+		"session_id":        "sess-elicit",
+		"transcript_path":   "/tmp/sess-elicit.jsonl",
+		"cwd":               "/project",
+		"permission_mode":   "default",
+		"hook_event_name":   "Elicitation",
+		"request_id":        "req-abc-123",
+		"server_name":       "my-mcp-server",
+		"message":           "Please provide your API key",
+		"requestedSchema":   map[string]any{"type": "object", "properties": map[string]any{"api_key": map[string]any{"type": "string"}}},
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*ElicitationHookInput)
+	if !ok {
+		t.Fatalf("expected *ElicitationHookInput, got %T", result)
+	}
+	if m.SessionID != "sess-elicit" {
+		t.Errorf("SessionID: got %q, want 'sess-elicit'", m.SessionID)
+	}
+	if m.RequestID != "req-abc-123" {
+		t.Errorf("RequestID: got %q, want 'req-abc-123'", m.RequestID)
+	}
+	if m.ServerName != "my-mcp-server" {
+		t.Errorf("ServerName: got %q, want 'my-mcp-server'", m.ServerName)
+	}
+	if m.Message != "Please provide your API key" {
+		t.Errorf("Message: got %q", m.Message)
+	}
+	if m.RequestedSchema == nil {
+		t.Error("RequestedSchema should not be nil")
+	}
+}
+
+func TestParseMessage_ElicitationComplete(t *testing.T) {
+	data := map[string]any{
+		"type":        "system",
+		"subtype":     "elicitation_complete",
+		"request_id":  "req-abc-123",
+		"server_name": "my-mcp-server",
+		"result":      map[string]any{"api_key": "sk-test-12345"},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*ElicitationCompleteMessage)
+	if !ok {
+		t.Fatalf("expected *ElicitationCompleteMessage, got %T", msg)
+	}
+	if m.RequestID != "req-abc-123" {
+		t.Errorf("RequestID: got %q, want 'req-abc-123'", m.RequestID)
+	}
+	if m.ServerName != "my-mcp-server" {
+		t.Errorf("ServerName: got %q, want 'my-mcp-server'", m.ServerName)
+	}
+	if m.Result == nil || m.Result["api_key"] != "sk-test-12345" {
+		t.Errorf("Result: got %v", m.Result)
+	}
+	if m.Subtype != "elicitation_complete" {
+		t.Errorf("Subtype: got %q, want 'elicitation_complete'", m.Subtype)
 	}
 }

@@ -114,6 +114,19 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			Changes:       mapField(input, "changes"),
 		}, nil
 
+	case HookEventElicitation:
+		var schema map[string]any
+		if s, ok := input["requestedSchema"].(map[string]any); ok {
+			schema = s
+		}
+		return &ElicitationHookInput{
+			BaseHookInput:   base,
+			RequestID:       stringField(input, "request_id"),
+			ServerName:      stringField(input, "server_name"),
+			Message:         stringField(input, "message"),
+			RequestedSchema: schema,
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil

@@ -25,6 +25,11 @@ const (
 	// HookEventConfigChange fires when session configuration changes (e.g.
 	// permission mode switch, model change). Port of TypeScript SDK v0.2.49.
 	HookEventConfigChange HookEvent = "ConfigChange"
+	// HookEventElicitation fires when an MCP server requests user input via
+	// the MCP elicitation protocol (MCP 2025-11-05). The hook callback can
+	// return a response map to provide the input programmatically, skipping
+	// any interactive prompt. Port of TypeScript SDK v0.2.76.
+	HookEventElicitation HookEvent = "Elicitation"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -189,6 +194,24 @@ type ConfigChangeHookInput struct {
 }
 
 func (*ConfigChangeHookInput) hookInputMarker() {}
+
+// ElicitationHookInput is the typed input for Elicitation hook events.
+// Fired when an MCP server requests user input via the MCP elicitation
+// protocol (MCP 2025-11-05). Port of TypeScript SDK v0.2.76.
+type ElicitationHookInput struct {
+	BaseHookInput
+	// RequestID is the identifier of the elicitation request.
+	RequestID string `json:"request_id,omitempty"`
+	// ServerName is the name of the MCP server requesting input.
+	ServerName string `json:"server_name,omitempty"`
+	// Message is the human-readable prompt from the MCP server.
+	Message string `json:"message,omitempty"`
+	// RequestedSchema is the JSON schema describing the form fields the server
+	// expects the user to fill in. Nil when no schema was provided.
+	RequestedSchema map[string]any `json:"requestedSchema,omitempty"`
+}
+
+func (*ElicitationHookInput) hookInputMarker() {}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {
