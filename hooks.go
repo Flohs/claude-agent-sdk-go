@@ -209,3 +209,36 @@ type HookMatcher struct {
 	// Timeout in seconds for all hooks in this matcher (default: 60).
 	Timeout *float64
 }
+
+// PostToolUseHookOutput is a typed helper for building [PostToolUse] hook
+// callback return values. All fields are optional — only set fields you want
+// to override.
+//
+// Usage:
+//
+//	output := claude.PostToolUseHookOutput{
+//	    UpdatedToolOutput: modifiedResult,
+//	}
+//	return output.ToHookJSONOutput(), nil
+type PostToolUseHookOutput struct {
+	// UpdatedToolOutput, when non-nil, replaces the tool's output for any
+	// tool type before it reaches the model. Supersedes UpdatedMCPToolOutput.
+	// Port of TypeScript SDK v0.2.121.
+	UpdatedToolOutput any `json:"updatedToolOutput,omitempty"`
+	// UpdatedMCPToolOutput is deprecated; use UpdatedToolOutput instead.
+	// Kept for backwards compatibility with callers targeting MCP tools only.
+	UpdatedMCPToolOutput any `json:"updatedMCPToolOutput,omitempty"`
+}
+
+// ToHookJSONOutput converts the typed output to the [HookJSONOutput] map
+// returned by [HookCallback] implementations.
+func (o PostToolUseHookOutput) ToHookJSONOutput() HookJSONOutput {
+	m := HookJSONOutput{}
+	if o.UpdatedToolOutput != nil {
+		m["updatedToolOutput"] = o.UpdatedToolOutput
+	}
+	if o.UpdatedMCPToolOutput != nil {
+		m["updatedMCPToolOutput"] = o.UpdatedMCPToolOutput
+	}
+	return m
+}

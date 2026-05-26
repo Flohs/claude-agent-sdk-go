@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- `ExitPlanModeToolInput` typed struct with `PlanFilePath string` field for accessing the plan file path from [PreToolUse] hook callbacks when `ToolName == "ExitPlanMode"`. Port of TypeScript SDK v0.2.76. ([#236](https://github.com/Flohs/claude-agent-sdk-go/issues/236))
+- `PostToolUseHookOutput` typed struct with `UpdatedToolOutput any` field (and deprecated `UpdatedMCPToolOutput`) for replacing a tool's output before it reaches the model from a PostToolUse hook. Includes `ToHookJSONOutput()` helper. Port of TypeScript SDK v0.2.121 / Python SDK v0.1.74 PR #911. ([#230](https://github.com/Flohs/claude-agent-sdk-go/issues/230))
+
 ### Changed
 
 - `.github/dependabot.yml` — added `cooldown.default-days: 2` to both `gomod` and `github-actions` ecosystems so Dependabot waits at least 2 days after a release before proposing the update. ([#168](https://github.com/Flohs/claude-agent-sdk-go/issues/168))

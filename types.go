@@ -406,3 +406,13 @@ type SessionListSubkeysKey struct {
 	ProjectKey string `json:"project_key"`
 	SessionID  string `json:"session_id"`
 }
+
+// ExitPlanModeToolInput is the typed input for the ExitPlanMode tool.
+// Accessible from [PreToolUseHookInput.ToolInput] when ToolName == "ExitPlanMode".
+// Cast or unmarshal ToolInput into this struct to read plan-mode output fields.
+// Requires CLI >= v2.1.76.
+type ExitPlanModeToolInput struct {
+	// PlanFilePath is the path of the plan file written during plan mode.
+	// Empty when no plan file was written.
+	PlanFilePath string `json:"planFilePath,omitempty"`
+}
