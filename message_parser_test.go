@@ -705,6 +705,42 @@ func TestParseMessage_MirrorErrorMessage(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ApiRetry(t *testing.T) {
+	errStatus := 429
+	data := map[string]any{
+		"type":           "system",
+		"subtype":        "api_retry",
+		"attempt_number": float64(2),
+		"max_attempts":   float64(3),
+		"delay_ms":       float64(1000),
+		"error_status":   float64(429),
+		"error_message":  "rate_limit_error",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	rm, ok := msg.(*ApiRetryMessage)
+	if !ok {
+		t.Fatalf("expected *ApiRetryMessage, got %T", msg)
+	}
+	if rm.AttemptNumber != 2 {
+		t.Errorf("AttemptNumber = %d, want 2", rm.AttemptNumber)
+	}
+	if rm.MaxAttempts != 3 {
+		t.Errorf("MaxAttempts = %d, want 3", rm.MaxAttempts)
+	}
+	if rm.DelayMs != 1000 {
+		t.Errorf("DelayMs = %d, want 1000", rm.DelayMs)
+	}
+	if rm.ErrorStatus == nil || *rm.ErrorStatus != errStatus {
+		t.Errorf("ErrorStatus = %v, want %d", rm.ErrorStatus, errStatus)
+	}
+	if rm.ErrorMessage != "rate_limit_error" {
+		t.Errorf("ErrorMessage = %q, want %q", rm.ErrorMessage, "rate_limit_error")
+	}
+}
+
 func TestParseMessage_MirrorErrorMessage_NullKey(t *testing.T) {
 	// When the key is absent/nil, the Key pointer should remain nil and the
 	// rest of the fields should populate.

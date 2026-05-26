@@ -193,6 +193,21 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Usage:         usage,
 		}, nil
 
+	case "api_retry":
+		msg := &ApiRetryMessage{
+			SystemMessage: base,
+			AttemptNumber: intField(data, "attempt_number"),
+			MaxAttempts:   intField(data, "max_attempts"),
+			DelayMs:       intField(data, "delay_ms"),
+			ErrorMessage:  stringField(data, "error_message"),
+		}
+		if v, ok := data["error_status"]; ok {
+			if s := intFromAny(v); s != 0 {
+				msg.ErrorStatus = &s
+			}
+		}
+		return msg, nil
+
 	default:
 		return &base, nil
 	}

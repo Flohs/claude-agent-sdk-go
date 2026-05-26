@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `ApiRetryMessage` system message type emitted before each API retry attempt when the CLI retries transient errors, exposing `AttemptNumber`, `MaxAttempts`, `DelayMs`, `ErrorStatus`, and `ErrorMessage`. Requires CLI >= v2.1.77. Port of TypeScript SDK v0.2.77. ([#234](https://github.com/Flohs/claude-agent-sdk-go/issues/234))
+
 ### Changed
 
 - `.github/dependabot.yml` — added `cooldown.default-days: 2` to both `gomod` and `github-actions` ecosystems so Dependabot waits at least 2 days after a release before proposing the update. ([#168](https://github.com/Flohs/claude-agent-sdk-go/issues/168))

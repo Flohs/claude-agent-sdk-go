@@ -255,6 +255,23 @@ type MirrorErrorMessage struct {
 	SessionID string      `json:"session_id,omitempty"`
 }
 
+// ApiRetryMessage is emitted before each API retry attempt when the CLI
+// retries transient API errors (e.g. rate limits, server errors). Requires
+// CLI >= v2.1.77.
+type ApiRetryMessage struct {
+	SystemMessage
+	// AttemptNumber is the current retry attempt (1-based).
+	AttemptNumber int `json:"attempt_number"`
+	// MaxAttempts is the maximum number of attempts allowed.
+	MaxAttempts int `json:"max_attempts"`
+	// DelayMs is the delay in milliseconds before this retry.
+	DelayMs int `json:"delay_ms"`
+	// ErrorStatus is the HTTP status code that triggered the retry, if any.
+	ErrorStatus *int `json:"error_status,omitempty"`
+	// ErrorMessage is the error message that triggered the retry.
+	ErrorMessage string `json:"error_message,omitempty"`
+}
+
 // ResultMessage contains cost and usage information for a completed query.
 type ResultMessage struct {
 	Subtype       string `json:"subtype"`
