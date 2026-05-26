@@ -17,6 +17,7 @@
 
 ### Added
 
+- CLI subprocesses are now registered in a global process registry and automatically terminated on `SIGINT`/`SIGTERM`, preventing orphaned `claude` processes when the parent Go program exits without calling `Close()`. Port of Python SDK v0.1.74 PR #916. ([#238](https://github.com/Flohs/claude-agent-sdk-go/issues/238))
 - `ApiRetryMessage` system message type emitted before each API retry attempt when the CLI encounters a transient error. Fields: `AttemptNumber`, `MaxAttempts`, `DelayMs`, `ErrorStatus *int`, `ErrorMessage`. Port of TypeScript SDK v0.2.77. ([#234](https://github.com/Flohs/claude-agent-sdk-go/issues/234))
 - `HookOutputKeyDecision`, `HookOutputKeyReason`, `HookOutputKeyUpdatedToolOutput`, and `HookOutputKeyUpdatedMCPToolOutput` exported string constants for the well-known `HookJSONOutput` map keys, replacing magic string literals. `HookJSONOutput`'s GoDoc is expanded with concrete usage examples for blocking tool calls and replacing tool output. Port of TypeScript SDK v0.2.121 / Python SDK v0.1.74. ([#224](https://github.com/Flohs/claude-agent-sdk-go/issues/224))
 - `ExitPlanModeToolInput` typed struct with `PlanFilePath string` field for decoding the `ExitPlanMode` tool's input in `PreToolUse` hook callbacks. Port of TypeScript SDK v0.2.76. ([#236](https://github.com/Flohs/claude-agent-sdk-go/issues/236))

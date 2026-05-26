@@ -8,19 +8,79 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
+// activeChildren tracks all live CLI subprocess Commands so they can be
+// terminated when the parent Go process exits unexpectedly.
+// This mirrors Python SDK v0.1.74 PR #916 / TypeScript SDK parent-exit cleanup.
+var (
+	activeChildrenMu sync.Mutex
+	activeChildren   []*exec.Cmd
+)
+
+func registerChild(cmd *exec.Cmd) {
+	activeChildrenMu.Lock()
+	activeChildren = append(activeChildren, cmd)
+	activeChildrenMu.Unlock()
+}
+
+func unregisterChild(cmd *exec.Cmd) {
+	activeChildrenMu.Lock()
+	for i, c := range activeChildren {
+		if c == cmd {
+			activeChildren = append(activeChildren[:i], activeChildren[i+1:]...)
+			break
+		}
+	}
+	activeChildrenMu.Unlock()
+}
+
+func killActiveChildren() {
+	activeChildrenMu.Lock()
+	cmds := make([]*exec.Cmd, len(activeChildren))
+	copy(cmds, activeChildren)
+	activeChildren = activeChildren[:0]
+	activeChildrenMu.Unlock()
+	for _, cmd := range cmds {
+		if cmd.Process != nil {
+			if runtime.GOOS == "windows" {
+				_ = cmd.Process.Kill()
+			} else {
+				_ = cmd.Process.Signal(os.Interrupt)
+			}
+		}
+	}
+}
+
+func init() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		killActiveChildren()
+		// Re-raise the signal with the default handler so the process exits
+		// with the correct status code.
+		signal.Reset(os.Interrupt, syscall.SIGTERM)
+		proc, _ := os.FindProcess(os.Getpid())
+		if proc != nil {
+			_ = proc.Signal(syscall.SIGTERM)
+		}
+	}()
+}
+
 const (
-	defaultMaxBufferSize       = 1024 * 1024 // 1MB
-	minimumClaudeCodeVersion   = "2.1.90"
-	sdkVersion                 = "2.0.0"
+	defaultMaxBufferSize     = 1024 * 1024 // 1MB
+	minimumClaudeCodeVersion = "2.1.90"
+	sdkVersion               = "2.0.0"
 )
 
 // SubprocessTransport implements Transport using the Claude Code CLI subprocess.
@@ -146,6 +206,7 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	}
 
 	t.cmd = cmd
+	registerChild(cmd)
 	t.ready = true
 
 	// Handle stderr in background
@@ -234,7 +295,8 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 
 		// Wait for process to finish and check exit code
 		if t.cmd != nil {
-			if err := t.cmd.Wait(); err != nil {
+			cmd := t.cmd
+			if err := cmd.Wait(); err != nil {
 				if exitErr, ok := err.(*exec.ExitError); ok {
 					code := exitErr.ExitCode()
 					select {
@@ -246,6 +308,7 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 					}
 				}
 			}
+			unregisterChild(cmd)
 		}
 	}()
 
@@ -265,22 +328,24 @@ func (t *SubprocessTransport) Close() error {
 	}
 
 	if t.cmd != nil && t.cmd.Process != nil {
+		cmd := t.cmd
 		done := make(chan error, 1)
-		go func() { done <- t.cmd.Wait() }()
+		go func() { done <- cmd.Wait() }()
 		// Wait for process to exit naturally after stdin close
 		select {
 		case <-done:
 			// Process exited cleanly — no signal needed
 		case <-time.After(5 * time.Second):
 			// Grace period expired — escalate to SIGINT
-			_ = t.cmd.Process.Signal(os.Interrupt)
+			_ = cmd.Process.Signal(os.Interrupt)
 			select {
 			case <-done:
 			case <-time.After(5 * time.Second):
-				_ = t.cmd.Process.Kill()
+				_ = cmd.Process.Kill()
 				<-done
 			}
 		}
+		unregisterChild(cmd)
 	}
 
 	t.cmd = nil
