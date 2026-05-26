@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `extractCreatedAtFromHead` now scans all lines in the head buffer when searching for a `timestamp` field instead of returning `nil` after the first valid JSON entry that lacks one. Fixes `ListSessions` / `GetSessionInfo` returning `created_at: nil` for sessions whose first JSONL record is a non-timestamp entry. Port of Python SDK v0.1.74 PR #907. ([#220](https://github.com/Flohs/claude-agent-sdk-go/issues/220))
+
 ### Changed
 
 - `.github/dependabot.yml` — added `cooldown.default-days: 2` to both `gomod` and `github-actions` ecosystems so Dependabot waits at least 2 days after a release before proposing the update. ([#168](https://github.com/Flohs/claude-agent-sdk-go/issues/168))
