@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Tests
+
+- `TestHandleStderr_PanicInCallbackDoesNotAbortLoop`: regression test verifying that a panicking `Options.Stderr` callback does not abort the stderr-reader loop — all subsequent lines are still delivered. The behaviour was already correct (per-call `recover()` in `callStderr`), but there was no test to guard against a future regression. Port of Python SDK v0.2.82 PR #932. ([#223](https://github.com/Flohs/claude-agent-sdk-go/issues/223))
+
 ### Fixed
 
 - `extractCreatedAtFromHead` now scans all lines in the head buffer when looking for a `timestamp` field, instead of stopping at the first valid JSON entry that happens to lack one. `ListSessions` and `GetSessionInfo` previously returned `CreatedAt: nil` for sessions whose first JSONL record was a metadata/summary entry without a `timestamp` key. Port of Python SDK v0.1.74 PR #907. ([#220](https://github.com/Flohs/claude-agent-sdk-go/issues/220))
