@@ -198,6 +198,15 @@ type HookContext struct {
 type HookJSONOutput map[string]any
 
 // HookCallback is the function type for hook callbacks.
+//
+// When multiple callbacks match the same event — either via multiple [HookMatcher]
+// entries for the same [HookEvent] or multiple callbacks in a single matcher's
+// Hooks slice — the CLI dispatches them concurrently. Each callback is invoked in
+// its own goroutine from the SDK's perspective (the SDK handles each
+// hook_callback control request in a separate goroutine). Callbacks that share
+// mutable state must use appropriate synchronisation (e.g. sync.Mutex).
+//
+// Port of Python SDK v0.2.82 PR #956.
 type HookCallback func(ctx context.Context, input HookInput, toolUseID string, hookCtx HookContext) (HookJSONOutput, error)
 
 // HookMatcher configures which hooks run for which events.
