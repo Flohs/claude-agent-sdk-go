@@ -387,6 +387,8 @@ type MemoryRecallMessage struct {
 	SystemMessage
 	// Paths is the list of memory file paths that were loaded.
 	Paths []string `json:"paths,omitempty"`
+}
+
 // ElicitationCompleteMessage is emitted when an MCP server's elicitation
 // request completes. MCP elicitation allows MCP servers to request user input
 // programmatically (MCP protocol 2025-11-05). Port of TypeScript SDK v0.2.76.

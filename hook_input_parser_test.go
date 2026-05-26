@@ -779,6 +779,7 @@ func TestExitPlanModeToolInput_Roundtrip(t *testing.T) {
 	b2, _ := json.Marshal(empty)
 	if string(b2) != "{}" {
 		t.Errorf("empty struct should marshal to {}, got %s", b2)
+	}
 }
 
 func TestParseHookInput_Elicitation(t *testing.T) {
