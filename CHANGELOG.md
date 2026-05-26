@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Eliminated a data-race in `transcriptMirrorBatcher` where a concurrent `Enqueue`/`CloseContext` could send on a closed channel and panic. Both the non-blocking channel send and `close(flushRequests)` are now executed while holding the mutex, making the two operations mutually exclusive. ([#221](https://github.com/Flohs/claude-agent-sdk-go/issues/221))
+
 ### Added
 
 - `McpServerConnectionStatusRequesting` (`"requesting"`) constant for the `McpServerConnectionStatus` type, covering the CLI state while it is actively authenticating or connecting to a remote MCP server. Port of TypeScript SDK v0.2.108. ([#206](https://github.com/Flohs/claude-agent-sdk-go/issues/206))
