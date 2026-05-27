@@ -30,6 +30,7 @@ var (
 	_ TypedHookInput = (*PostCompactHookInput)(nil)
 	_ TypedHookInput = (*PostToolBatchHookInput)(nil)
 	_ TypedHookInput = (*PermissionDeniedHookInput)(nil)
+	_ TypedHookInput = (*ElicitationResultHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -990,6 +991,33 @@ func TestPermissionDeniedHookOutput_ToHookJSONOutput(t *testing.T) {
 	j2 := empty.ToHookJSONOutput()
 	if _, ok := j2["retry"]; ok {
 		t.Error("retry should be absent when false")
+	}
+}
+
+func TestParseHookInput_ElicitationResult(t *testing.T) {
+	input := merge(base("ElicitationResult"), HookInput{
+		"mcp_server_name": "my-mcp",
+		"elicitation_id":  "elicit-42",
+		"mode":            "form",
+		"action":          "accept",
+		"content":         map[string]any{"api_key": "sk-test"},
+	})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*ElicitationResultHookInput)
+	if !ok {
+		t.Fatalf("expected *ElicitationResultHookInput, got %T", result)
+	}
+	if m.McpServerName != "my-mcp" {
+		t.Errorf("McpServerName: got %q, want 'my-mcp'", m.McpServerName)
+	}
+	if m.Action != "accept" {
+		t.Errorf("Action: got %q, want 'accept'", m.Action)
+	}
+	if m.Content["api_key"] != "sk-test" {
+		t.Errorf("Content: got %v", m.Content)
 	}
 }
 

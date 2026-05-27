@@ -184,6 +184,16 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			Reason:        stringField(input, "reason"),
 		}, nil
 
+	case HookEventElicitationResult:
+		return &ElicitationResultHookInput{
+			BaseHookInput: base,
+			McpServerName: stringField(input, "mcp_server_name"),
+			ElicitationID: stringField(input, "elicitation_id"),
+			Mode:          stringField(input, "mode"),
+			Action:        stringField(input, "action"),
+			Content:       mapField(input, "content"),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil

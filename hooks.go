@@ -50,6 +50,9 @@ const (
 	HookEventPostToolBatch HookEvent = "PostToolBatch"
 	// HookEventPermissionDenied fires when a tool call is blocked by a permission check.
 	HookEventPermissionDenied HookEvent = "PermissionDenied"
+	// HookEventElicitationResult fires when an MCP server elicitation request
+	// completes (complements [HookEventElicitation] which fires when received).
+	HookEventElicitationResult HookEvent = "ElicitationResult"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -377,6 +380,24 @@ type PostToolBatchHookInput struct {
 }
 
 func (*PostToolBatchHookInput) hookInputMarker() {}
+
+// ElicitationResultHookInput is the typed input for ElicitationResult hook events.
+// Fires when an MCP server elicitation request completes.
+type ElicitationResultHookInput struct {
+	BaseHookInput
+	// McpServerName is the name of the MCP server that initiated elicitation.
+	McpServerName string `json:"mcp_server_name"`
+	// ElicitationID is the identifier of the elicitation request (optional).
+	ElicitationID string `json:"elicitation_id,omitempty"`
+	// Mode is the elicitation mode: "form" or "url" (optional).
+	Mode string `json:"mode,omitempty"`
+	// Action is the user's response: "accept", "decline", or "cancel".
+	Action string `json:"action"`
+	// Content contains the user-provided form content when Action is "accept" (optional).
+	Content map[string]any `json:"content,omitempty"`
+}
+
+func (*ElicitationResultHookInput) hookInputMarker() {}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {
