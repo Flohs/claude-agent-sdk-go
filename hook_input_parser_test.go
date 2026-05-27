@@ -28,6 +28,7 @@ var (
 	_ TypedHookInput = (*SessionEndHookInput)(nil)
 	_ TypedHookInput = (*StopFailureHookInput)(nil)
 	_ TypedHookInput = (*PostCompactHookInput)(nil)
+	_ TypedHookInput = (*PostToolBatchHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -911,6 +912,44 @@ func TestParseHookInput_PostCompact(t *testing.T) {
 	}
 	if m.CompactSummary != "Session compacted after 50k tokens." {
 		t.Errorf("CompactSummary: got %q", m.CompactSummary)
+	}
+}
+
+func TestParseHookInput_PostToolBatch(t *testing.T) {
+	input := merge(base("PostToolBatch"), HookInput{
+		"tool_calls": []any{
+			map[string]any{
+				"tool_name":     "Bash",
+				"tool_input":    map[string]any{"command": "ls"},
+				"tool_use_id":   "toolu_1",
+				"tool_response": map[string]any{"content": "file.txt"},
+			},
+			map[string]any{
+				"tool_name":   "Read",
+				"tool_input":  map[string]any{"path": "/README.md"},
+				"tool_use_id": "toolu_2",
+			},
+		},
+	})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*PostToolBatchHookInput)
+	if !ok {
+		t.Fatalf("expected *PostToolBatchHookInput, got %T", result)
+	}
+	if len(m.ToolCalls) != 2 {
+		t.Fatalf("ToolCalls: got %d, want 2", len(m.ToolCalls))
+	}
+	if m.ToolCalls[0].ToolName != "Bash" {
+		t.Errorf("ToolCalls[0].ToolName: got %q, want 'Bash'", m.ToolCalls[0].ToolName)
+	}
+	if m.ToolCalls[0].ToolUseID != "toolu_1" {
+		t.Errorf("ToolCalls[0].ToolUseID: got %q, want 'toolu_1'", m.ToolCalls[0].ToolUseID)
+	}
+	if m.ToolCalls[1].ToolName != "Read" {
+		t.Errorf("ToolCalls[1].ToolName: got %q, want 'Read'", m.ToolCalls[1].ToolName)
 	}
 }
 
