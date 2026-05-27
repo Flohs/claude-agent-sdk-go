@@ -24,6 +24,7 @@ var (
 	_ TypedHookInput = (*ConfigChangeHookInput)(nil)
 	_ TypedHookInput = (*ElicitationHookInput)(nil)
 	_ TypedHookInput = (*MessageDisplayHookInput)(nil)
+	_ TypedHookInput = (*SessionStartHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -817,6 +818,47 @@ func TestParseHookInput_Elicitation(t *testing.T) {
 	}
 	if m.RequestedSchema == nil {
 		t.Error("RequestedSchema should not be nil")
+	}
+}
+
+func TestParseHookInput_SessionStart(t *testing.T) {
+	input := base("SessionStart")
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*SessionStartHookInput)
+	if !ok {
+		t.Fatalf("expected *SessionStartHookInput, got %T", result)
+	}
+	if m.SessionID != "sess-1" {
+		t.Errorf("SessionID: got %q, want 'sess-1'", m.SessionID)
+	}
+}
+
+func TestSessionStartHookOutput_ToHookJSONOutput(t *testing.T) {
+	out := SessionStartHookOutput{ReloadSkills: true, SessionTitle: "My Session"}
+	j := out.ToHookJSONOutput()
+	if j["reloadSkills"] != true {
+		t.Errorf("reloadSkills: got %v, want true", j["reloadSkills"])
+	}
+	nested, ok := j["hookSpecificOutput"].(map[string]any)
+	if !ok {
+		t.Fatalf("hookSpecificOutput should be map, got %T", j["hookSpecificOutput"])
+	}
+	if nested["sessionTitle"] != "My Session" {
+		t.Errorf("sessionTitle: got %v, want 'My Session'", nested["sessionTitle"])
+	}
+}
+
+func TestSessionStartHookOutput_Empty_ToHookJSONOutput(t *testing.T) {
+	out := SessionStartHookOutput{}
+	j := out.ToHookJSONOutput()
+	if _, ok := j["reloadSkills"]; ok {
+		t.Error("reloadSkills should be absent when false")
+	}
+	if _, ok := j["hookSpecificOutput"]; ok {
+		t.Error("hookSpecificOutput should be absent when SessionTitle is empty")
 	}
 }
 

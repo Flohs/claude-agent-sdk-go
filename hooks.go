@@ -36,6 +36,9 @@ const (
 	// message and what the model sees are untouched.
 	// Port of TypeScript SDK v0.3.152.
 	HookEventMessageDisplay HookEvent = "MessageDisplay"
+	// HookEventSessionStart fires at the beginning of a session, before the first
+	// user turn. Port of TypeScript SDK v0.3.152.
+	HookEventSessionStart HookEvent = "SessionStart"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -253,6 +256,36 @@ func (o MessageDisplayHookOutput) ToHookJSONOutput() HookJSONOutput {
 	out := HookJSONOutput{}
 	if o.DisplayContent != nil {
 		out["displayContent"] = *o.DisplayContent
+	}
+	return out
+}
+
+// SessionStartHookInput is the typed input for SessionStart hook events.
+// Fires at session initialization before the first user turn.
+// Port of TypeScript SDK v0.3.152.
+type SessionStartHookInput struct {
+	BaseHookInput
+}
+
+func (*SessionStartHookInput) hookInputMarker() {}
+
+// SessionStartHookOutput is the typed output for [HookEventSessionStart]
+// callbacks. Port of TypeScript SDK v0.3.152.
+type SessionStartHookOutput struct {
+	// ReloadSkills, when true, triggers a skill re-scan during session start.
+	ReloadSkills bool
+	// SessionTitle, when non-empty, sets the session title during initialization.
+	SessionTitle string
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map.
+func (o SessionStartHookOutput) ToHookJSONOutput() HookJSONOutput {
+	out := HookJSONOutput{}
+	if o.ReloadSkills {
+		out["reloadSkills"] = true
+	}
+	if o.SessionTitle != "" {
+		out["hookSpecificOutput"] = map[string]any{"sessionTitle": o.SessionTitle}
 	}
 	return out
 }
