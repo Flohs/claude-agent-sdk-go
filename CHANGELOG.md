@@ -8,6 +8,7 @@
 - `HookEventSessionStart` (`"SessionStart"`) hook event constant, `SessionStartHookInput` typed struct, and `SessionStartHookOutput` typed output with `ReloadSkills bool`, `SessionTitle string`, and `ToHookJSONOutput()`. Returning `ReloadSkills: true` triggers a skill re-scan; `SessionTitle` sets the session title at initialization via `hookSpecificOutput.sessionTitle`. Port of TypeScript SDK v0.3.152. ([#250](https://github.com/Flohs/claude-agent-sdk-go/issues/250))
 - `HookEventSessionEnd` (`"SessionEnd"`) hook event and `SessionEndHookInput` typed struct. Fires when a session ends (complements `SessionStart`). ([#252](https://github.com/Flohs/claude-agent-sdk-go/issues/252))
 - `HookEventStopFailure` (`"StopFailure"`) hook event and `StopFailureHookInput` typed struct. Fires when the Stop hook itself encounters an error. ([#252](https://github.com/Flohs/claude-agent-sdk-go/issues/252))
+- `HookEventPostCompact` (`"PostCompact"`) hook event and `PostCompactHookInput` typed struct with `Trigger` (`"manual"` or `"auto"`) and `CompactSummary` fields. Fires after a context compaction completes. ([#253](https://github.com/Flohs/claude-agent-sdk-go/issues/253))
 
 ### Documentation
 

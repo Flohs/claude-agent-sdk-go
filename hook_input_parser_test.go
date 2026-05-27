@@ -27,6 +27,7 @@ var (
 	_ TypedHookInput = (*SessionStartHookInput)(nil)
 	_ TypedHookInput = (*SessionEndHookInput)(nil)
 	_ TypedHookInput = (*StopFailureHookInput)(nil)
+	_ TypedHookInput = (*PostCompactHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -889,6 +890,27 @@ func TestParseHookInput_StopFailure(t *testing.T) {
 	}
 	if m.SessionID != "sess-1" {
 		t.Errorf("SessionID: got %q, want 'sess-1'", m.SessionID)
+	}
+}
+
+func TestParseHookInput_PostCompact(t *testing.T) {
+	input := merge(base("PostCompact"), HookInput{
+		"trigger":         "auto",
+		"compact_summary": "Session compacted after 50k tokens.",
+	})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*PostCompactHookInput)
+	if !ok {
+		t.Fatalf("expected *PostCompactHookInput, got %T", result)
+	}
+	if m.Trigger != "auto" {
+		t.Errorf("Trigger: got %q, want 'auto'", m.Trigger)
+	}
+	if m.CompactSummary != "Session compacted after 50k tokens." {
+		t.Errorf("CompactSummary: got %q", m.CompactSummary)
 	}
 }
 
