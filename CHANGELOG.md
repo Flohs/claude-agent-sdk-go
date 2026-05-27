@@ -6,6 +6,8 @@
 
 - `HookEventMessageDisplay` (`"MessageDisplay"`) hook event constant, `MessageDisplayHookInput` typed struct (fields: `TurnID`, `MessageID`, `Index`, `Final`, `Delta`), and `MessageDisplayHookOutput` typed output struct with `DisplayContent *string` and `ToHookJSONOutput()` helper. The `MessageDisplay` hook fires during assistant message streaming; returning a non-nil `DisplayContent` replaces the text shown to the user. Display-only: the stored message and what the model sees are untouched. Port of TypeScript SDK v0.3.152. ([#249](https://github.com/Flohs/claude-agent-sdk-go/issues/249))
 - `HookEventSessionStart` (`"SessionStart"`) hook event constant, `SessionStartHookInput` typed struct, and `SessionStartHookOutput` typed output with `ReloadSkills bool`, `SessionTitle string`, and `ToHookJSONOutput()`. Returning `ReloadSkills: true` triggers a skill re-scan; `SessionTitle` sets the session title at initialization via `hookSpecificOutput.sessionTitle`. Port of TypeScript SDK v0.3.152. ([#250](https://github.com/Flohs/claude-agent-sdk-go/issues/250))
+- `HookEventSessionEnd` (`"SessionEnd"`) hook event and `SessionEndHookInput` typed struct. Fires when a session ends (complements `SessionStart`). ([#252](https://github.com/Flohs/claude-agent-sdk-go/issues/252))
+- `HookEventStopFailure` (`"StopFailure"`) hook event and `StopFailureHookInput` typed struct. Fires when the Stop hook itself encounters an error. ([#252](https://github.com/Flohs/claude-agent-sdk-go/issues/252))
 
 ### Documentation
 
