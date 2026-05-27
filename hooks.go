@@ -48,6 +48,8 @@ const (
 	// HookEventPostToolBatch fires after a batch of tool calls completes.
 	// Unlike PostToolUse (which fires per tool), this fires once for the whole batch.
 	HookEventPostToolBatch HookEvent = "PostToolBatch"
+	// HookEventPermissionDenied fires when a tool call is blocked by a permission check.
+	HookEventPermissionDenied HookEvent = "PermissionDenied"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -295,6 +297,37 @@ func (o SessionStartHookOutput) ToHookJSONOutput() HookJSONOutput {
 	}
 	if o.SessionTitle != "" {
 		out["hookSpecificOutput"] = map[string]any{"sessionTitle": o.SessionTitle}
+	}
+	return out
+}
+
+// PermissionDeniedHookInput is the typed input for PermissionDenied hook events.
+// Fires when a tool call is blocked by a permission check.
+type PermissionDeniedHookInput struct {
+	BaseHookInput
+	// ToolName is the name of the tool that was denied.
+	ToolName string `json:"tool_name"`
+	// ToolInput contains the tool call arguments.
+	ToolInput map[string]any `json:"tool_input"`
+	// ToolUseID is the ID of the tool use that was denied.
+	ToolUseID string `json:"tool_use_id"`
+	// Reason is the human-readable reason for the denial.
+	Reason string `json:"reason"`
+}
+
+func (*PermissionDeniedHookInput) hookInputMarker() {}
+
+// PermissionDeniedHookOutput is the typed output for [HookEventPermissionDenied] callbacks.
+type PermissionDeniedHookOutput struct {
+	// Retry, when true, asks the CLI to retry the permission check.
+	Retry bool
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map.
+func (o PermissionDeniedHookOutput) ToHookJSONOutput() HookJSONOutput {
+	out := HookJSONOutput{}
+	if o.Retry {
+		out["retry"] = true
 	}
 	return out
 }

@@ -175,6 +175,15 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			ToolCalls:     calls,
 		}, nil
 
+	case HookEventPermissionDenied:
+		return &PermissionDeniedHookInput{
+			BaseHookInput: base,
+			ToolName:      stringField(input, "tool_name"),
+			ToolInput:     mapField(input, "tool_input"),
+			ToolUseID:     stringField(input, "tool_use_id"),
+			Reason:        stringField(input, "reason"),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil
