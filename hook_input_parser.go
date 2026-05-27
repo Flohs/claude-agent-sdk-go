@@ -127,6 +127,16 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			RequestedSchema: schema,
 		}, nil
 
+	case HookEventMessageDisplay:
+		return &MessageDisplayHookInput{
+			BaseHookInput: base,
+			TurnID:        stringField(input, "turn_id"),
+			MessageID:     stringField(input, "message_id"),
+			Index:         intField(input, "index"),
+			Final:         boolField(input, "final"),
+			Delta:         stringField(input, "delta"),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil

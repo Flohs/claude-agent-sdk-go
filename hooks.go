@@ -30,6 +30,12 @@ const (
 	// return a response map to provide the input programmatically, skipping
 	// any interactive prompt. Port of TypeScript SDK v0.2.76.
 	HookEventElicitation HookEvent = "Elicitation"
+	// HookEventMessageDisplay fires during assistant message streaming, allowing
+	// hooks to transform or hide the displayed text. The Delta field contains
+	// newly completed lines since the prior flush. Display-only: the stored
+	// message and what the model sees are untouched.
+	// Port of TypeScript SDK v0.3.152.
+	HookEventMessageDisplay HookEvent = "MessageDisplay"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -212,6 +218,44 @@ type ElicitationHookInput struct {
 }
 
 func (*ElicitationHookInput) hookInputMarker() {}
+
+// MessageDisplayHookInput is the typed input for MessageDisplay hook events.
+// Fires during assistant message streaming. Delta contains newly completed
+// lines since the prior flush. Display-only: the stored message and what the
+// model sees are untouched. Port of TypeScript SDK v0.3.152.
+type MessageDisplayHookInput struct {
+	BaseHookInput
+	// TurnID identifies the current conversation turn.
+	TurnID string `json:"turn_id"`
+	// MessageID identifies the specific message being displayed.
+	MessageID string `json:"message_id"`
+	// Index is the position of this delta within the message stream.
+	Index int `json:"index"`
+	// Final indicates this is the last delta for the message.
+	Final bool `json:"final"`
+	// Delta contains the newly completed lines since the prior flush.
+	Delta string `json:"delta"`
+}
+
+func (*MessageDisplayHookInput) hookInputMarker() {}
+
+// MessageDisplayHookOutput is the typed output for [HookEventMessageDisplay]
+// callbacks. Port of TypeScript SDK v0.3.152.
+type MessageDisplayHookOutput struct {
+	// DisplayContent, when non-nil, replaces the text shown to the user.
+	// Display-only: does not affect the stored message or what the model sees.
+	DisplayContent *string
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map suitable
+// for returning from a [HookCallback]. Fields with a nil value are omitted.
+func (o MessageDisplayHookOutput) ToHookJSONOutput() HookJSONOutput {
+	out := HookJSONOutput{}
+	if o.DisplayContent != nil {
+		out["displayContent"] = *o.DisplayContent
+	}
+	return out
+}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {

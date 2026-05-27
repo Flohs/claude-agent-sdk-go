@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `HookEventMessageDisplay` (`"MessageDisplay"`) hook event constant, `MessageDisplayHookInput` typed struct (fields: `TurnID`, `MessageID`, `Index`, `Final`, `Delta`), and `MessageDisplayHookOutput` typed output struct with `DisplayContent *string` and `ToHookJSONOutput()` helper. The `MessageDisplay` hook fires during assistant message streaming; returning a non-nil `DisplayContent` replaces the text shown to the user. Display-only: the stored message and what the model sees are untouched. Port of TypeScript SDK v0.3.152. ([#249](https://github.com/Flohs/claude-agent-sdk-go/issues/249))
+
 ### Fixed
 
 - `message_parser.go`: `MemoryRecallMessage` switch-case branch was missing `}, nil` before `case "elicitation_complete":`, leaving the struct literal open and causing a parse error. Residual from the v2.1.0 rebase conflict resolution.
