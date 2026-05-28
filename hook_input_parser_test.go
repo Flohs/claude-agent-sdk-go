@@ -36,6 +36,9 @@ var (
 	_ TypedHookInput = (*FileChangedHookInput)(nil)
 	_ TypedHookInput = (*WorktreeCreateHookInput)(nil)
 	_ TypedHookInput = (*WorktreeRemoveHookInput)(nil)
+	_ TypedHookInput = (*UserPromptExpansionHookInput)(nil)
+	_ TypedHookInput = (*SetupHookInput)(nil)
+	_ TypedHookInput = (*TaskCreatedHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -1266,5 +1269,96 @@ func TestParseHookInput_WorktreeRemove(t *testing.T) {
 	}
 	if m.WorktreePath != "/tmp/worktrees/feature-branch" {
 		t.Errorf("WorktreePath: got %q", m.WorktreePath)
+	}
+}
+
+func TestParseHookInput_UserPromptExpansion(t *testing.T) {
+	input := HookInput{
+		"session_id":      "sess-upe",
+		"transcript_path": "/tmp/sess-upe.jsonl",
+		"cwd":             "/project",
+		"permission_mode": "default",
+		"hook_event_name": "UserPromptExpansion",
+		"expansion_type":  "slash_command",
+		"command_name":    "build",
+		"command_args":    "--release",
+		"command_source":  "project",
+		"prompt":          "/build --release",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*UserPromptExpansionHookInput)
+	if !ok {
+		t.Fatalf("expected *UserPromptExpansionHookInput, got %T", result)
+	}
+	if m.ExpansionType != "slash_command" {
+		t.Errorf("ExpansionType: got %q", m.ExpansionType)
+	}
+	if m.CommandName != "build" {
+		t.Errorf("CommandName: got %q", m.CommandName)
+	}
+	if m.CommandArgs != "--release" {
+		t.Errorf("CommandArgs: got %q", m.CommandArgs)
+	}
+	if m.CommandSource != "project" {
+		t.Errorf("CommandSource: got %q", m.CommandSource)
+	}
+	if m.Prompt != "/build --release" {
+		t.Errorf("Prompt: got %q", m.Prompt)
+	}
+}
+
+func TestParseHookInput_Setup(t *testing.T) {
+	input := HookInput{
+		"session_id":      "sess-setup",
+		"transcript_path": "/tmp/sess-setup.jsonl",
+		"cwd":             "/project",
+		"permission_mode": "default",
+		"hook_event_name": "Setup",
+		"trigger":         "init",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*SetupHookInput)
+	if !ok {
+		t.Fatalf("expected *SetupHookInput, got %T", result)
+	}
+	if m.Trigger != "init" {
+		t.Errorf("Trigger: got %q", m.Trigger)
+	}
+}
+
+func TestParseHookInput_TaskCreated(t *testing.T) {
+	input := HookInput{
+		"session_id":       "sess-tc",
+		"transcript_path":  "/tmp/sess-tc.jsonl",
+		"cwd":              "/project",
+		"permission_mode":  "default",
+		"hook_event_name":  "TaskCreated",
+		"task_name":        "Refactor auth module",
+		"task_description": "Extract auth logic into separate package",
+		"agent_id":         "agent-77",
+		"agent_type":       "planner",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*TaskCreatedHookInput)
+	if !ok {
+		t.Fatalf("expected *TaskCreatedHookInput, got %T", result)
+	}
+	if m.TaskName != "Refactor auth module" {
+		t.Errorf("TaskName: got %q", m.TaskName)
+	}
+	if m.TaskDescription != "Extract auth logic into separate package" {
+		t.Errorf("TaskDescription: got %q", m.TaskDescription)
+	}
+	if m.AgentID != "agent-77" {
+		t.Errorf("AgentID: got %q", m.AgentID)
 	}
 }

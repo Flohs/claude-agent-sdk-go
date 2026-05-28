@@ -71,6 +71,17 @@ const (
 	// HookEventWorktreeRemove fires when the CLI is removing a git worktree.
 	// Observability only — output is not acted on.
 	HookEventWorktreeRemove HookEvent = "WorktreeRemove"
+	// HookEventUserPromptExpansion fires when a slash command or MCP prompt
+	// expands into a full prompt before being sent to the model. Matcher value
+	// is the command name (e.g. "build", "test").
+	HookEventUserPromptExpansion HookEvent = "UserPromptExpansion"
+	// HookEventSetup fires during one-time session initialization triggered by
+	// --init-only or the -p --init/--maintenance flags. Matcher value is the
+	// trigger type: "init" or "maintenance".
+	HookEventSetup HookEvent = "Setup"
+	// HookEventTaskCreated fires when a new task is being created (e.g. via
+	// the TaskCreate tool). Returning decision:"block" rolls back the creation.
+	HookEventTaskCreated HookEvent = "TaskCreated"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -506,6 +517,51 @@ type WorktreeRemoveHookInput struct {
 }
 
 func (*WorktreeRemoveHookInput) hookInputMarker() {}
+
+// UserPromptExpansionHookInput is the typed input for UserPromptExpansion hook
+// events. Fires when a slash command or MCP prompt expands before reaching the
+// model. The hook can block the expansion or inject additional context.
+type UserPromptExpansionHookInput struct {
+	BaseHookInput
+	// ExpansionType is "slash_command" or "mcp_prompt".
+	ExpansionType string `json:"expansion_type"`
+	// CommandName is the name of the slash command or MCP prompt being expanded.
+	CommandName string `json:"command_name"`
+	// CommandArgs is the raw argument string following the command name.
+	CommandArgs string `json:"command_args"`
+	// CommandSource describes where the command is defined: "plugin", "user",
+	// "project", or "mcp_server".
+	CommandSource string `json:"command_source"`
+	// Prompt is the full original prompt text (e.g. "/build --flag").
+	Prompt string `json:"prompt"`
+}
+
+func (*UserPromptExpansionHookInput) hookInputMarker() {}
+
+// SetupHookInput is the typed input for Setup hook events. Fires during
+// one-time session initialization (--init-only or -p --init/--maintenance).
+// Hook output is written to the debug log only; the hook cannot block setup.
+type SetupHookInput struct {
+	BaseHookInput
+	// Trigger is "init" or "maintenance".
+	Trigger string `json:"trigger"`
+}
+
+func (*SetupHookInput) hookInputMarker() {}
+
+// TaskCreatedHookInput is the typed input for TaskCreated hook events. Fires
+// when a new task is being created (e.g. via the TaskCreate tool). Returning
+// decision:"block" rolls back the creation.
+type TaskCreatedHookInput struct {
+	BaseHookInput
+	SubagentContext
+	// TaskName is the name assigned to the new task.
+	TaskName string `json:"task_name"`
+	// TaskDescription is the human-readable description of the task.
+	TaskDescription string `json:"task_description"`
+}
+
+func (*TaskCreatedHookInput) hookInputMarker() {}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {
