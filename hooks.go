@@ -64,6 +64,13 @@ const (
 	// deleted. Watch paths are registered via the SessionStart hook output.
 	// Observability only — output is not acted on.
 	HookEventFileChanged HookEvent = "FileChanged"
+	// HookEventWorktreeCreate fires when the CLI is creating a git worktree
+	// (used in parallel agent and isolated-workspace workflows). The hook
+	// callback can supply a custom worktree path via its output.
+	HookEventWorktreeCreate HookEvent = "WorktreeCreate"
+	// HookEventWorktreeRemove fires when the CLI is removing a git worktree.
+	// Observability only — output is not acted on.
+	HookEventWorktreeRemove HookEvent = "WorktreeRemove"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -458,6 +465,47 @@ type FileChangedHookInput struct {
 }
 
 func (*FileChangedHookInput) hookInputMarker() {}
+
+// WorktreeCreateHookInput is the typed input for WorktreeCreate hook events.
+// Fires when the CLI is about to create a git worktree for a parallel agent
+// or isolated workspace. The hook may return a custom worktree path.
+type WorktreeCreateHookInput struct {
+	BaseHookInput
+	// WorktreeName is the proposed name for the new worktree.
+	WorktreeName string `json:"worktree_name"`
+	// IsolationLevel describes the scope of isolation: "worktree" or "project".
+	IsolationLevel string `json:"isolation_level"`
+}
+
+func (*WorktreeCreateHookInput) hookInputMarker() {}
+
+// WorktreeCreateHookOutput is the typed output for [HookEventWorktreeCreate]
+// callbacks. A non-empty WorktreePath overrides the CLI-chosen worktree
+// location.
+type WorktreeCreateHookOutput struct {
+	// WorktreePath, when non-empty, tells the CLI where to create the worktree.
+	// The CLI uses this path instead of its default location.
+	WorktreePath string
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map.
+func (o WorktreeCreateHookOutput) ToHookJSONOutput() HookJSONOutput {
+	out := HookJSONOutput{}
+	if o.WorktreePath != "" {
+		out["hookSpecificOutput"] = map[string]any{"worktreePath": o.WorktreePath}
+	}
+	return out
+}
+
+// WorktreeRemoveHookInput is the typed input for WorktreeRemove hook events.
+// Fires when the CLI is removing a git worktree. Observability only.
+type WorktreeRemoveHookInput struct {
+	BaseHookInput
+	// WorktreePath is the absolute path of the worktree being removed.
+	WorktreePath string `json:"worktree_path"`
+}
+
+func (*WorktreeRemoveHookInput) hookInputMarker() {}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {

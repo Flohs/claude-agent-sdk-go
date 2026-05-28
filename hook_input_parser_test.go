@@ -34,6 +34,8 @@ var (
 	_ TypedHookInput = (*InstructionsLoadedHookInput)(nil)
 	_ TypedHookInput = (*CwdChangedHookInput)(nil)
 	_ TypedHookInput = (*FileChangedHookInput)(nil)
+	_ TypedHookInput = (*WorktreeCreateHookInput)(nil)
+	_ TypedHookInput = (*WorktreeRemoveHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -1198,5 +1200,71 @@ func TestMessageDisplayHookOutput_ToHookJSONOutput(t *testing.T) {
 	j2 := empty.ToHookJSONOutput()
 	if _, ok := j2["displayContent"]; ok {
 		t.Error("displayContent should be absent when nil")
+	}
+}
+
+func TestParseHookInput_WorktreeCreate(t *testing.T) {
+	input := HookInput{
+		"session_id":       "sess-wt",
+		"transcript_path":  "/tmp/sess-wt.jsonl",
+		"cwd":              "/project",
+		"permission_mode":  "default",
+		"hook_event_name":  "WorktreeCreate",
+		"worktree_name":    "feature-branch",
+		"isolation_level":  "worktree",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*WorktreeCreateHookInput)
+	if !ok {
+		t.Fatalf("expected *WorktreeCreateHookInput, got %T", result)
+	}
+	if m.WorktreeName != "feature-branch" {
+		t.Errorf("WorktreeName: got %q", m.WorktreeName)
+	}
+	if m.IsolationLevel != "worktree" {
+		t.Errorf("IsolationLevel: got %q", m.IsolationLevel)
+	}
+}
+
+func TestWorktreeCreateHookOutput_ToHookJSONOutput(t *testing.T) {
+	o := WorktreeCreateHookOutput{WorktreePath: "/tmp/worktrees/feature-branch"}
+	out := o.ToHookJSONOutput()
+	specific, ok := out["hookSpecificOutput"].(map[string]any)
+	if !ok {
+		t.Fatalf("hookSpecificOutput missing or wrong type: %v", out)
+	}
+	if specific["worktreePath"] != "/tmp/worktrees/feature-branch" {
+		t.Errorf("worktreePath: got %v", specific["worktreePath"])
+	}
+
+	empty := WorktreeCreateHookOutput{}
+	emptyOut := empty.ToHookJSONOutput()
+	if len(emptyOut) != 0 {
+		t.Errorf("empty output should produce empty map, got %v", emptyOut)
+	}
+}
+
+func TestParseHookInput_WorktreeRemove(t *testing.T) {
+	input := HookInput{
+		"session_id":      "sess-wr",
+		"transcript_path": "/tmp/sess-wr.jsonl",
+		"cwd":             "/project",
+		"permission_mode": "default",
+		"hook_event_name": "WorktreeRemove",
+		"worktree_path":   "/tmp/worktrees/feature-branch",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*WorktreeRemoveHookInput)
+	if !ok {
+		t.Fatalf("expected *WorktreeRemoveHookInput, got %T", result)
+	}
+	if m.WorktreePath != "/tmp/worktrees/feature-branch" {
+		t.Errorf("WorktreePath: got %q", m.WorktreePath)
 	}
 }
