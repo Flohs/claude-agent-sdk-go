@@ -137,6 +137,11 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			Delta:         stringField(input, "delta"),
 		}, nil
 
+	case HookEventSessionStart:
+		return &SessionStartHookInput{
+			BaseHookInput: base,
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil
