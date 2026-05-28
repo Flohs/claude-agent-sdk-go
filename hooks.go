@@ -45,6 +45,9 @@ const (
 	HookEventStopFailure HookEvent = "StopFailure"
 	// HookEventPostCompact fires after a context compaction completes.
 	HookEventPostCompact HookEvent = "PostCompact"
+	// HookEventPostToolBatch fires after a batch of tool calls completes.
+	// Unlike PostToolUse (which fires per tool), this fires once for the whole batch.
+	HookEventPostToolBatch HookEvent = "PostToolBatch"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -323,6 +326,24 @@ type PostCompactHookInput struct {
 }
 
 func (*PostCompactHookInput) hookInputMarker() {}
+
+// PostToolBatchToolCall describes a single tool call in a [PostToolBatchHookInput].
+type PostToolBatchToolCall struct {
+	ToolName     string         `json:"tool_name"`
+	ToolInput    map[string]any `json:"tool_input"`
+	ToolUseID    string         `json:"tool_use_id"`
+	ToolResponse any            `json:"tool_response,omitempty"`
+}
+
+// PostToolBatchHookInput is the typed input for PostToolBatch hook events.
+// Fires once after a batch of tool calls completes.
+type PostToolBatchHookInput struct {
+	BaseHookInput
+	// ToolCalls is the list of tool calls that completed in this batch.
+	ToolCalls []PostToolBatchToolCall `json:"tool_calls"`
+}
+
+func (*PostToolBatchHookInput) hookInputMarker() {}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {

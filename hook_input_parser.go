@@ -155,6 +155,26 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			CompactSummary: stringField(input, "compact_summary"),
 		}, nil
 
+	case HookEventPostToolBatch:
+		var calls []PostToolBatchToolCall
+		if raw, ok := input["tool_calls"].([]any); ok {
+			calls = make([]PostToolBatchToolCall, 0, len(raw))
+			for _, item := range raw {
+				if m, ok := item.(map[string]any); ok {
+					calls = append(calls, PostToolBatchToolCall{
+						ToolName:     stringField(m, "tool_name"),
+						ToolInput:    mapField(m, "tool_input"),
+						ToolUseID:    stringField(m, "tool_use_id"),
+						ToolResponse: m["tool_response"],
+					})
+				}
+			}
+		}
+		return &PostToolBatchHookInput{
+			BaseHookInput: base,
+			ToolCalls:     calls,
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil
