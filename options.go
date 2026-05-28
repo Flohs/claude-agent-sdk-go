@@ -239,7 +239,16 @@ type Options struct {
 	ManagedSettings string
 	// AddDirs adds additional directories.
 	AddDirs []string
-	// Env sets additional environment variables for the CLI process.
+	// Env sets additional environment variables for the CLI subprocess. Entries
+	// are merged with the inherited process environment using a four-layer order:
+	//   1. SDK defaults (e.g. CLAUDE_CODE_ENTRYPOINT=sdk-go)
+	//   2. Inherited os.Environ() (CLAUDECODE is stripped to prevent nested-SDK interference)
+	//   3. Entries from Env (these override step 2)
+	//   4. SDK-controlled vars appended last (CLAUDE_AGENT_SDK_VERSION is always set
+	//      by the SDK and cannot be overridden via Env)
+	//
+	// Note: unlike the TypeScript SDK (where options.env replaces the subprocess
+	// environment), the Go SDK merges Env on top of the inherited environment.
 	Env map[string]string
 	// Debug enables verbose debug logging from the CLI subprocess.
 	Debug bool

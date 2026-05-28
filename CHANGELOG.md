@@ -7,6 +7,10 @@
 - `HookEventMessageDisplay` (`"MessageDisplay"`) hook event constant, `MessageDisplayHookInput` typed struct (fields: `TurnID`, `MessageID`, `Index`, `Final`, `Delta`), and `MessageDisplayHookOutput` typed output struct with `DisplayContent *string` and `ToHookJSONOutput()` helper. The `MessageDisplay` hook fires during assistant message streaming; returning a non-nil `DisplayContent` replaces the text shown to the user. Display-only: the stored message and what the model sees are untouched. Port of TypeScript SDK v0.3.152. ([#249](https://github.com/Flohs/claude-agent-sdk-go/issues/249))
 - `HookEventSessionStart` (`"SessionStart"`) hook event constant, `SessionStartHookInput` typed struct, and `SessionStartHookOutput` typed output with `ReloadSkills bool`, `SessionTitle string`, and `ToHookJSONOutput()`. Returning `ReloadSkills: true` triggers a skill re-scan; `SessionTitle` sets the session title at initialization via `hookSpecificOutput.sessionTitle`. Port of TypeScript SDK v0.3.152. ([#250](https://github.com/Flohs/claude-agent-sdk-go/issues/250))
 
+### Documentation
+
+- `Options.Env`: expanded GoDoc to describe the four-layer merge order (SDK defaults → inherited `os.Environ()` → user-provided `Env` entries → SDK-controlled vars), clarify that `CLAUDE_AGENT_SDK_VERSION` is always set by the SDK and cannot be overridden via `Env`, and note that `CLAUDECODE` is filtered from the inherited env. Note that unlike the TypeScript SDK (where `options.env` replaces the subprocess environment), the Go SDK merges `Env` on top of the inherited environment. Port of TypeScript SDK v0.3.149. ([#251](https://github.com/Flohs/claude-agent-sdk-go/issues/251))
+
 ### Fixed
 
 - `message_parser.go`: `MemoryRecallMessage` switch-case branch was missing `}, nil` before `case "elicitation_complete":`, leaving the struct literal open and causing a parse error. Residual from the v2.1.0 rebase conflict resolution.
