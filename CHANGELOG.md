@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `message_parser.go`: `MemoryRecallMessage` switch-case branch was missing `}, nil` before `case "elicitation_complete":`, leaving the struct literal open and causing a parse error. Residual from the v2.1.0 rebase conflict resolution.
+- `types.go`: `MemoryRecallMessage` struct definition was missing its closing `}`, causing a parse error. Residual from the v2.1.0 rebase conflict resolution.
+- `hook_input_parser_test.go`: `TestExitPlanModeToolInput_Roundtrip` was missing the closing `}` on the inner if-block, causing a parse error. Residual from the v2.1.0 rebase conflict resolution.
+
 ## [2.1.0] - 2026-05-26
 
 ### Documentation
