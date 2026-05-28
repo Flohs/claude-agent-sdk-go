@@ -232,6 +232,30 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			WorktreePath:  stringField(input, "worktree_path"),
 		}, nil
 
+	case HookEventUserPromptExpansion:
+		return &UserPromptExpansionHookInput{
+			BaseHookInput: base,
+			ExpansionType: stringField(input, "expansion_type"),
+			CommandName:   stringField(input, "command_name"),
+			CommandArgs:   stringField(input, "command_args"),
+			CommandSource: stringField(input, "command_source"),
+			Prompt:        stringField(input, "prompt"),
+		}, nil
+
+	case HookEventSetup:
+		return &SetupHookInput{
+			BaseHookInput: base,
+			Trigger:       stringField(input, "trigger"),
+		}, nil
+
+	case HookEventTaskCreated:
+		return &TaskCreatedHookInput{
+			BaseHookInput:   base,
+			SubagentContext: parseSubagentContext(input),
+			TaskName:        stringField(input, "task_name"),
+			TaskDescription: stringField(input, "task_description"),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil
