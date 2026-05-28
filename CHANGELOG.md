@@ -11,6 +11,7 @@
 - `HookEventPostCompact` (`"PostCompact"`) hook event and `PostCompactHookInput` typed struct with `Trigger` (`"manual"` or `"auto"`) and `CompactSummary` fields. Fires after a context compaction completes. ([#253](https://github.com/Flohs/claude-agent-sdk-go/issues/253))
 - `HookEventPostToolBatch` (`"PostToolBatch"`) hook event, `PostToolBatchHookInput` struct (field: `ToolCalls []PostToolBatchToolCall`), and `PostToolBatchToolCall` type (`ToolName`, `ToolInput`, `ToolUseID`, `ToolResponse`). Fires once after a batch of tool calls completes, as opposed to `PostToolUse` which fires per tool. ([#254](https://github.com/Flohs/claude-agent-sdk-go/issues/254))
 - `HookEventPermissionDenied` (`"PermissionDenied"`) hook event, `PermissionDeniedHookInput` struct (`ToolName`, `ToolInput`, `ToolUseID`, `Reason`), and `PermissionDeniedHookOutput` typed output with `Retry bool` and `ToHookJSONOutput()`. Fires when a tool call is blocked by a permission check; returning `Retry: true` asks the CLI to retry. ([#255](https://github.com/Flohs/claude-agent-sdk-go/issues/255))
+- `HookEventElicitationResult` (`"ElicitationResult"`) hook event and `ElicitationResultHookInput` struct (`McpServerName`, `ElicitationID`, `Mode`, `Action`, `Content`). Fires when an MCP server elicitation request completes; complements `HookEventElicitation` which fires when the request is received. ([#256](https://github.com/Flohs/claude-agent-sdk-go/issues/256))
 
 ### Documentation
 
