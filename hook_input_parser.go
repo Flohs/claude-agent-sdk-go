@@ -219,6 +219,19 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			ChangeType:    stringField(input, "change_type"),
 		}, nil
 
+	case HookEventWorktreeCreate:
+		return &WorktreeCreateHookInput{
+			BaseHookInput:  base,
+			WorktreeName:   stringField(input, "worktree_name"),
+			IsolationLevel: stringField(input, "isolation_level"),
+		}, nil
+
+	case HookEventWorktreeRemove:
+		return &WorktreeRemoveHookInput{
+			BaseHookInput: base,
+			WorktreePath:  stringField(input, "worktree_path"),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil
