@@ -23,6 +23,7 @@ var (
 	_ TypedHookInput = (*TaskCompletedHookInput)(nil)
 	_ TypedHookInput = (*ConfigChangeHookInput)(nil)
 	_ TypedHookInput = (*ElicitationHookInput)(nil)
+	_ TypedHookInput = (*MessageDisplayHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -846,5 +847,61 @@ func TestParseMessage_ElicitationComplete(t *testing.T) {
 	}
 	if m.Subtype != "elicitation_complete" {
 		t.Errorf("Subtype: got %q, want 'elicitation_complete'", m.Subtype)
+	}
+}
+
+func TestParseHookInput_MessageDisplay(t *testing.T) {
+	input := HookInput{
+		"session_id":       "sess-md",
+		"transcript_path":  "/path/session.jsonl",
+		"cwd":              "/home/user",
+		"permission_mode":  "default",
+		"hook_event_name":  "MessageDisplay",
+		"turn_id":          "turn-001",
+		"message_id":       "msg-xyz",
+		"index":            float64(3),
+		"final":            true,
+		"delta":            "Hello, world!\n",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*MessageDisplayHookInput)
+	if !ok {
+		t.Fatalf("expected *MessageDisplayHookInput, got %T", result)
+	}
+	if m.SessionID != "sess-md" {
+		t.Errorf("SessionID: got %q, want 'sess-md'", m.SessionID)
+	}
+	if m.TurnID != "turn-001" {
+		t.Errorf("TurnID: got %q, want 'turn-001'", m.TurnID)
+	}
+	if m.MessageID != "msg-xyz" {
+		t.Errorf("MessageID: got %q, want 'msg-xyz'", m.MessageID)
+	}
+	if m.Index != 3 {
+		t.Errorf("Index: got %d, want 3", m.Index)
+	}
+	if !m.Final {
+		t.Error("Final: expected true")
+	}
+	if m.Delta != "Hello, world!\n" {
+		t.Errorf("Delta: got %q, want 'Hello, world!\\n'", m.Delta)
+	}
+}
+
+func TestMessageDisplayHookOutput_ToHookJSONOutput(t *testing.T) {
+	content := "transformed text"
+	out := MessageDisplayHookOutput{DisplayContent: &content}
+	j := out.ToHookJSONOutput()
+	if j["displayContent"] != content {
+		t.Errorf("displayContent: got %v, want %q", j["displayContent"], content)
+	}
+
+	empty := MessageDisplayHookOutput{}
+	j2 := empty.ToHookJSONOutput()
+	if _, ok := j2["displayContent"]; ok {
+		t.Error("displayContent should be absent when nil")
 	}
 }
