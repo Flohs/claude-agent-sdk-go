@@ -31,6 +31,9 @@ var (
 	_ TypedHookInput = (*PostToolBatchHookInput)(nil)
 	_ TypedHookInput = (*PermissionDeniedHookInput)(nil)
 	_ TypedHookInput = (*ElicitationResultHookInput)(nil)
+	_ TypedHookInput = (*InstructionsLoadedHookInput)(nil)
+	_ TypedHookInput = (*CwdChangedHookInput)(nil)
+	_ TypedHookInput = (*FileChangedHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -1018,6 +1021,97 @@ func TestParseHookInput_ElicitationResult(t *testing.T) {
 	}
 	if m.Content["api_key"] != "sk-test" {
 		t.Errorf("Content: got %v", m.Content)
+	}
+}
+
+func TestParseHookInput_InstructionsLoaded(t *testing.T) {
+	input := HookInput{
+		"session_id":        "sess-il",
+		"transcript_path":   "/tmp/sess-il.jsonl",
+		"cwd":               "/project",
+		"permission_mode":   "default",
+		"hook_event_name":   "InstructionsLoaded",
+		"file_path":         "/project/CLAUDE.md",
+		"memory_type":       "Project",
+		"load_reason":       "session_start",
+		"globs":             []any{"*.go", "*.ts"},
+		"trigger_file_path": "/project/CLAUDE.md",
+		"parent_file_path":  "",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*InstructionsLoadedHookInput)
+	if !ok {
+		t.Fatalf("expected *InstructionsLoadedHookInput, got %T", result)
+	}
+	if m.FilePath != "/project/CLAUDE.md" {
+		t.Errorf("FilePath: got %q", m.FilePath)
+	}
+	if m.MemoryType != "Project" {
+		t.Errorf("MemoryType: got %q", m.MemoryType)
+	}
+	if m.LoadReason != "session_start" {
+		t.Errorf("LoadReason: got %q", m.LoadReason)
+	}
+	if len(m.Globs) != 2 || m.Globs[0] != "*.go" || m.Globs[1] != "*.ts" {
+		t.Errorf("Globs: got %v", m.Globs)
+	}
+	if m.TriggerFilePath != "/project/CLAUDE.md" {
+		t.Errorf("TriggerFilePath: got %q", m.TriggerFilePath)
+	}
+}
+
+func TestParseHookInput_CwdChanged(t *testing.T) {
+	input := HookInput{
+		"session_id":      "sess-cwd",
+		"transcript_path": "/tmp/sess-cwd.jsonl",
+		"cwd":             "/new/dir",
+		"permission_mode": "default",
+		"hook_event_name": "CwdChanged",
+		"old_cwd":         "/old/dir",
+		"new_cwd":         "/new/dir",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*CwdChangedHookInput)
+	if !ok {
+		t.Fatalf("expected *CwdChangedHookInput, got %T", result)
+	}
+	if m.OldCwd != "/old/dir" {
+		t.Errorf("OldCwd: got %q", m.OldCwd)
+	}
+	if m.NewCwd != "/new/dir" {
+		t.Errorf("NewCwd: got %q", m.NewCwd)
+	}
+}
+
+func TestParseHookInput_FileChanged(t *testing.T) {
+	input := HookInput{
+		"session_id":      "sess-fc",
+		"transcript_path": "/tmp/sess-fc.jsonl",
+		"cwd":             "/project",
+		"permission_mode": "default",
+		"hook_event_name": "FileChanged",
+		"file_path":       "/project/.env",
+		"change_type":     "modified",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*FileChangedHookInput)
+	if !ok {
+		t.Fatalf("expected *FileChangedHookInput, got %T", result)
+	}
+	if m.FilePath != "/project/.env" {
+		t.Errorf("FilePath: got %q", m.FilePath)
+	}
+	if m.ChangeType != "modified" {
+		t.Errorf("ChangeType: got %q", m.ChangeType)
 	}
 }
 

@@ -53,6 +53,17 @@ const (
 	// HookEventElicitationResult fires when an MCP server elicitation request
 	// completes (complements [HookEventElicitation] which fires when received).
 	HookEventElicitationResult HookEvent = "ElicitationResult"
+	// HookEventInstructionsLoaded fires when Claude loads a CLAUDE.md or
+	// equivalent instructions file during session initialization or directory
+	// traversal. Observability only — output is not acted on.
+	HookEventInstructionsLoaded HookEvent = "InstructionsLoaded"
+	// HookEventCwdChanged fires when the working directory changes during a
+	// session. Observability only — output is not acted on.
+	HookEventCwdChanged HookEvent = "CwdChanged"
+	// HookEventFileChanged fires when a watched file is modified, created, or
+	// deleted. Watch paths are registered via the SessionStart hook output.
+	// Observability only — output is not acted on.
+	HookEventFileChanged HookEvent = "FileChanged"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -398,6 +409,55 @@ type ElicitationResultHookInput struct {
 }
 
 func (*ElicitationResultHookInput) hookInputMarker() {}
+
+// InstructionsLoadedHookInput is the typed input for InstructionsLoaded hook
+// events. Fires when Claude loads a CLAUDE.md or rules file during session
+// initialization or directory traversal.
+type InstructionsLoadedHookInput struct {
+	BaseHookInput
+	// FilePath is the absolute path to the loaded instructions file.
+	FilePath string `json:"file_path"`
+	// MemoryType describes the configuration tier: "User", "Project", "Local",
+	// or "Managed".
+	MemoryType string `json:"memory_type"`
+	// LoadReason explains why the file was loaded: "session_start",
+	// "nested_traversal", "path_glob_match", "include", or "compact".
+	LoadReason string `json:"load_reason"`
+	// Globs lists glob patterns that triggered the load (optional).
+	Globs []string `json:"globs,omitempty"`
+	// TriggerFilePath is the file whose presence triggered loading (optional).
+	TriggerFilePath string `json:"trigger_file_path,omitempty"`
+	// ParentFilePath is the file that included this one via an include directive
+	// (optional).
+	ParentFilePath string `json:"parent_file_path,omitempty"`
+}
+
+func (*InstructionsLoadedHookInput) hookInputMarker() {}
+
+// CwdChangedHookInput is the typed input for CwdChanged hook events.
+// Fires when the working directory changes during a session.
+type CwdChangedHookInput struct {
+	BaseHookInput
+	// OldCwd is the previous working directory.
+	OldCwd string `json:"old_cwd"`
+	// NewCwd is the new working directory.
+	NewCwd string `json:"new_cwd"`
+}
+
+func (*CwdChangedHookInput) hookInputMarker() {}
+
+// FileChangedHookInput is the typed input for FileChanged hook events.
+// Fires when a watched file is modified, created, or deleted. Watch paths are
+// registered via the SessionStart hook output's WatchPaths field.
+type FileChangedHookInput struct {
+	BaseHookInput
+	// FilePath is the absolute path of the file that changed.
+	FilePath string `json:"file_path"`
+	// ChangeType describes the change: "modified", "created", or "deleted".
+	ChangeType string `json:"change_type"`
+}
+
+func (*FileChangedHookInput) hookInputMarker() {}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {

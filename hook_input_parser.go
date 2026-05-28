@@ -194,6 +194,31 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			Content:       mapField(input, "content"),
 		}, nil
 
+	case HookEventInstructionsLoaded:
+		return &InstructionsLoadedHookInput{
+			BaseHookInput:   base,
+			FilePath:        stringField(input, "file_path"),
+			MemoryType:      stringField(input, "memory_type"),
+			LoadReason:      stringField(input, "load_reason"),
+			Globs:           stringSliceField(input, "globs"),
+			TriggerFilePath: stringField(input, "trigger_file_path"),
+			ParentFilePath:  stringField(input, "parent_file_path"),
+		}, nil
+
+	case HookEventCwdChanged:
+		return &CwdChangedHookInput{
+			BaseHookInput: base,
+			OldCwd:        stringField(input, "old_cwd"),
+			NewCwd:        stringField(input, "new_cwd"),
+		}, nil
+
+	case HookEventFileChanged:
+		return &FileChangedHookInput{
+			BaseHookInput: base,
+			FilePath:      stringField(input, "file_path"),
+			ChangeType:    stringField(input, "change_type"),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil
@@ -220,6 +245,20 @@ func parseSubagentContext(m map[string]any) SubagentContext {
 func mapField(m map[string]any, key string) map[string]any {
 	v, _ := m[key].(map[string]any)
 	return v
+}
+
+func stringSliceField(m map[string]any, key string) []string {
+	raw, _ := m[key].([]any)
+	if raw == nil {
+		return nil
+	}
+	result := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 func mapSliceField(m map[string]any, key string) []map[string]any {
