@@ -148,6 +148,13 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 	case HookEventStopFailure:
 		return &StopFailureHookInput{BaseHookInput: base}, nil
 
+	case HookEventPostCompact:
+		return &PostCompactHookInput{
+			BaseHookInput:  base,
+			Trigger:        stringField(input, "trigger"),
+			CompactSummary: stringField(input, "compact_summary"),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil
