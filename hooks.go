@@ -39,6 +39,10 @@ const (
 	// HookEventSessionStart fires at the beginning of a session, before the first
 	// user turn. Port of TypeScript SDK v0.3.152.
 	HookEventSessionStart HookEvent = "SessionStart"
+	// HookEventSessionEnd fires when a session ends.
+	HookEventSessionEnd HookEvent = "SessionEnd"
+	// HookEventStopFailure fires when the Stop hook itself encounters an error.
+	HookEventStopFailure HookEvent = "StopFailure"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -289,6 +293,22 @@ func (o SessionStartHookOutput) ToHookJSONOutput() HookJSONOutput {
 	}
 	return out
 }
+
+// SessionEndHookInput is the typed input for SessionEnd hook events.
+// Fires when a session ends.
+type SessionEndHookInput struct {
+	BaseHookInput
+}
+
+func (*SessionEndHookInput) hookInputMarker() {}
+
+// StopFailureHookInput is the typed input for StopFailure hook events.
+// Fires when the Stop hook itself encounters an error.
+type StopFailureHookInput struct {
+	BaseHookInput
+}
+
+func (*StopFailureHookInput) hookInputMarker() {}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {

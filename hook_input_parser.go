@@ -142,6 +142,12 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			BaseHookInput: base,
 		}, nil
 
+	case HookEventSessionEnd:
+		return &SessionEndHookInput{BaseHookInput: base}, nil
+
+	case HookEventStopFailure:
+		return &StopFailureHookInput{BaseHookInput: base}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil

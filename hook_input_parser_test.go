@@ -25,6 +25,8 @@ var (
 	_ TypedHookInput = (*ElicitationHookInput)(nil)
 	_ TypedHookInput = (*MessageDisplayHookInput)(nil)
 	_ TypedHookInput = (*SessionStartHookInput)(nil)
+	_ TypedHookInput = (*SessionEndHookInput)(nil)
+	_ TypedHookInput = (*StopFailureHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -836,6 +838,20 @@ func TestParseHookInput_SessionStart(t *testing.T) {
 	}
 }
 
+func TestParseHookInput_SessionEnd(t *testing.T) {
+	result, err := ParseHookInput(base("SessionEnd"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*SessionEndHookInput)
+	if !ok {
+		t.Fatalf("expected *SessionEndHookInput, got %T", result)
+	}
+	if m.SessionID != "sess-1" {
+		t.Errorf("SessionID: got %q, want 'sess-1'", m.SessionID)
+	}
+}
+
 func TestSessionStartHookOutput_ToHookJSONOutput(t *testing.T) {
 	out := SessionStartHookOutput{ReloadSkills: true, SessionTitle: "My Session"}
 	j := out.ToHookJSONOutput()
@@ -859,6 +875,20 @@ func TestSessionStartHookOutput_Empty_ToHookJSONOutput(t *testing.T) {
 	}
 	if _, ok := j["hookSpecificOutput"]; ok {
 		t.Error("hookSpecificOutput should be absent when SessionTitle is empty")
+	}
+}
+
+func TestParseHookInput_StopFailure(t *testing.T) {
+	result, err := ParseHookInput(base("StopFailure"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*StopFailureHookInput)
+	if !ok {
+		t.Fatalf("expected *StopFailureHookInput, got %T", result)
+	}
+	if m.SessionID != "sess-1" {
+		t.Errorf("SessionID: got %q, want 'sess-1'", m.SessionID)
 	}
 }
 
