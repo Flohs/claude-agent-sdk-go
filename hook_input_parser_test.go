@@ -29,6 +29,7 @@ var (
 	_ TypedHookInput = (*StopFailureHookInput)(nil)
 	_ TypedHookInput = (*PostCompactHookInput)(nil)
 	_ TypedHookInput = (*PostToolBatchHookInput)(nil)
+	_ TypedHookInput = (*PermissionDeniedHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -950,6 +951,45 @@ func TestParseHookInput_PostToolBatch(t *testing.T) {
 	}
 	if m.ToolCalls[1].ToolName != "Read" {
 		t.Errorf("ToolCalls[1].ToolName: got %q, want 'Read'", m.ToolCalls[1].ToolName)
+	}
+}
+
+func TestParseHookInput_PermissionDenied(t *testing.T) {
+	input := merge(base("PermissionDenied"), HookInput{
+		"tool_name":   "Bash",
+		"tool_input":  map[string]any{"command": "rm -rf /"},
+		"tool_use_id": "toolu_denied1",
+		"reason":      "command modifies system files",
+	})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*PermissionDeniedHookInput)
+	if !ok {
+		t.Fatalf("expected *PermissionDeniedHookInput, got %T", result)
+	}
+	if m.ToolName != "Bash" {
+		t.Errorf("ToolName: got %q, want 'Bash'", m.ToolName)
+	}
+	if m.ToolUseID != "toolu_denied1" {
+		t.Errorf("ToolUseID: got %q, want 'toolu_denied1'", m.ToolUseID)
+	}
+	if m.Reason != "command modifies system files" {
+		t.Errorf("Reason: got %q", m.Reason)
+	}
+}
+
+func TestPermissionDeniedHookOutput_ToHookJSONOutput(t *testing.T) {
+	out := PermissionDeniedHookOutput{Retry: true}
+	j := out.ToHookJSONOutput()
+	if j["retry"] != true {
+		t.Errorf("retry: got %v, want true", j["retry"])
+	}
+	empty := PermissionDeniedHookOutput{}
+	j2 := empty.ToHookJSONOutput()
+	if _, ok := j2["retry"]; ok {
+		t.Error("retry should be absent when false")
 	}
 }
 
