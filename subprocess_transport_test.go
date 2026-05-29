@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -606,6 +607,77 @@ func TestBuildCommand_SessionMirrorFlag(t *testing.T) {
 		}
 		cmd := transport.buildCommand()
 		assertContainsFlag(t, cmd, "--session-mirror")
+	})
+}
+
+func TestMcpServerConfig_AlwaysLoad_Serialization(t *testing.T) {
+	t.Run("stdio without alwaysLoad omits field", func(t *testing.T) {
+		cfg := McpStdioServerConfig{Command: "myserver"}
+		data, err := json.Marshal(cfg)
+		if err != nil {
+			t.Fatalf("marshal error: %v", err)
+		}
+		if strings.Contains(string(data), "alwaysLoad") {
+			t.Errorf("expected alwaysLoad absent when false, got %s", data)
+		}
+	})
+
+	t.Run("stdio with alwaysLoad=true includes field", func(t *testing.T) {
+		cfg := McpStdioServerConfig{Command: "myserver", AlwaysLoad: true}
+		data, err := json.Marshal(cfg)
+		if err != nil {
+			t.Fatalf("marshal error: %v", err)
+		}
+		if !strings.Contains(string(data), `"alwaysLoad":true`) {
+			t.Errorf("expected alwaysLoad:true in JSON, got %s", data)
+		}
+	})
+
+	t.Run("sse with alwaysLoad=true includes field", func(t *testing.T) {
+		cfg := McpSSEServerConfig{URL: "https://example.com", AlwaysLoad: true}
+		data, err := json.Marshal(cfg)
+		if err != nil {
+			t.Fatalf("marshal error: %v", err)
+		}
+		if !strings.Contains(string(data), `"alwaysLoad":true`) {
+			t.Errorf("expected alwaysLoad:true in JSON, got %s", data)
+		}
+	})
+
+	t.Run("http with alwaysLoad=true includes field", func(t *testing.T) {
+		cfg := McpHTTPServerConfig{URL: "https://example.com", AlwaysLoad: true}
+		data, err := json.Marshal(cfg)
+		if err != nil {
+			t.Fatalf("marshal error: %v", err)
+		}
+		if !strings.Contains(string(data), `"alwaysLoad":true`) {
+			t.Errorf("expected alwaysLoad:true in JSON, got %s", data)
+		}
+	})
+
+	t.Run("buildCommand includes alwaysLoad in mcp-config", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				McpServers: map[string]McpServerConfig{
+					"myserver": McpStdioServerConfig{
+						Command:    "npx",
+						Args:       []string{"-y", "my-pkg"},
+						AlwaysLoad: true,
+					},
+				},
+			},
+		}
+		cmd := transport.buildCommand()
+		for i, arg := range cmd {
+			if arg == "--mcp-config" && i+1 < len(cmd) {
+				if !strings.Contains(cmd[i+1], `"alwaysLoad":true`) {
+					t.Errorf("expected alwaysLoad:true in --mcp-config JSON, got %s", cmd[i+1])
+				}
+				return
+			}
+		}
+		t.Error("--mcp-config flag not found")
 	})
 }
 
