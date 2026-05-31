@@ -23,6 +23,7 @@
 
 ### Documentation
 
+- `Options.AllowedTools`: added a GoDoc deprecation notice clarifying that adding `"Skill"` entries directly to `AllowedTools` is deprecated. Use `Options.Skills` instead, which automatically injects the appropriate `AllowedTools` entries and defaults `SettingSources` to `[user, project]`. Port of Python SDK v0.1.77. ([#274](https://github.com/Flohs/claude-agent-sdk-go/issues/274))
 - `Options.Env`: expanded GoDoc to describe the four-layer merge order (SDK defaults → inherited `os.Environ()` → user-provided `Env` entries → SDK-controlled vars), clarify that `CLAUDE_AGENT_SDK_VERSION` is always set by the SDK and cannot be overridden via `Env`, and note that `CLAUDECODE` is filtered from the inherited env. Note that unlike the TypeScript SDK (where `options.env` replaces the subprocess environment), the Go SDK merges `Env` on top of the inherited environment. Port of TypeScript SDK v0.3.149. ([#251](https://github.com/Flohs/claude-agent-sdk-go/issues/251))
 
 ### Fixed
