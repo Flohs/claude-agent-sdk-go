@@ -17,6 +17,8 @@ type McpStdioServerConfig struct {
 	Command string            `json:"command"`
 	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
+	// AlwaysLoad, when true, requires this server to connect before the first query is executed. By default servers connect in the background.
+	AlwaysLoad bool `json:"alwaysLoad,omitempty"`
 }
 
 func (McpStdioServerConfig) mcpServerConfigMarker() {}
@@ -40,6 +42,8 @@ type McpSSEServerConfig struct {
 	// PermissionPolicy sets per-tool permission decisions for this server.
 	// Keys are tool names; values are "allow", "ask", or "deny".
 	PermissionPolicy map[string]string `json:"permissionPolicy,omitempty"`
+	// AlwaysLoad, when true, requires this server to connect before the first query is executed. By default servers connect in the background.
+	AlwaysLoad bool `json:"alwaysLoad,omitempty"`
 }
 
 func (McpSSEServerConfig) mcpServerConfigMarker() {}
@@ -63,6 +67,8 @@ type McpHTTPServerConfig struct {
 	// PermissionPolicy sets per-tool permission decisions for this server.
 	// Keys are tool names; values are "allow", "ask", or "deny".
 	PermissionPolicy map[string]string `json:"permissionPolicy,omitempty"`
+	// AlwaysLoad, when true, requires this server to connect before the first query is executed. By default servers connect in the background.
+	AlwaysLoad bool `json:"alwaysLoad,omitempty"`
 }
 
 func (McpHTTPServerConfig) mcpServerConfigMarker() {}
