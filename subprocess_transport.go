@@ -459,14 +459,6 @@ func stringSliceContains(s []string, target string) bool {
 	return false
 }
 
-func (t *SubprocessTransport) hasExtraArg(key string) bool {
-	if t.options.ExtraArgs == nil {
-		return false
-	}
-	_, ok := t.options.ExtraArgs[key]
-	return ok
-}
-
 func (t *SubprocessTransport) handleStderr() {
 	if t.stderr == nil {
 		return
