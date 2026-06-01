@@ -81,7 +81,36 @@ const (
 	defaultMaxBufferSize     = 1024 * 1024 // 1MB
 	minimumClaudeCodeVersion = "2.1.90"
 	sdkVersion               = "2.0.0"
+
+	// stderrMaxBytes caps the rolling stderr buffer at ~8 KB.
+	stderrMaxBytes = 8 * 1024
 )
+
+// stderrBuffer is a fixed-capacity rolling buffer that retains the tail of
+// stderr output up to stderrMaxBytes bytes.
+type stderrBuffer struct {
+	mu    sync.Mutex
+	lines []string
+	size  int
+}
+
+func (b *stderrBuffer) add(line string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.lines = append(b.lines, line)
+	b.size += len(line) + 1 // +1 for the newline separator
+	// Evict oldest lines until we are within the cap.
+	for b.size > stderrMaxBytes && len(b.lines) > 0 {
+		b.size -= len(b.lines[0]) + 1
+		b.lines = b.lines[1:]
+	}
+}
+
+func (b *stderrBuffer) tail() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return strings.Join(b.lines, "\n")
+}
 
 // SubprocessTransport implements Transport using the Claude Code CLI subprocess.
 type SubprocessTransport struct {
@@ -93,6 +122,7 @@ type SubprocessTransport struct {
 	stdin        io.WriteCloser
 	stdout       io.ReadCloser
 	stderr       io.ReadCloser
+	stderrBuf    stderrBuffer
 	ready        bool
 	maxBufSize   int
 	mu           sync.Mutex
@@ -189,12 +219,11 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 		return &ConnectionError{SDKError: SDKError{Message: fmt.Sprintf("Failed to create stdout pipe: %v", err)}}
 	}
 
-	// Pipe stderr if callback is set or debug mode
-	if t.options.Stderr != nil || t.hasExtraArg("debug-to-stderr") {
-		t.stderr, err = cmd.StderrPipe()
-		if err != nil {
-			return &ConnectionError{SDKError: SDKError{Message: fmt.Sprintf("Failed to create stderr pipe: %v", err)}}
-		}
+	// Always pipe stderr so we can capture it for error reporting.
+	// The handleStderr goroutine also forwards lines to opts.Stderr callback when set.
+	t.stderr, err = cmd.StderrPipe()
+	if err != nil {
+		return &ConnectionError{SDKError: SDKError{Message: fmt.Sprintf("Failed to create stderr pipe: %v", err)}}
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -303,10 +332,16 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 			if err := cmd.Wait(); err != nil {
 				if exitErr, ok := err.(*exec.ExitError); ok {
 					code := exitErr.ExitCode()
+					stderrTail := t.stderrBuf.tail()
+					procErr := &ProcessError{
+						SDKError: SDKError{Message: "Command failed"},
+						ExitCode: &code,
+						Stderr:   stderrTail,
+					}
 					select {
 					case ch <- map[string]any{
 						"type":  "error",
-						"error": fmt.Sprintf("Command failed with exit code %d", code),
+						"error": procErr.Error(),
 					}:
 					case <-ctx.Done():
 					}
@@ -428,14 +463,6 @@ func stringSliceContains(s []string, target string) bool {
 	return false
 }
 
-func (t *SubprocessTransport) hasExtraArg(key string) bool {
-	if t.options.ExtraArgs == nil {
-		return false
-	}
-	_, ok := t.options.ExtraArgs[key]
-	return ok
-}
-
 func (t *SubprocessTransport) handleStderr() {
 	if t.stderr == nil {
 		return
@@ -446,6 +473,9 @@ func (t *SubprocessTransport) handleStderr() {
 		if line == "" {
 			continue
 		}
+		// Always capture into the rolling buffer for error reporting.
+		t.stderrBuf.add(line)
+		// Forward to the caller's callback if provided.
 		if t.options.Stderr != nil {
 			t.callStderr(line)
 		}
