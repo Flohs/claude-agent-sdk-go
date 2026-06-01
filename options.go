@@ -167,6 +167,20 @@ type SandboxIgnoreViolations struct {
 	Network []string `json:"network,omitempty"`
 }
 
+// SandboxFilesystemConfig configures filesystem access restrictions for sandboxed commands.
+type SandboxFilesystemConfig struct {
+	// AllowWrite lists additional paths that sandboxed commands may write to.
+	AllowWrite []string `json:"allowWrite,omitempty"`
+	// DenyWrite lists paths that sandboxed commands may not write to.
+	DenyWrite []string `json:"denyWrite,omitempty"`
+	// DenyRead lists paths that sandboxed commands may not read from.
+	DenyRead []string `json:"denyRead,omitempty"`
+	// AllowRead re-allows reading specific paths within DenyRead regions.
+	AllowRead []string `json:"allowRead,omitempty"`
+	// AllowManagedReadPathsOnly, when true, restricts reads to AllowRead entries only.
+	AllowManagedReadPathsOnly *bool `json:"allowManagedReadPathsOnly,omitempty"`
+}
+
 // SandboxSettings controls bash command sandboxing.
 type SandboxSettings struct {
 	Enabled                    *bool                    `json:"enabled,omitempty"`
@@ -182,6 +196,11 @@ type SandboxSettings struct {
 	// true), the CLI emits an error result message instead of silently running
 	// commands unsandboxed.
 	FailIfUnavailable *bool `json:"failIfUnavailable,omitempty"`
+	// Filesystem configures filesystem access restrictions for sandboxed commands.
+	Filesystem *SandboxFilesystemConfig `json:"filesystem,omitempty"`
+	// EnableWeakerNetworkIsolation allows system TLS access on macOS when
+	// network isolation is enabled. Has no effect on Linux.
+	EnableWeakerNetworkIsolation *bool `json:"enableWeakerNetworkIsolation,omitempty"`
 }
 
 // Options configures a Claude SDK query or client.
