@@ -273,6 +273,12 @@ type Options struct {
 	// Note: unlike the TypeScript SDK (where options.env replaces the subprocess
 	// environment), the Go SDK merges Env on top of the inherited environment.
 	Env map[string]string
+	// InheritEnv controls whether the CLI subprocess inherits the parent process
+	// environment. Defaults to true when nil. When set to false, the subprocess
+	// starts with a clean environment containing only SDK-required variables
+	// (ANTHROPIC_API_KEY, CLAUDE_CODE_ENTRYPOINT, CLAUDE_AGENT_SDK_VERSION)
+	// plus any entries from Options.Env.
+	InheritEnv *bool
 	// Debug enables verbose debug logging from the CLI subprocess.
 	Debug bool
 	// DebugFile writes debug output to the specified file path instead of stderr.
