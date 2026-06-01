@@ -134,6 +134,7 @@ type UserMessage struct {
 	UUID            string         `json:"uuid,omitempty"`
 	ParentToolUseID string         `json:"parent_tool_use_id,omitempty"`
 	ToolUseResult   map[string]any `json:"tool_use_result,omitempty"`
+	Timestamp       string         `json:"timestamp,omitempty"`
 }
 
 func (UserMessage) messageMarker() {}
@@ -170,6 +171,9 @@ type AssistantMessage struct {
 	StopReason string `json:"stop_reason,omitempty"`
 	// RequestID is the API request identifier for this message.
 	RequestID string `json:"request_id,omitempty"`
+	// Timestamp is the ISO-8601 datetime when this message was recorded in the
+	// CLI transcript. Empty when not provided by the CLI.
+	Timestamp string `json:"timestamp,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
@@ -179,8 +183,9 @@ func (AssistantMessage) messageMarker() {}
 
 // SystemMessage represents a system message with metadata.
 type SystemMessage struct {
-	Subtype string         `json:"subtype"`
-	Data    map[string]any `json:"data"`
+	Subtype   string         `json:"subtype"`
+	Data      map[string]any `json:"data"`
+	Timestamp string         `json:"timestamp,omitempty"`
 }
 
 func (SystemMessage) messageMarker() {}
@@ -458,6 +463,9 @@ type ResultMessage struct {
 	// {"decision": "defer"}, surfacing the pending tool call so the caller
 	// can prompt the user and resume. Nil when no deferral occurred.
 	DeferredToolUse *DeferredToolUse `json:"deferred_tool_use,omitempty"`
+	// Timestamp is the ISO-8601 datetime when this message was recorded in the
+	// CLI transcript. Empty when not provided by the CLI.
+	Timestamp string `json:"timestamp,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
