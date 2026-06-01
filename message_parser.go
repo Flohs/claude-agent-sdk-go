@@ -41,6 +41,7 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 	msg := &UserMessage{
 		ParentToolUseID: stringField(data, "parent_tool_use_id"),
 		UUID:            stringField(data, "uuid"),
+		Timestamp:       stringField(data, "timestamp"),
 	}
 
 	if tr, ok := data["tool_use_result"].(map[string]any); ok {
@@ -105,6 +106,7 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		UUID:            stringField(data, "uuid"),
 		StopReason:      stringField(message, "stop_reason"),
 		RequestID:       stringField(data, "request_id"),
+		Timestamp:       stringField(data, "timestamp"),
 	}
 
 	if errStr := stringField(data, "error"); errStr != "" {
@@ -130,8 +132,9 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 	}
 
 	base := SystemMessage{
-		Subtype: subtype,
-		Data:    data,
+		Subtype:   subtype,
+		Data:      data,
+		Timestamp: stringField(data, "timestamp"),
 	}
 
 	switch subtype {
@@ -260,6 +263,7 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		Origin:         stringField(data, "origin"),
 		RequestID:      stringField(data, "request_id"),
 		Result:         stringField(data, "result"),
+		Timestamp:      stringField(data, "timestamp"),
 	}
 
 	if errors, ok := data["errors"].([]any); ok {
