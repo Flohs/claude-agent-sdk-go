@@ -192,6 +192,10 @@ type Options struct {
 	// without invoking the CanUseTool callback. Tools not in this list fall through
 	// to PermissionMode + CanUseTool evaluation. This is NOT an availability filter —
 	// it does not restrict which tools are available, only which are pre-approved.
+	//
+	// Deprecated: adding "Skill" to AllowedTools directly is deprecated. Use
+	// Options.Skills instead, which automatically injects the appropriate
+	// AllowedTools entries and defaults SettingSources.
 	AllowedTools []string
 	// SystemPrompt configures the system prompt. Use StringPrompt or PresetPrompt.
 	SystemPrompt SystemPrompt
