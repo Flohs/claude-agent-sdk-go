@@ -117,6 +117,10 @@ func materializeResumeSession(ctx context.Context, opts *Options) (*materialized
 		}
 	}()
 
+	// Sanitize tool_use.id values before writing to ensure they conform to
+	// the toolu_[a-zA-Z0-9_-]+ format required by the Claude API.
+	entries = sanitizeSessionEntries(entries)
+
 	projectDir := filepath.Join(tempDir, "projects", projectKey)
 	if err := os.MkdirAll(projectDir, 0o700); err != nil {
 		return nil, fmt.Errorf("session_store resume: create project dir: %w", err)
@@ -583,6 +587,170 @@ func copyIfPresent(src, dst string) {
 	}
 	defer func() { _ = out.Close() }()
 	_, _ = io.Copy(out, in)
+}
+
+// sanitizeToolUseID ensures a tool use ID conforms to toolu_[a-zA-Z0-9_-]+.
+// If the ID doesn't start with "toolu_", the prefix is prepended.
+// Any characters outside [a-zA-Z0-9_-] are replaced with "_".
+func sanitizeToolUseID(id string) string {
+	if id == "" {
+		return id
+	}
+	// Replace invalid characters
+	var buf strings.Builder
+	for _, r := range id {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			buf.WriteRune(r)
+		} else {
+			buf.WriteRune('_')
+		}
+	}
+	sanitized := buf.String()
+	if !strings.HasPrefix(sanitized, "toolu_") {
+		sanitized = "toolu_" + sanitized
+	}
+	return sanitized
+}
+
+// sanitizeSessionEntries walks a slice of SessionStoreEntry values and
+// sanitizes all tool_use.id and tool_use_id fields so they conform to the
+// toolu_[a-zA-Z0-9_-]+ format required by the Claude API. Entries whose
+// content does not contain tool_use blocks are returned unchanged. The
+// returned slice may share entries with the input when no modification was
+// needed for a given entry.
+func sanitizeSessionEntries(entries []SessionStoreEntry) []SessionStoreEntry {
+	out := make([]SessionStoreEntry, len(entries))
+	for i, e := range entries {
+		out[i] = sanitizeEntry(e)
+	}
+	return out
+}
+
+// sanitizeEntry sanitizes all tool_use.id and tool_use_id values inside a
+// single SessionStoreEntry. Returns the original entry unchanged when there
+// is nothing to sanitize.
+func sanitizeEntry(e SessionStoreEntry) SessionStoreEntry {
+	if e == nil {
+		return e
+	}
+
+	// Top-level "message" object may contain a "content" array.
+	msg, _ := e["message"].(map[string]any)
+	if msg == nil {
+		// Also handle entries where "content" is directly on the entry itself
+		// (e.g. tool_result blocks at the top level in some CLI formats).
+		return sanitizeEntryContent(e)
+	}
+
+	newContent, changed := sanitizeContentArray(msg["content"])
+	if !changed {
+		// Also check for tool_use_id at message level.
+		if id, ok := msg["tool_use_id"].(string); ok {
+			sanitized := sanitizeToolUseID(id)
+			if sanitized != id {
+				newEntry := copyEntry(e)
+				newMsg := copyMap(msg)
+				newMsg["tool_use_id"] = sanitized
+				newEntry["message"] = newMsg
+				return newEntry
+			}
+		}
+		return e
+	}
+
+	newEntry := copyEntry(e)
+	newMsg := copyMap(msg)
+	newMsg["content"] = newContent
+	newEntry["message"] = newMsg
+	return newEntry
+}
+
+// sanitizeEntryContent handles entries where "content" is directly on the
+// entry (not under a "message" key).
+func sanitizeEntryContent(e SessionStoreEntry) SessionStoreEntry {
+	newContent, changed := sanitizeContentArray(e["content"])
+	if !changed {
+		if id, ok := e["tool_use_id"].(string); ok {
+			sanitized := sanitizeToolUseID(id)
+			if sanitized != id {
+				newEntry := copyEntry(e)
+				newEntry["tool_use_id"] = sanitized
+				return newEntry
+			}
+		}
+		return e
+	}
+	newEntry := copyEntry(e)
+	newEntry["content"] = newContent
+	return newEntry
+}
+
+// sanitizeContentArray sanitizes tool_use blocks within a content array.
+// Returns (newContent, true) when at least one ID was changed, or
+// (nil, false) when nothing needed changing.
+func sanitizeContentArray(raw any) (any, bool) {
+	arr, ok := raw.([]any)
+	if !ok {
+		return nil, false
+	}
+	changed := false
+	newArr := make([]any, len(arr))
+	for i, item := range arr {
+		block, ok := item.(map[string]any)
+		if !ok {
+			newArr[i] = item
+			continue
+		}
+		blockType, _ := block["type"].(string)
+		switch blockType {
+		case "tool_use":
+			id, _ := block["id"].(string)
+			sanitized := sanitizeToolUseID(id)
+			if sanitized != id {
+				newBlock := copyMap(block)
+				newBlock["id"] = sanitized
+				newArr[i] = newBlock
+				changed = true
+			} else {
+				newArr[i] = item
+			}
+		case "tool_result":
+			id, _ := block["tool_use_id"].(string)
+			sanitized := sanitizeToolUseID(id)
+			if sanitized != id {
+				newBlock := copyMap(block)
+				newBlock["tool_use_id"] = sanitized
+				newArr[i] = newBlock
+				changed = true
+			} else {
+				newArr[i] = item
+			}
+		default:
+			newArr[i] = item
+		}
+	}
+	if !changed {
+		return nil, false
+	}
+	return newArr, true
+}
+
+// copyEntry returns a shallow copy of a SessionStoreEntry map.
+func copyEntry(e SessionStoreEntry) SessionStoreEntry {
+	out := make(SessionStoreEntry, len(e))
+	for k, v := range e {
+		out[k] = v
+	}
+	return out
+}
+
+// copyMap returns a shallow copy of a map[string]any.
+func copyMap(m map[string]any) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // safeRemoveAll removes path with Windows-safe retries. On Windows,
