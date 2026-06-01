@@ -290,6 +290,11 @@ func DeleteSession(sessionID string, directory ...string) error {
 
 // ForkSession creates a copy of a session's transcript file with a new session ID.
 // Returns the new session ID.
+//
+// The copy is written atomically: all source data is staged to a temporary file
+// in the same directory and only renamed into place once the write completes
+// successfully. This prevents a partial/corrupt destination file if the process
+// crashes mid-write.
 func ForkSession(sessionID string, directory ...string) (string, error) {
 	if !isValidUUID(sessionID) {
 		return "", fmt.Errorf("invalid session ID: %s", sessionID)
@@ -305,21 +310,49 @@ func ForkSession(sessionID string, directory ...string) (string, error) {
 		return "", fmt.Errorf("session not found: %s", sessionID)
 	}
 
-	// Generate new UUID
-	newID := generateUUID()
-
-	// Copy file
-	sourceDir := filepath.Dir(sourcePath)
-	destPath := filepath.Join(sourceDir, newID+".jsonl")
-
+	// Read all source data into memory before touching the destination so
+	// that any read failure leaves no partial file behind.
 	data, err := os.ReadFile(sourcePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read session file: %w", err)
 	}
 
-	if err := os.WriteFile(destPath, data, 0644); err != nil {
-		return "", fmt.Errorf("failed to write forked session file: %w", err)
+	// Generate new UUID
+	newID := generateUUID()
+
+	// Write atomically: stage to a temp file in the same directory (so the
+	// rename is on the same filesystem and therefore an atomic rename(2)
+	// rather than a copy), then rename into the final destination.
+	sourceDir := filepath.Dir(sourcePath)
+	destPath := filepath.Join(sourceDir, newID+".jsonl")
+
+	tmpFile, err := os.CreateTemp(sourceDir, ".fork-tmp-")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file for forked session: %w", err)
 	}
+	tmpPath := tmpFile.Name()
+
+	// Clean up the temp file on any failure path.
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return "", fmt.Errorf("failed to write forked session data: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close temp file for forked session: %w", err)
+	}
+
+	// Atomic rename: either the full file appears at destPath or nothing does.
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		return "", fmt.Errorf("failed to commit forked session file: %w", err)
+	}
+	committed = true
 
 	return newID, nil
 }

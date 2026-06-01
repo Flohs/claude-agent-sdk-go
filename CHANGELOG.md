@@ -34,6 +34,7 @@
 ### Fixed
 
 - Subprocess CLI errors now include the captured stderr tail (last ~8 KB) in the error message, making it much easier to diagnose failures such as missing API keys, invalid flags, or CLI crashes. Port of Python SDK PR anthropics/claude-agent-sdk-python#961. ([#282](https://github.com/Flohs/claude-agent-sdk-go/issues/282))
+- Forked session transcripts are now written atomically: all entries are staged in memory first and only committed to the `SessionStore` once the full set is ready. This prevents partial/corrupt forked sessions when a failure occurs mid-write. Port of Python SDK PR anthropics/claude-agent-sdk-python#960. ([#284](https://github.com/Flohs/claude-agent-sdk-go/issues/284))
 - `message_parser.go`: `MemoryRecallMessage` switch-case branch was missing `}, nil` before `case "elicitation_complete":`, leaving the struct literal open and causing a parse error. Residual from the v2.1.0 rebase conflict resolution.
 - `types.go`: `MemoryRecallMessage` struct definition was missing its closing `}`, causing a parse error. Residual from the v2.1.0 rebase conflict resolution.
 - `hook_input_parser_test.go`: `TestExitPlanModeToolInput_Roundtrip` was missing the closing `}` on the inner if-block, causing a parse error. Residual from the v2.1.0 rebase conflict resolution.
