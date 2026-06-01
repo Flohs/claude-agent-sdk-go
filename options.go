@@ -84,6 +84,19 @@ type ToolsPreset struct {
 	Preset string `json:"preset"` // e.g. "claude_code"
 }
 
+// AdvisorToolConfig configures the advisor tool for an AgentDefinition.
+// It mirrors the API's BetaAdvisorTool20260301Param shape.
+type AdvisorToolConfig struct {
+	// Model is the advisor model to consult (e.g. "claude-opus-4-5").
+	Model string `json:"model,omitempty"`
+	// MaxUses limits how many times the advisor may be consulted per turn.
+	MaxUses *int `json:"max_uses,omitempty"`
+	// Caching, when true, enables prompt caching for advisor calls.
+	Caching *bool `json:"caching,omitempty"`
+	// AllowedCallers restricts which agent IDs may invoke this advisor.
+	AllowedCallers []string `json:"allowed_callers,omitempty"`
+}
+
 // AgentDefinition is an agent definition configuration.
 type AgentDefinition struct {
 	Description     string   `json:"description"`
@@ -99,6 +112,10 @@ type AgentDefinition struct {
 	DisallowedTools []string `json:"disallowedTools,omitempty"`
 	MaxTurns        *int     `json:"maxTurns,omitempty"`
 	InitialPrompt   string   `json:"initialPrompt,omitempty"`
+	// Advisor enables the advisor tool for this agent definition.
+	// Set to true to enable with default config, or provide an *AdvisorToolConfig
+	// for fine-grained control. When nil (default), the field is omitted.
+	Advisor any `json:"advisor,omitempty"`
 }
 
 // ThinkingConfig is the interface for thinking configuration.
