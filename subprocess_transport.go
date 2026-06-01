@@ -127,6 +127,7 @@ type SubprocessTransport struct {
 	maxBufSize   int
 	mu           sync.Mutex
 	stdinClosed  bool
+	cleanupFuncs []func()
 }
 
 // NewSubprocessTransport creates a new subprocess transport.
@@ -349,6 +350,7 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 			}
 			unregisterChild(cmd)
 		}
+		t.runCleanup()
 	}()
 
 	return ch
@@ -391,7 +393,20 @@ func (t *SubprocessTransport) Close() error {
 	t.stdout = nil
 	t.stdin = nil
 	t.stderr = nil
+
+	t.runCleanup()
+
 	return nil
+}
+
+// runCleanup executes and clears all registered cleanup functions.
+// Must be called without holding t.mu (cleanup functions may need to acquire it).
+func (t *SubprocessTransport) runCleanup() {
+	fns := t.cleanupFuncs
+	t.cleanupFuncs = nil
+	for _, fn := range fns {
+		fn()
+	}
 }
 
 // IsReady returns whether the transport is ready.
@@ -508,6 +523,24 @@ func (t *SubprocessTransport) buildCommand() []string {
 		case PresetPrompt:
 			if sp.Append != "" {
 				cmd = append(cmd, "--append-system-prompt", sp.Append)
+			}
+		case ContentBlocksPrompt:
+			data, err := json.Marshal([]map[string]any(sp))
+			if err == nil {
+				tmpFile, err := os.CreateTemp("", "claude-system-prompt-*.json")
+				if err == nil {
+					_, writeErr := tmpFile.Write(data)
+					closeErr := tmpFile.Close()
+					if writeErr == nil && closeErr == nil {
+						tmpPath := tmpFile.Name()
+						cmd = append(cmd, "--system-prompt-file", tmpPath)
+						t.cleanupFuncs = append(t.cleanupFuncs, func() {
+							_ = os.Remove(tmpPath)
+						})
+					} else {
+						_ = os.Remove(tmpFile.Name())
+					}
+				}
 			}
 		}
 	}
