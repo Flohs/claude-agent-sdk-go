@@ -79,6 +79,13 @@ type PresetPrompt struct {
 
 func (PresetPrompt) systemPromptMarker() {}
 
+// ContentBlocksPrompt is a system prompt expressed as an array of content blocks,
+// matching the Anthropic API's list-form system parameter.
+// Each block is a map with at minimum {"type": "text", "text": "..."}.
+type ContentBlocksPrompt []map[string]any
+
+func (ContentBlocksPrompt) systemPromptMarker() {}
+
 // ToolsPreset represents a tools preset configuration.
 type ToolsPreset struct {
 	Preset string `json:"preset"` // e.g. "claude_code"

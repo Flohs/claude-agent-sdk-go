@@ -26,6 +26,7 @@
 - `HookEventSetup` (`"Setup"`) hook event constant and `SetupHookInput` typed struct with `Trigger string` (`"init"` or `"maintenance"`). Fires during one-time session initialization via `--init-only` or `-p --init/--maintenance` flags. Hook output is written to the debug log only. ([#259](https://github.com/Flohs/claude-agent-sdk-go/issues/259))
 - `HookEventTaskCreated` (`"TaskCreated"`) hook event constant and `TaskCreatedHookInput` typed struct with `TaskName`, `TaskDescription`, and embedded `SubagentContext` fields. Fires when a new task is being created (e.g. via the TaskCreate tool). Returning `decision:"block"` rolls back the creation. ([#259](https://github.com/Flohs/claude-agent-sdk-go/issues/259))
 - `InheritEnv *bool` field on `Options`. When set to `false`, the CLI subprocess starts with a clean environment containing only SDK-required variables plus any entries from `Options.Env` (instead of inheriting the full parent process environment). Defaults to `true` (nil treated as true) for backward compatibility. Port of Python SDK PR anthropics/claude-agent-sdk-python#944. ([#278](https://github.com/Flohs/claude-agent-sdk-go/issues/278))
+- `ContentBlocksPrompt` type (`[]map[string]any`) implementing `SystemPrompt`. Allows passing a list of Anthropic content blocks as the system prompt. Serialized to a temporary JSON file and passed via `--system-prompt-file`. Port of Python SDK PRs anthropics/claude-agent-sdk-python#947 and #900. ([#283](https://github.com/Flohs/claude-agent-sdk-go/issues/283))
 
 ### Documentation
 
