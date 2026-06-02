@@ -210,6 +210,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			MaxAttempts:   intField(data, "max_attempts"),
 			DelayMs:       intField(data, "delay_ms"),
 			ErrorMessage:  stringField(data, "error_message"),
+			Error:         ApiRetryError(stringField(data, "error")),
 		}
 		if v, ok := data["error_status"]; ok {
 			if status := intFromAny(v); status != 0 {

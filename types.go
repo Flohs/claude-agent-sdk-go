@@ -369,6 +369,17 @@ type MirrorErrorMessage struct {
 	SessionID string      `json:"session_id,omitempty"`
 }
 
+// ApiRetryError is the machine-readable error category in an [ApiRetryMessage].
+// Port of TypeScript SDK 0.3.150.
+type ApiRetryError string
+
+const (
+	// ApiRetryErrorOverloaded is reported for 529 (server overloaded) responses.
+	ApiRetryErrorOverloaded ApiRetryError = "overloaded"
+	// ApiRetryErrorRateLimit is reported for 429 (rate limit) responses.
+	ApiRetryErrorRateLimit ApiRetryError = "rate_limit"
+)
+
 // ApiRetryMessage is emitted before each API retry attempt when the CLI
 // encounters a transient API error. Port of TypeScript SDK v0.2.77.
 type ApiRetryMessage struct {
@@ -384,6 +395,9 @@ type ApiRetryMessage struct {
 	ErrorStatus *int `json:"error_status,omitempty"`
 	// ErrorMessage is a human-readable description of the error that triggered the retry.
 	ErrorMessage string `json:"error_message,omitempty"`
+	// Error is the machine-readable error category: "overloaded" for 529 responses,
+	// "rate_limit" for 429 responses. Port of TypeScript SDK 0.3.150.
+	Error ApiRetryError `json:"error,omitempty"`
 }
 
 // MemoryRecallMessage is emitted when Claude loads memory files during a session.
