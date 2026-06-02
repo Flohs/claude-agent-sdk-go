@@ -35,6 +35,7 @@
 
 ### Fixed
 
+- `applySkillsDefaults` now also injects `"Skill"` into the `--tools` argument when `Options.Skills` is set and `Options.Tools` is an explicit `[]string`. Previously `Skill` was added to `--allowedTools` (auto-approve) but not to `--tools` (availability), so the model could never invoke any skill when an explicit tools list was provided. Port of Python SDK PR anthropics/claude-agent-sdk-python#985. ([#297](https://github.com/Flohs/claude-agent-sdk-go/issues/297))
 - Subprocess CLI errors now include the captured stderr tail (last ~8 KB) in the error message, making it much easier to diagnose failures such as missing API keys, invalid flags, or CLI crashes. Port of Python SDK PR anthropics/claude-agent-sdk-python#961. ([#282](https://github.com/Flohs/claude-agent-sdk-go/issues/282))
 - Forked session transcripts are now written atomically: all entries are staged in memory first and only committed to the `SessionStore` once the full set is ready. This prevents partial/corrupt forked sessions when a failure occurs mid-write. Port of Python SDK PR anthropics/claude-agent-sdk-python#960. ([#284](https://github.com/Flohs/claude-agent-sdk-go/issues/284))
 - Session resume now sanitizes `tool_use.id` values in the loaded transcript to conform to the `toolu_[a-zA-Z0-9_-]+` format required by the Claude API, preventing `400 Bad Request` errors when resuming sessions that contain bare UUIDs or IDs with invalid characters. Port of Python SDK PR anthropics/claude-agent-sdk-python#876. ([#281](https://github.com/Flohs/claude-agent-sdk-go/issues/281))
@@ -230,7 +231,7 @@ PRs.
 
 ### Changed
 
-- Minimum Claude CLI version bumped from `2.1.0` to `2.1.90` to align with Python SDK and ensure compatibility with v1.3.0 features (TaskBudget, ForkSession, DeleteSession, GetContextUsage, control_cancel_request, Errors on ResultMessage). ([#88](https://github.com/Flohs/claude-agent-sdk-go/issues/88))
+- Minimum Claude CLI version bumped from `2.1.0` to `2.1.90` to align with Python SDK and ensure compatibility with features like skills, memory, mcpServers in agent definitions, typed `RateLimitEvent`, and `GetSessionInfo` with `tag/created_at`. ([#88](https://github.com/Flohs/claude-agent-sdk-go/issues/88))
 - `sdkVersion` constant updated from `1.3.0` to `1.4.0`.
 
 ### Fixed
