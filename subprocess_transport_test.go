@@ -441,6 +441,93 @@ func TestBuildCommand_Skills(t *testing.T) {
 		}
 		t.Error("--setting-sources not found")
 	})
+
+	t.Run("skills all with explicit tools injects Skill into --tools", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Tools:  []string{"Read", "Write"},
+				Skills: "all",
+			},
+		}
+		cmd := transport.buildCommand()
+		for i, a := range cmd {
+			if a == "--tools" && i+1 < len(cmd) {
+				v := cmd[i+1]
+				if !strings.Contains(v, "Read") || !strings.Contains(v, "Write") || !strings.Contains(v, "Skill") {
+					t.Errorf("expected --tools to contain Read,Write,Skill, got %s", v)
+				}
+				return
+			}
+		}
+		t.Error("--tools flag not found")
+	})
+
+	t.Run("skills list with explicit tools injects Skill into --tools", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Tools:  []string{"Read"},
+				Skills: []string{"pdf"},
+			},
+		}
+		cmd := transport.buildCommand()
+		for i, a := range cmd {
+			if a == "--tools" && i+1 < len(cmd) {
+				v := cmd[i+1]
+				if !strings.Contains(v, "Read") || !strings.Contains(v, "Skill") {
+					t.Errorf("expected --tools to contain Read,Skill, got %s", v)
+				}
+				return
+			}
+		}
+		t.Error("--tools flag not found")
+	})
+
+	t.Run("skills with nil tools does not emit --tools", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Skills: "all",
+			},
+		}
+		cmd := transport.buildCommand()
+		assertNotContainsFlag(t, cmd, "--tools")
+	})
+
+	t.Run("skills with preset tools does not change --tools value", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Tools:  &ToolsPreset{Preset: "claude_code"},
+				Skills: "all",
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--tools", "default")
+	})
+
+	t.Run("Skill already in explicit tools is not duplicated", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Tools:  []string{"Read", "Skill"},
+				Skills: "all",
+			},
+		}
+		cmd := transport.buildCommand()
+		for i, a := range cmd {
+			if a == "--tools" && i+1 < len(cmd) {
+				v := cmd[i+1]
+				count := strings.Count(v, "Skill")
+				if count != 1 {
+					t.Errorf("expected Skill to appear exactly once in --tools, got: %s", v)
+				}
+				return
+			}
+		}
+		t.Error("--tools flag not found")
+	})
 }
 
 func TestBuildSettingsValue_SandboxFailIfUnavailable(t *testing.T) {
