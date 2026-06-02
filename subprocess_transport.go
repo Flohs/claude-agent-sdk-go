@@ -429,18 +429,17 @@ func (t *SubprocessTransport) EndInput() error {
 	return nil
 }
 
-// applySkillsDefaults computes the effective AllowedTools and SettingSources
-// when Options.Skills is set. When Skills is "all", it injects the bare Skill
-// tool; when it is a []string, it injects Skill(name) for each entry. In either
-// case SettingSources defaults to [user, project] if unset so the CLI
-// discovers installed skills without the caller having to wire both options
-// manually. Returns copies — the original options are not mutated.
-func applySkillsDefaults(opts *Options) ([]string, []SettingSource) {
+// applySkillsDefaults computes the effective AllowedTools, SettingSources, and
+// (when an explicit Tools list is provided) an effective Tools list when
+// Options.Skills is set. The third return value is the effective tools slice;
+// it is non-nil only when Skills injection appended "Skill" to a user-provided
+// []string Tools list. Returns copies — the original options are not mutated.
+func applySkillsDefaults(opts *Options) ([]string, []SettingSource, []string) {
 	allowed := append([]string(nil), opts.AllowedTools...)
 	settingSources := opts.SettingSources
 
 	if opts.Skills == nil {
-		return allowed, settingSources
+		return allowed, settingSources, nil
 	}
 
 	injected := false
@@ -466,7 +465,21 @@ func applySkillsDefaults(opts *Options) ([]string, []SettingSource) {
 		settingSources = []SettingSource{SettingSourceUser, SettingSourceProject}
 	}
 
-	return allowed, settingSources
+	// When Tools is an explicit []string, inject "Skill" there too so the CLI
+	// makes it available. --allowedTools alone only auto-approves it; the tool
+	// must also appear in --tools to be loadable by the model.
+	var effectiveTools []string
+	if injected {
+		if tools, ok := opts.Tools.([]string); ok {
+			effectiveTools = make([]string, len(tools))
+			copy(effectiveTools, tools)
+			if !stringSliceContains(effectiveTools, "Skill") {
+				effectiveTools = append(effectiveTools, "Skill")
+			}
+		}
+	}
+
+	return allowed, settingSources, effectiveTools
 }
 
 func stringSliceContains(s []string, target string) bool {
@@ -545,9 +558,15 @@ func (t *SubprocessTransport) buildCommand() []string {
 		}
 	}
 
-	// Tools
-	if opts.Tools != nil {
-		switch tools := opts.Tools.(type) {
+	effectiveAllowedTools, effectiveSettingSources, effectiveTools := applySkillsDefaults(opts)
+
+	// Tools — use effectiveTools when Skills injection appended "Skill" to the list.
+	var toolsValue any = opts.Tools
+	if effectiveTools != nil {
+		toolsValue = (any)(effectiveTools)
+	}
+	if toolsValue != nil {
+		switch tools := toolsValue.(type) {
 		case []string:
 			if len(tools) == 0 {
 				cmd = append(cmd, "--tools", "")
@@ -559,7 +578,6 @@ func (t *SubprocessTransport) buildCommand() []string {
 		}
 	}
 
-	effectiveAllowedTools, effectiveSettingSources := applySkillsDefaults(opts)
 	if len(effectiveAllowedTools) > 0 {
 		cmd = append(cmd, "--allowedTools", strings.Join(effectiveAllowedTools, ","))
 	}
