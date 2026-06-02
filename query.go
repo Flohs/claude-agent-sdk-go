@@ -450,18 +450,35 @@ func (q *query) handleControlRequest(msg map[string]any) {
 	request, _ := msg["request"].(map[string]any)
 	subtype, _ := request["subtype"].(string)
 
+	type callResult struct {
+		data map[string]any
+		err  error
+	}
+
+	done := make(chan callResult, 1)
+	go func() {
+		var responseData map[string]any
+		var err error
+		switch subtype {
+		case "can_use_tool":
+			responseData, err = q.handleCanUseTool(request)
+		case "hook_callback":
+			responseData, err = q.handleHookCallback(request)
+		case "mcp_message":
+			responseData, err = q.handleMcpMessage(request)
+		default:
+			err = fmt.Errorf("unsupported control request subtype: %s", subtype)
+		}
+		done <- callResult{responseData, err}
+	}()
+
 	var responseData map[string]any
 	var err error
-
-	switch subtype {
-	case "can_use_tool":
-		responseData, err = q.handleCanUseTool(request)
-	case "hook_callback":
-		responseData, err = q.handleHookCallback(request)
-	case "mcp_message":
-		responseData, err = q.handleMcpMessage(request)
-	default:
-		err = fmt.Errorf("unsupported control request subtype: %s", subtype)
+	select {
+	case r := <-done:
+		responseData, err = r.data, r.err
+	case <-q.ctx.Done():
+		err = fmt.Errorf("query cancelled")
 	}
 
 	var response map[string]any
