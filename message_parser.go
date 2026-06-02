@@ -48,10 +48,15 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		msg.ToolUseResult = tr
 	}
 
-	message, ok := data["message"].(map[string]any)
+	rawMsg, hasMsgField := data["message"]
+	message, ok := rawMsg.(map[string]any)
 	if !ok {
+		errMsg := "Missing required field 'message' in user message"
+		if hasMsgField {
+			errMsg = fmt.Sprintf("Malformed field in user message: message is %T, expected map", rawMsg)
+		}
 		return nil, &MessageParseError{
-			SDKError: SDKError{Message: "Missing 'message' field in user message"},
+			SDKError: SDKError{Message: errMsg},
 			Data:     data,
 		}
 	}
@@ -74,18 +79,28 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 }
 
 func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
-	message, ok := data["message"].(map[string]any)
+	rawMsg, hasMsgField := data["message"]
+	message, ok := rawMsg.(map[string]any)
 	if !ok {
+		errMsg := "Missing required field 'message' in assistant message"
+		if hasMsgField {
+			errMsg = fmt.Sprintf("Malformed field in assistant message: message is %T, expected map", rawMsg)
+		}
 		return nil, &MessageParseError{
-			SDKError: SDKError{Message: "Missing 'message' field in assistant message"},
+			SDKError: SDKError{Message: errMsg},
 			Data:     data,
 		}
 	}
 
-	contentRaw, ok := message["content"].([]any)
+	rawContent, hasContentField := message["content"]
+	contentRaw, ok := rawContent.([]any)
 	if !ok {
+		errMsg := "Missing required field 'content' in assistant message"
+		if hasContentField {
+			errMsg = fmt.Sprintf("Malformed field in assistant message: content is %T, expected array", rawContent)
+		}
 		return nil, &MessageParseError{
-			SDKError: SDKError{Message: "Missing 'content' field in assistant message"},
+			SDKError: SDKError{Message: errMsg},
 			Data:     data,
 		}
 	}
@@ -314,8 +329,14 @@ func parseRateLimitEvent(data map[string]any) (*RateLimitEvent, error) {
 		SessionID: stringField(data, "session_id"),
 	}
 
-	// Extract rate_limit_info from nested map if present
-	if infoMap, ok := data["rate_limit_info"].(map[string]any); ok {
+	if rawInfo, exists := data["rate_limit_info"]; exists && rawInfo != nil {
+		infoMap, ok := rawInfo.(map[string]any)
+		if !ok {
+			return nil, &MessageParseError{
+				SDKError: SDKError{Message: fmt.Sprintf("Malformed field in rate_limit_event message: rate_limit_info is %T, expected map", rawInfo)},
+				Data:     data,
+			}
+		}
 		event.RateLimitInfo = parseRateLimitInfo(infoMap)
 	}
 
