@@ -642,3 +642,35 @@ func TestHandleStderr_PanicInCallbackDoesNotAbortLoop(t *testing.T) {
 			totalLines, len(delivered), panicOnLine)
 	}
 }
+
+func TestBuildCommand_JsonSchemaFile(t *testing.T) {
+	t.Run("json_schema type emits --json-schema-file flag", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				OutputFormat: map[string]any{
+					"type":   "json_schema",
+					"schema": map[string]any{"type": "object"},
+				},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContainsFlag(t, cmd, "--json-schema-file")
+		assertNotContainsFlag(t, cmd, "--json-schema")
+	})
+
+	t.Run("json_schema_file type passes path directly", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				OutputFormat: map[string]any{
+					"type": "json_schema_file",
+					"path": "/tmp/my-schema.json",
+				},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--json-schema-file", "/tmp/my-schema.json")
+		assertNotContainsFlag(t, cmd, "--json-schema")
+	})
+}

@@ -740,10 +740,32 @@ func (t *SubprocessTransport) buildCommand() []string {
 
 	// Output format / JSON schema
 	if opts.OutputFormat != nil {
-		if opts.OutputFormat["type"] == "json_schema" {
+		switch opts.OutputFormat["type"] {
+		case "json_schema":
 			if schema, ok := opts.OutputFormat["schema"]; ok {
-				data, _ := json.Marshal(schema)
-				cmd = append(cmd, "--json-schema", string(data))
+				schemaJSON, _ := json.Marshal(schema)
+				// Write to a temp file to avoid inlining the schema in argv (can be
+				// 6-7 KB for real-world schemas, causing log noise and PII exposure).
+				if tmpFile, tmpErr := os.CreateTemp("", "claude-json-schema-*.json"); tmpErr == nil {
+					_, writeErr := tmpFile.Write(schemaJSON)
+					closeErr := tmpFile.Close()
+					if writeErr == nil && closeErr == nil {
+						tmpPath := tmpFile.Name()
+						cmd = append(cmd, "--json-schema-file", tmpPath)
+						t.cleanupFuncs = append(t.cleanupFuncs, func() {
+							_ = os.Remove(tmpPath)
+						})
+					} else {
+						_ = os.Remove(tmpFile.Name())
+						cmd = append(cmd, "--json-schema", string(schemaJSON))
+					}
+				} else {
+					cmd = append(cmd, "--json-schema", string(schemaJSON))
+				}
+			}
+		case "json_schema_file":
+			if path, ok := opts.OutputFormat["path"].(string); ok && path != "" {
+				cmd = append(cmd, "--json-schema-file", path)
 			}
 		}
 	}
