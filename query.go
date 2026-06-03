@@ -758,6 +758,15 @@ func (q *query) setModel(model string) error {
 	return err
 }
 
+func (q *query) applyFlagSettings(settings map[string]any) error {
+	req := map[string]any{"subtype": "apply_flag_settings"}
+	for k, v := range settings {
+		req[k] = v
+	}
+	_, err := q.sendControlRequest(req, 60*time.Second)
+	return err
+}
+
 func (q *query) getMcpStatus() (*McpStatusResponse, error) {
 	resp, err := q.sendControlRequest(map[string]any{"subtype": "mcp_status"}, 60*time.Second)
 	if err != nil {
