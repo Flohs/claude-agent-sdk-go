@@ -556,6 +556,8 @@ type ServerCapabilities struct {
 	// SupportsAdaptiveThinking is true when the model supports adaptive
 	// thinking mode (ThinkingConfigAdaptive).
 	SupportsAdaptiveThinking bool `json:"supportsAdaptiveThinking"`
+	// SupportsFastMode is true when the current model supports fast mode.
+	SupportsFastMode bool `json:"supportsFastMode"`
 	// MemoryPaths is the list of memory file paths loaded at session initialization.
 	// Empty when no memory files are configured.
 	MemoryPaths []string `json:"memoryPaths,omitempty"`

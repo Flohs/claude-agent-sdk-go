@@ -462,6 +462,9 @@ func (c *Client) GetServerCapabilities() *ServerCapabilities {
 	if v, ok := c.q.initializationResult["supportsAdaptiveThinking"].(bool); ok {
 		caps.SupportsAdaptiveThinking = v
 	}
+	if v, ok := c.q.initializationResult["supportsFastMode"].(bool); ok {
+		caps.SupportsFastMode = v
+	}
 	if levels, ok := c.q.initializationResult["supportedEffortLevels"].([]any); ok {
 		for _, l := range levels {
 			if s, ok := l.(string); ok {
