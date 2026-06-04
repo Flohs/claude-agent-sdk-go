@@ -561,9 +561,9 @@ func (t *SubprocessTransport) buildCommand() []string {
 	effectiveAllowedTools, effectiveSettingSources, effectiveTools := applySkillsDefaults(opts)
 
 	// Tools — use effectiveTools when Skills injection appended "Skill" to the list.
-	var toolsValue any = opts.Tools
+	toolsValue := opts.Tools
 	if effectiveTools != nil {
-		toolsValue = (any)(effectiveTools)
+		toolsValue = any(effectiveTools)
 	}
 	if toolsValue != nil {
 		switch tools := toolsValue.(type) {
