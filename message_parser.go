@@ -216,6 +216,9 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 				msg.ErrorStatus = &status
 			}
 		}
+		if errStr := stringField(data, "error"); errStr != "" {
+			msg.Error = ApiRetryError(errStr)
+		}
 		return msg, nil
 
 	case "memory_recall":
