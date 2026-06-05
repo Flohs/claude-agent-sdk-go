@@ -190,6 +190,42 @@ type SubagentStopHookInput struct {
 
 func (*SubagentStopHookInput) hookInputMarker() {}
 
+// StopHookOutput is the typed output for [HookEventStop] callbacks.
+// Returning a non-empty AdditionalContext provides non-error feedback that
+// continues the turn instead of halting it. Port of TypeScript SDK v0.3.163.
+type StopHookOutput struct {
+	// AdditionalContext, when non-empty, is injected as context after the stop
+	// decision, continuing the turn instead of halting it.
+	AdditionalContext string
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map.
+func (o StopHookOutput) ToHookJSONOutput() HookJSONOutput {
+	out := HookJSONOutput{}
+	if o.AdditionalContext != "" {
+		out["hookSpecificOutput"] = map[string]any{"additionalContext": o.AdditionalContext}
+	}
+	return out
+}
+
+// SubagentStopHookOutput is the typed output for [HookEventSubagentStop] callbacks.
+// Returning a non-empty AdditionalContext provides non-error feedback that
+// continues the turn instead of halting it. Port of TypeScript SDK v0.3.163.
+type SubagentStopHookOutput struct {
+	// AdditionalContext, when non-empty, is injected as context after the stop
+	// decision, continuing the turn instead of halting it.
+	AdditionalContext string
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map.
+func (o SubagentStopHookOutput) ToHookJSONOutput() HookJSONOutput {
+	out := HookJSONOutput{}
+	if o.AdditionalContext != "" {
+		out["hookSpecificOutput"] = map[string]any{"additionalContext": o.AdditionalContext}
+	}
+	return out
+}
+
 // SubagentStartHookInput is the typed input for SubagentStart hook events.
 type SubagentStartHookInput struct {
 	BaseHookInput
