@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -656,6 +657,13 @@ func (q *query) initialize() (map[string]any, error) {
 
 	response, err := q.sendControlRequest(request, time.Duration(q.initTimeout*float64(time.Second)))
 	if err != nil {
+		// A second initialize call returns "Already initialized" — treat as success.
+		errMsg := err.Error()
+		if strings.Contains(strings.ToLower(errMsg), "already initialized") {
+			if q.initializationResult != nil {
+				return q.initializationResult, nil
+			}
+		}
 		return nil, err
 	}
 
@@ -709,6 +717,25 @@ func (q *query) sendControlRequest(request map[string]any, timeout time.Duration
 		if responseData == nil {
 			responseData = map[string]any{}
 		}
+
+		// Dispatch any permission requests that were queued before the session
+		// loop was fully running. Port of TypeScript SDK v0.3.161.
+		if pending, ok := responseData["pending_permission_requests"].([]any); ok {
+			for _, pr := range pending {
+				if prMap, ok := pr.(map[string]any); ok {
+					syntheticMsg := map[string]any{
+						"type":    "control_request",
+						"request": prMap,
+					}
+					q.wg.Add(1)
+					go func(msg map[string]any) {
+						defer q.wg.Done()
+						q.handleControlRequest(msg)
+					}(syntheticMsg)
+				}
+			}
+		}
+
 		return responseData, nil
 
 	case <-time.After(timeout):
