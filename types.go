@@ -169,6 +169,10 @@ type AssistantMessage struct {
 	// StopReason is why the model stopped generating (e.g. "end_turn",
 	// "tool_use", "max_tokens"). Empty when not provided.
 	StopReason string `json:"stop_reason,omitempty"`
+	// StopDetails contains structured metadata when StopReason is "refusal" or
+	// another stop condition that carries additional context. Nil when not
+	// provided by the CLI.
+	StopDetails map[string]any `json:"stop_details,omitempty"`
 	// RequestID is the API request identifier for this message.
 	RequestID string `json:"request_id,omitempty"`
 	// Timestamp is the ISO-8601 datetime when this message was recorded in the
@@ -456,6 +460,9 @@ type ResultMessage struct {
 	NumTurns      int    `json:"num_turns"`
 	SessionID     string `json:"session_id"`
 	StopReason    string `json:"stop_reason,omitempty"`
+	// StopDetails contains structured metadata accompanying the stop reason,
+	// e.g. when StopReason is "refusal". Nil when not provided by the CLI.
+	StopDetails map[string]any `json:"stop_details,omitempty"`
 	// TerminalReason describes why the session terminated (e.g. "completed",
 	// "aborted_tools", "max_turns", "blocking_limit"). Empty when not
 	// provided by the CLI.

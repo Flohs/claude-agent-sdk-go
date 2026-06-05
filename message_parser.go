@@ -131,6 +131,10 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		msg.Usage = usage
 	}
 
+	if sd, ok := message["stop_details"].(map[string]any); ok {
+		msg.StopDetails = sd
+	}
+
 	msg.RawData = data
 
 	return msg, nil
@@ -285,6 +289,10 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 
 	if errors, ok := data["errors"].([]any); ok {
 		msg.Errors = errors
+	}
+
+	if sd, ok := data["stop_details"].(map[string]any); ok {
+		msg.StopDetails = sd
 	}
 
 	if v, ok := data["api_error_status"]; ok {

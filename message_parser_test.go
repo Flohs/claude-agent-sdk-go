@@ -1176,3 +1176,31 @@ func TestParseMessage_AssistantMessage_MessageWrongType(t *testing.T) {
 		t.Errorf("unexpected error message: %q", mpe.Message)
 	}
 }
+
+func TestParseAssistantMessage_StopDetails(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content":     []any{},
+			"stop_reason": "refusal",
+			"stop_details": map[string]any{"type": "refusal", "reason": "policy"},
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	am, ok := msg.(*AssistantMessage)
+	if !ok {
+		t.Fatalf("expected AssistantMessage, got %T", msg)
+	}
+	if am.StopReason != "refusal" {
+		t.Errorf("expected StopReason 'refusal', got %q", am.StopReason)
+	}
+	if am.StopDetails == nil {
+		t.Fatal("expected StopDetails to be non-nil")
+	}
+	if am.StopDetails["type"] != "refusal" {
+		t.Errorf("expected StopDetails type 'refusal', got %v", am.StopDetails["type"])
+	}
+}
