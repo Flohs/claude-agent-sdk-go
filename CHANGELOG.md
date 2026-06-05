@@ -35,6 +35,7 @@
 
 ### Fixed
 
+- `Client.StopTask` now treats CLI error responses of `"not_found"` and `"not_running"` as success, making the call idempotent for already-gone tasks. Port of TypeScript SDK v0.3.163. ([#317](https://github.com/Flohs/claude-agent-sdk-go/issues/317))
 - Subprocess CLI errors now include the captured stderr tail (last ~8 KB) in the error message, making it much easier to diagnose failures such as missing API keys, invalid flags, or CLI crashes. Port of Python SDK PR anthropics/claude-agent-sdk-python#961. ([#282](https://github.com/Flohs/claude-agent-sdk-go/issues/282))
 - Forked session transcripts are now written atomically: all entries are staged in memory first and only committed to the `SessionStore` once the full set is ready. This prevents partial/corrupt forked sessions when a failure occurs mid-write. Port of Python SDK PR anthropics/claude-agent-sdk-python#960. ([#284](https://github.com/Flohs/claude-agent-sdk-go/issues/284))
 - Session resume now sanitizes `tool_use.id` values in the loaded transcript to conform to the `toolu_[a-zA-Z0-9_-]+` format required by the Claude API, preventing `400 Bad Request` errors when resuming sessions that contain bare UUIDs or IDs with invalid characters. Port of Python SDK PR anthropics/claude-agent-sdk-python#876. ([#281](https://github.com/Flohs/claude-agent-sdk-go/issues/281))
