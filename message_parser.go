@@ -48,10 +48,17 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		msg.ToolUseResult = tr
 	}
 
-	message, ok := data["message"].(map[string]any)
-	if !ok {
+	rawMessage, exists := data["message"]
+	if !exists || rawMessage == nil {
 		return nil, &MessageParseError{
 			SDKError: SDKError{Message: "Missing 'message' field in user message"},
+			Data:     data,
+		}
+	}
+	message, ok := rawMessage.(map[string]any)
+	if !ok {
+		return nil, &MessageParseError{
+			SDKError: SDKError{Message: "Wrong type for 'message' field in user message"},
 			Data:     data,
 		}
 	}
@@ -74,10 +81,17 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 }
 
 func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
-	message, ok := data["message"].(map[string]any)
-	if !ok {
+	rawMessage, exists := data["message"]
+	if !exists || rawMessage == nil {
 		return nil, &MessageParseError{
 			SDKError: SDKError{Message: "Missing 'message' field in assistant message"},
+			Data:     data,
+		}
+	}
+	message, ok := rawMessage.(map[string]any)
+	if !ok {
+		return nil, &MessageParseError{
+			SDKError: SDKError{Message: "Wrong type for 'message' field in assistant message"},
 			Data:     data,
 		}
 	}
@@ -318,8 +332,15 @@ func parseRateLimitEvent(data map[string]any) (*RateLimitEvent, error) {
 	}
 
 	// Extract rate_limit_info from nested map if present
-	if infoMap, ok := data["rate_limit_info"].(map[string]any); ok {
-		event.RateLimitInfo = parseRateLimitInfo(infoMap)
+	if rl, exists := data["rate_limit_info"]; exists {
+		if infoMap, ok := rl.(map[string]any); ok {
+			event.RateLimitInfo = parseRateLimitInfo(infoMap)
+		} else if rl != nil {
+			return nil, &MessageParseError{
+				SDKError: SDKError{Message: "rate_limit_info has wrong type"},
+				Data:     data,
+			}
+		}
 	}
 
 	return event, nil

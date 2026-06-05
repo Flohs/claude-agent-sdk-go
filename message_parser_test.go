@@ -1054,3 +1054,125 @@ func TestParseMessage_MemoryRecall(t *testing.T) {
 		t.Errorf("Subtype: got %q, want 'memory_recall'", m.Subtype)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tests for wrong-type field detection (#300)
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_RateLimitEvent_RateLimitInfoNull(t *testing.T) {
+	// rate_limit_info present but nil — should not error (treat as missing).
+	data := map[string]any{
+		"type":            "rate_limit_event",
+		"uuid":            "rl-uuid",
+		"session_id":      "sess-1",
+		"rate_limit_info": nil,
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error for nil rate_limit_info: %v", err)
+	}
+	event, ok := msg.(*RateLimitEvent)
+	if !ok {
+		t.Fatalf("expected *RateLimitEvent, got %T", msg)
+	}
+	if event.RateLimitInfo.Status != "" {
+		t.Errorf("expected empty RateLimitInfo for nil value, got status=%q", event.RateLimitInfo.Status)
+	}
+}
+
+func TestParseMessage_RateLimitEvent_RateLimitInfoWrongType(t *testing.T) {
+	// rate_limit_info present as a string — should return MessageParseError.
+	data := map[string]any{
+		"type":            "rate_limit_event",
+		"uuid":            "rl-uuid",
+		"session_id":      "sess-1",
+		"rate_limit_info": "invalid_string",
+	}
+	_, err := ParseMessage(data)
+	if err == nil {
+		t.Fatal("expected error for wrong-type rate_limit_info, got nil")
+	}
+	mpe, ok := err.(*MessageParseError)
+	if !ok {
+		t.Fatalf("expected *MessageParseError, got %T", err)
+	}
+	if mpe.Message != "rate_limit_info has wrong type" {
+		t.Errorf("unexpected error message: %q", mpe.Message)
+	}
+}
+
+func TestParseMessage_UserMessage_MessageNull(t *testing.T) {
+	// message field present but nil — should return MessageParseError with "Missing" message.
+	data := map[string]any{
+		"type":    "user",
+		"message": nil,
+	}
+	_, err := ParseMessage(data)
+	if err == nil {
+		t.Fatal("expected error for nil message field, got nil")
+	}
+	mpe, ok := err.(*MessageParseError)
+	if !ok {
+		t.Fatalf("expected *MessageParseError, got %T", err)
+	}
+	if mpe.Message != "Missing 'message' field in user message" {
+		t.Errorf("unexpected error message: %q", mpe.Message)
+	}
+}
+
+func TestParseMessage_UserMessage_MessageWrongType(t *testing.T) {
+	// message field present as an int — should return MessageParseError with "Wrong type" message.
+	data := map[string]any{
+		"type":    "user",
+		"message": 42,
+	}
+	_, err := ParseMessage(data)
+	if err == nil {
+		t.Fatal("expected error for wrong-type message field, got nil")
+	}
+	mpe, ok := err.(*MessageParseError)
+	if !ok {
+		t.Fatalf("expected *MessageParseError, got %T", err)
+	}
+	if mpe.Message != "Wrong type for 'message' field in user message" {
+		t.Errorf("unexpected error message: %q", mpe.Message)
+	}
+}
+
+func TestParseMessage_AssistantMessage_MessageNull(t *testing.T) {
+	// message field present but nil — should return MessageParseError with "Missing" message.
+	data := map[string]any{
+		"type":    "assistant",
+		"message": nil,
+	}
+	_, err := ParseMessage(data)
+	if err == nil {
+		t.Fatal("expected error for nil message field, got nil")
+	}
+	mpe, ok := err.(*MessageParseError)
+	if !ok {
+		t.Fatalf("expected *MessageParseError, got %T", err)
+	}
+	if mpe.Message != "Missing 'message' field in assistant message" {
+		t.Errorf("unexpected error message: %q", mpe.Message)
+	}
+}
+
+func TestParseMessage_AssistantMessage_MessageWrongType(t *testing.T) {
+	// message field present as an int — should return MessageParseError with "Wrong type" message.
+	data := map[string]any{
+		"type":    "assistant",
+		"message": 42,
+	}
+	_, err := ParseMessage(data)
+	if err == nil {
+		t.Fatal("expected error for wrong-type message field, got nil")
+	}
+	mpe, ok := err.(*MessageParseError)
+	if !ok {
+		t.Fatalf("expected *MessageParseError, got %T", err)
+	}
+	if mpe.Message != "Wrong type for 'message' field in assistant message" {
+		t.Errorf("unexpected error message: %q", mpe.Message)
+	}
+}
