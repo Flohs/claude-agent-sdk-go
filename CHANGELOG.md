@@ -4,6 +4,7 @@
 
 ### Added
 
+- `ApiRetryError` type and `ApiRetryErrorRateLimit` / `ApiRetryErrorOverloaded` constants for the machine-readable error category on `ApiRetryMessage`. `ApiRetryMessage` gains an `Error ApiRetryError` field (`json:"error,omitempty"`) exposing this value: `"overloaded"` for 529 and `"rate_limit"` for 429. Port of TypeScript SDK v0.3.150. ([#299](https://github.com/Flohs/claude-agent-sdk-go/issues/299))
 - `AdvisorToolConfig` struct (fields: `Model`, `MaxUses`, `Caching`, `AllowedCallers`) and `Advisor any` field on `AgentDefinition`. Set `Advisor` to `true` to enable the advisor tool with default config, or provide `*AdvisorToolConfig` for fine-grained control. Enables the executor/advisor pattern without dropping to the raw Anthropic SDK. Port of Python SDK PR anthropics/claude-agent-sdk-python#880. ([#279](https://github.com/Flohs/claude-agent-sdk-go/issues/279))
 - `AlwaysLoad bool` field (`json:"alwaysLoad,omitempty"`) on `McpStdioServerConfig`, `McpSSEServerConfig`, and `McpHTTPServerConfig`. When `true`, the CLI waits for the server to connect before executing the first query (blocking behavior). By default servers connect in the background since CLI v2.1.142. Port of TypeScript SDK v0.3.142. ([#272](https://github.com/Flohs/claude-agent-sdk-go/issues/272))
 - `SandboxFilesystemConfig` struct with fields `AllowWrite`, `DenyWrite`, `DenyRead`, `AllowRead`, and `AllowManagedReadPathsOnly` for controlling filesystem access in sandboxed commands. Port of Python SDK PR anthropics/claude-agent-sdk-python#862. ([#280](https://github.com/Flohs/claude-agent-sdk-go/issues/280))
@@ -27,6 +28,7 @@
 - `HookEventTaskCreated` (`"TaskCreated"`) hook event constant and `TaskCreatedHookInput` typed struct with `TaskName`, `TaskDescription`, and embedded `SubagentContext` fields. Fires when a new task is being created (e.g. via the TaskCreate tool). Returning `decision:"block"` rolls back the creation. ([#259](https://github.com/Flohs/claude-agent-sdk-go/issues/259))
 - `InheritEnv *bool` field on `Options`. When set to `false`, the CLI subprocess starts with a clean environment containing only SDK-required variables plus any entries from `Options.Env` (instead of inheriting the full parent process environment). Defaults to `true` (nil treated as true) for backward compatibility. Port of Python SDK PR anthropics/claude-agent-sdk-python#944. ([#278](https://github.com/Flohs/claude-agent-sdk-go/issues/278))
 - `ContentBlocksPrompt` type (`[]map[string]any`) implementing `SystemPrompt`. Allows passing a list of Anthropic content blocks as the system prompt. Serialized to a temporary JSON file and passed via `--system-prompt-file`. Port of Python SDK PRs anthropics/claude-agent-sdk-python#947 and #900. ([#283](https://github.com/Flohs/claude-agent-sdk-go/issues/283))
+- `StopHookOutput` typed output struct for [HookEventStop] callbacks with `AdditionalContext` field and `ToHookJSONOutput()` helper. `SubagentStopHookOutput` typed output struct for [HookEventSubagentStop] with the same fields. Returning a non-empty `AdditionalContext` injects non-error feedback that continues the turn instead of halting it. Port of TypeScript SDK v0.3.163. ([#316](https://github.com/Flohs/claude-agent-sdk-go/issues/316))
 
 ### Documentation
 
@@ -35,6 +37,7 @@
 
 ### Fixed
 
+- `Client.StopTask` now treats CLI error responses of `"not_found"` and `"not_running"` as success, making the call idempotent for already-gone tasks. Port of TypeScript SDK v0.3.163. ([#317](https://github.com/Flohs/claude-agent-sdk-go/issues/317))
 - Subprocess CLI errors now include the captured stderr tail (last ~8 KB) in the error message, making it much easier to diagnose failures such as missing API keys, invalid flags, or CLI crashes. Port of Python SDK PR anthropics/claude-agent-sdk-python#961. ([#282](https://github.com/Flohs/claude-agent-sdk-go/issues/282))
 - Forked session transcripts are now written atomically: all entries are staged in memory first and only committed to the `SessionStore` once the full set is ready. This prevents partial/corrupt forked sessions when a failure occurs mid-write. Port of Python SDK PR anthropics/claude-agent-sdk-python#960. ([#284](https://github.com/Flohs/claude-agent-sdk-go/issues/284))
 - Session resume now sanitizes `tool_use.id` values in the loaded transcript to conform to the `toolu_[a-zA-Z0-9_-]+` format required by the Claude API, preventing `400 Bad Request` errors when resuming sessions that contain bare UUIDs or IDs with invalid characters. Port of Python SDK PR anthropics/claude-agent-sdk-python#876. ([#281](https://github.com/Flohs/claude-agent-sdk-go/issues/281))

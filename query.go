@@ -897,6 +897,14 @@ func (q *query) stopTask(taskID string) error {
 		"subtype": "stop_task",
 		"task_id": taskID,
 	}, 60*time.Second)
+	if err != nil {
+		// not_found and not_running are idempotent-stop success cases.
+		// The task is already gone; there is nothing to stop.
+		errMsg := err.Error()
+		if errMsg == "not_found" || errMsg == "not_running" {
+			return nil
+		}
+	}
 	return err
 }
 
