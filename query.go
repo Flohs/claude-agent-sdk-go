@@ -327,7 +327,11 @@ func (q *query) readMessages() {
 
 		// Handle incoming control requests from CLI
 		if msgType == "control_request" {
-			go q.handleControlRequest(msg)
+			q.wg.Add(1)
+			go func() {
+				defer q.wg.Done()
+				q.handleControlRequest(msg)
+			}()
 			continue
 		}
 
@@ -450,37 +454,60 @@ func (q *query) handleControlRequest(msg map[string]any) {
 	request, _ := msg["request"].(map[string]any)
 	subtype, _ := request["subtype"].(string)
 
-	var responseData map[string]any
-	var err error
-
-	switch subtype {
-	case "can_use_tool":
-		responseData, err = q.handleCanUseTool(request)
-	case "hook_callback":
-		responseData, err = q.handleHookCallback(request)
-	case "mcp_message":
-		responseData, err = q.handleMcpMessage(request)
-	default:
-		err = fmt.Errorf("unsupported control request subtype: %s", subtype)
+	type callbackResult struct {
+		resp map[string]any
+		err  error
 	}
 
+	resultCh := make(chan callbackResult, 1)
+	go func() {
+		var responseData map[string]any
+		var err error
+		switch subtype {
+		case "can_use_tool":
+			responseData, err = q.handleCanUseTool(request)
+		case "hook_callback":
+			responseData, err = q.handleHookCallback(request)
+		case "mcp_message":
+			responseData, err = q.handleMcpMessage(request)
+		default:
+			err = fmt.Errorf("unsupported control request subtype: %s", subtype)
+		}
+		resultCh <- callbackResult{responseData, err}
+	}()
+
 	var response map[string]any
-	if err != nil {
+	select {
+	case result := <-resultCh:
+		if result.err != nil {
+			response = map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "error",
+					"request_id": requestID,
+					"error":      result.err.Error(),
+				},
+			}
+		} else {
+			response = map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": requestID,
+					"response":   result.resp,
+				},
+			}
+		}
+	case <-q.ctx.Done():
+		// Context was cancelled while the callback was executing. Send an
+		// error response so the CLI subprocess can end the turn cleanly
+		// rather than waiting indefinitely for a reply that will never come.
 		response = map[string]any{
 			"type": "control_response",
 			"response": map[string]any{
 				"subtype":    "error",
 				"request_id": requestID,
-				"error":      err.Error(),
-			},
-		}
-	} else {
-		response = map[string]any{
-			"type": "control_response",
-			"response": map[string]any{
-				"subtype":    "success",
-				"request_id": requestID,
-				"response":   responseData,
+				"error":      "context cancelled",
 			},
 		}
 	}
