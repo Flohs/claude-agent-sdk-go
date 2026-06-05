@@ -328,6 +328,17 @@ func (c *Client) SetModel(ctx context.Context, model string) error {
 	return c.q.setModel(model)
 }
 
+// ApplyFlagSettings applies one or more flag settings to the running session.
+// Settings take effect on the next query turn. Pass nil as the value for a
+// key to clear that setting (e.g. map[string]any{"agent": nil} resets to the
+// default agent). Port of TypeScript SDK v0.2.132 / v0.3.161.
+func (c *Client) ApplyFlagSettings(ctx context.Context, settings map[string]any) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.applyFlagSettings(settings)
+}
+
 // GetMcpStatus returns the current MCP server connection status.
 func (c *Client) GetMcpStatus(ctx context.Context) (*McpStatusResponse, error) {
 	if c.q == nil {
