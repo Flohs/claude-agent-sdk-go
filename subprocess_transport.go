@@ -549,10 +549,26 @@ func (t *SubprocessTransport) buildCommand() []string {
 	if opts.Tools != nil {
 		switch tools := opts.Tools.(type) {
 		case []string:
-			if len(tools) == 0 {
+			toolList := append([]string(nil), tools...)
+			// When skills are active and an explicit tool list is given, inject
+			// "Skill" so the model can invoke skills. Without this, Skill is
+			// authorised via AllowedTools but never loadable.
+			if opts.Skills != nil && len(toolList) > 0 {
+				hasSkill := false
+				for _, t := range toolList {
+					if t == "Skill" {
+						hasSkill = true
+						break
+					}
+				}
+				if !hasSkill {
+					toolList = append(toolList, "Skill")
+				}
+			}
+			if len(toolList) == 0 {
 				cmd = append(cmd, "--tools", "")
 			} else {
-				cmd = append(cmd, "--tools", strings.Join(tools, ","))
+				cmd = append(cmd, "--tools", strings.Join(toolList, ","))
 			}
 		case *ToolsPreset:
 			cmd = append(cmd, "--tools", "default")

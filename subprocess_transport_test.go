@@ -441,6 +441,99 @@ func TestBuildCommand_Skills(t *testing.T) {
 		}
 		t.Error("--setting-sources not found")
 	})
+
+	t.Run("skills with explicit tool list injects Skill into --tools", func(t *testing.T) {
+		// Bug #297: when Skills is set alongside an explicit []string Tools,
+		// "Skill" must appear in --tools so the model can actually invoke skills.
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Skills: "all",
+				Tools:  []string{"Read"},
+			},
+		}
+		cmd := transport.buildCommand()
+		for i, a := range cmd {
+			if a == "--tools" && i+1 < len(cmd) {
+				v := cmd[i+1]
+				if !strings.Contains(v, "Read") {
+					t.Errorf("expected Read in --tools, got %s", v)
+				}
+				if !strings.Contains(v, "Skill") {
+					t.Errorf("expected Skill injected into --tools, got %s", v)
+				}
+				return
+			}
+		}
+		t.Error("--tools flag not found")
+	})
+
+	t.Run("skills with explicit tool list is idempotent when Skill already present", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Skills: "all",
+				Tools:  []string{"Read", "Skill"},
+			},
+		}
+		cmd := transport.buildCommand()
+		for i, a := range cmd {
+			if a == "--tools" && i+1 < len(cmd) {
+				v := cmd[i+1]
+				count := strings.Count(v, "Skill")
+				if count != 1 {
+					t.Errorf("expected exactly one Skill in --tools, got %d in %s", count, v)
+				}
+				return
+			}
+		}
+		t.Error("--tools flag not found")
+	})
+
+	t.Run("skills with nil Tools does not emit --tools", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Skills: "all",
+			},
+		}
+		cmd := transport.buildCommand()
+		assertNotContainsFlag(t, cmd, "--tools")
+	})
+
+	t.Run("skills with empty tool list does not inject Skill", func(t *testing.T) {
+		// An empty []string means the caller explicitly wants no tools.
+		// Skills injection only applies when the explicit list is non-empty.
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Skills: "all",
+				Tools:  []string{},
+			},
+		}
+		cmd := transport.buildCommand()
+		for i, a := range cmd {
+			if a == "--tools" && i+1 < len(cmd) {
+				if cmd[i+1] != "" {
+					t.Errorf("expected empty --tools value, got %s", cmd[i+1])
+				}
+				return
+			}
+		}
+		t.Error("--tools flag not found")
+	})
+
+	t.Run("skills preset does not get Skill injected into --tools", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Skills: "all",
+				Tools:  &ToolsPreset{Preset: "claude_code"},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--tools", "default")
+	})
 }
 
 func TestBuildSettingsValue_SandboxFailIfUnavailable(t *testing.T) {
