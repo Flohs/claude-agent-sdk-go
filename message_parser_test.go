@@ -1054,3 +1054,93 @@ func TestParseMessage_MemoryRecall(t *testing.T) {
 		t.Errorf("Subtype: got %q, want 'memory_recall'", m.Subtype)
 	}
 }
+
+func TestParseMessage_HookEventMessage_HookStarted(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_started",
+		"hook_event": "PreToolUse",
+		"hook_id":    "hook-id-123",
+		"hook_name":  "my_pre_tool_hook",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*HookEventMessage)
+	if !ok {
+		t.Fatalf("expected *HookEventMessage, got %T", msg)
+	}
+	if m.Subtype != "hook_started" {
+		t.Errorf("Subtype: got %q, want 'hook_started'", m.Subtype)
+	}
+	if m.HookEvent != "PreToolUse" {
+		t.Errorf("HookEvent: got %q, want 'PreToolUse'", m.HookEvent)
+	}
+	if m.HookID != "hook-id-123" {
+		t.Errorf("HookID: got %q, want 'hook-id-123'", m.HookID)
+	}
+	if m.HookName != "my_pre_tool_hook" {
+		t.Errorf("HookName: got %q, want 'my_pre_tool_hook'", m.HookName)
+	}
+	if m.Output != nil {
+		t.Errorf("Output: got %v, want nil for hook_started", m.Output)
+	}
+	if m.ExitCode != nil {
+		t.Errorf("ExitCode: got %v, want nil for hook_started", m.ExitCode)
+	}
+	if m.Outcome != "" {
+		t.Errorf("Outcome: got %q, want empty for hook_started", m.Outcome)
+	}
+}
+
+func TestParseMessage_HookEventMessage_HookResponse(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_response",
+		"hook_event": "PostToolUse",
+		"hook_id":    "hook-id-456",
+		"hook_name":  "my_post_tool_hook",
+		"output":     map[string]any{"decision": "approve", "reason": "looks good"},
+		"exit_code":  float64(0),
+		"outcome":    "success",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*HookEventMessage)
+	if !ok {
+		t.Fatalf("expected *HookEventMessage, got %T", msg)
+	}
+	if m.Subtype != "hook_response" {
+		t.Errorf("Subtype: got %q, want 'hook_response'", m.Subtype)
+	}
+	if m.HookEvent != "PostToolUse" {
+		t.Errorf("HookEvent: got %q, want 'PostToolUse'", m.HookEvent)
+	}
+	if m.HookID != "hook-id-456" {
+		t.Errorf("HookID: got %q, want 'hook-id-456'", m.HookID)
+	}
+	if m.HookName != "my_post_tool_hook" {
+		t.Errorf("HookName: got %q, want 'my_post_tool_hook'", m.HookName)
+	}
+	if m.Output == nil {
+		t.Fatal("Output: got nil, want non-nil map")
+	}
+	if m.Output["decision"] != "approve" {
+		t.Errorf("Output[decision]: got %v, want 'approve'", m.Output["decision"])
+	}
+	if m.Output["reason"] != "looks good" {
+		t.Errorf("Output[reason]: got %v, want 'looks good'", m.Output["reason"])
+	}
+	if m.ExitCode == nil {
+		t.Fatal("ExitCode: got nil, want non-nil")
+	}
+	if *m.ExitCode != 0 {
+		t.Errorf("ExitCode: got %d, want 0", *m.ExitCode)
+	}
+	if m.Outcome != "success" {
+		t.Errorf("Outcome: got %q, want 'success'", m.Outcome)
+	}
+}

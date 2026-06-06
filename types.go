@@ -408,6 +408,27 @@ type ElicitationCompleteMessage struct {
 	Result map[string]any `json:"result,omitempty"`
 }
 
+// HookEventMessage is emitted when Options.IncludeHookEvents is true. The CLI
+// emits a hook_started system message when a hook is dispatched and a
+// hook_response message when the hook returns. Both embed SystemMessage for
+// backward compatibility. Port of Python SDK PR
+// anthropics/claude-agent-sdk-python#917.
+type HookEventMessage struct {
+	SystemMessage
+	// HookEvent is the hook event type, e.g. "PreToolUse".
+	HookEvent string `json:"hook_event"`
+	// HookID is the unique invocation identifier.
+	HookID string `json:"hook_id"`
+	// HookName is the name of the hook callback.
+	HookName string `json:"hook_name"`
+	// Output is the hook return value. Only present on hook_response messages.
+	Output map[string]any `json:"output,omitempty"`
+	// ExitCode is the exit code of the hook process. Only present on hook_response messages.
+	ExitCode *int `json:"exit_code,omitempty"`
+	// Outcome is the result outcome string. Only present on hook_response messages.
+	Outcome string `json:"outcome,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 
