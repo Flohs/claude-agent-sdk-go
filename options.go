@@ -314,8 +314,12 @@ type Options struct {
 	MaxBufferSize *int
 	// Stderr is a callback for stderr output from the CLI.
 	Stderr func(string)
-	// CanUseTool is a callback invoked for tool permission decisions when a tool
-	// is not matched by AllowedTools or DisallowedTools.
+	// CanUseTool is a callback invoked for tool permission decisions, but only
+	// when the CLI's internal permission evaluation resolves to "ask" — i.e. the
+	// tool is not already permitted by AllowedTools, PermissionMode, or
+	// permissions.allow/deny rules. It is NOT called for every tool use. For a
+	// universal pre-tool interceptor, use a PreToolUse hook instead. See
+	// [CanUseToolFunc] for full details.
 	CanUseTool CanUseToolFunc
 	// Hooks configures hook callbacks.
 	Hooks map[HookEvent][]HookMatcher
