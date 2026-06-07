@@ -892,6 +892,26 @@ func (q *query) toggleMcpServer(serverName string, enabled bool) error {
 	return err
 }
 
+func (q *query) setMcpServers(servers map[string]McpServerConfig) error {
+	serialized := make(map[string]any, len(servers))
+	for name, cfg := range servers {
+		data, err := json.Marshal(cfg)
+		if err != nil {
+			return fmt.Errorf("marshal MCP server %q: %w", name, err)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(data, &m); err != nil {
+			return fmt.Errorf("unmarshal MCP server %q: %w", name, err)
+		}
+		serialized[name] = m
+	}
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype":    "mcp_set_servers",
+		"mcpServers": serialized,
+	}, 60*time.Second)
+	return err
+}
+
 func (q *query) stopTask(taskID string) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype": "stop_task",
