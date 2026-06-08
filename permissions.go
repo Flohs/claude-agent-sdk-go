@@ -160,5 +160,20 @@ func parsePermissionUpdate(m map[string]any) PermissionUpdate {
 }
 
 // CanUseToolFunc is the callback type for tool permission decisions.
-// It is invoked for tools not matched by AllowedTools or DisallowedTools.
+//
+// Important: this callback is invoked only when the CLI's internal permission
+// evaluation resolves to "ask" — i.e. the tool was not already approved or
+// denied by AllowedTools, PermissionMode, or permissions.allow/deny rules in
+// the user/project settings. It is NOT called for every tool use.
+//
+//   - If a tool is pre-approved (via AllowedTools, PermissionMode
+//     BypassPermissions, or an allow rule), this callback is skipped entirely.
+//   - If a tool is pre-denied (via DisallowedTools or a deny rule), this
+//     callback is also skipped.
+//
+// For a universal pre-tool interceptor that fires on every tool call regardless
+// of the permission decision, use a PreToolUse hook instead.
+//
+// When this callback is invoked, ToolPermissionContext.ToolUseID is always
+// non-empty.
 type CanUseToolFunc func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error)
