@@ -434,6 +434,17 @@ func (c *Client) ToggleMcpServer(ctx context.Context, name string, enabled bool)
 	return c.q.toggleMcpServer(name, enabled)
 }
 
+// SetMcpServers replaces the set of active MCP servers for the running session.
+// Servers omitted from the map are disconnected; servers present in the map are
+// connected (or replaced if already connected). Builtin servers such as
+// "claude-in-chrome" can be added even if the CLI was not started with them.
+func (c *Client) SetMcpServers(ctx context.Context, servers map[string]McpServerConfig) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.setMcpServers(servers)
+}
+
 // StopTask stops a running task.
 func (c *Client) StopTask(ctx context.Context, taskID string) error {
 	if c.q == nil {
