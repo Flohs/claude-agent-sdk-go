@@ -355,6 +355,20 @@ func (c *Client) GetContextUsage(ctx context.Context) (*ContextUsage, error) {
 	return c.q.getContextUsage()
 }
 
+// GetSettings returns the effective merged settings for the running session,
+// including the "applied" sub-object with runtime-resolved values such as the
+// actual model and effort level selected after alias resolution.
+//
+// This is distinct from ResolveSettings, which reads settings files from disk
+// without spawning the CLI. GetSettings queries the live subprocess for its
+// current runtime state. Port of TypeScript SDK v0.2.72.
+func (c *Client) GetSettings(ctx context.Context) (map[string]any, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getSettings()
+}
+
 // ReloadPlugins reloads plugins and returns refreshed commands, agents, and
 // MCP server status.
 func (c *Client) ReloadPlugins(ctx context.Context) (map[string]any, error) {

@@ -858,6 +858,11 @@ func (q *query) getContextUsage() (*ContextUsage, error) {
 	return &usage, nil
 }
 
+func (q *query) getSettings() (map[string]any, error) {
+	resp, err := q.sendControlRequest(map[string]any{"subtype": "get_settings"}, 60*time.Second)
+	return resp, err
+}
+
 func (q *query) reloadPlugins() (map[string]any, error) {
 	resp, err := q.sendControlRequest(map[string]any{
 		"subtype": "reload_plugins",
