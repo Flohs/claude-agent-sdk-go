@@ -104,6 +104,19 @@ type AdvisorToolConfig struct {
 	AllowedCallers []string `json:"allowed_callers,omitempty"`
 }
 
+// AskUserQuestionToolConfig configures the AskUserQuestion built-in tool.
+type AskUserQuestionToolConfig struct {
+	// PreviewFormat sets the content format for the AskUserQuestion tool's
+	// preview field. Typical values: "markdown", "text".
+	PreviewFormat string `json:"previewFormat,omitempty"`
+}
+
+// BuiltinToolConfig configures individual built-in tools.
+type BuiltinToolConfig struct {
+	// AskUserQuestion configures the AskUserQuestion built-in tool.
+	AskUserQuestion *AskUserQuestionToolConfig `json:"askUserQuestion,omitempty"`
+}
+
 // AgentDefinition is an agent definition configuration.
 type AgentDefinition struct {
 	Description     string   `json:"description"`
@@ -310,6 +323,10 @@ type Options struct {
 	DebugFile string
 	// ExtraArgs passes arbitrary CLI flags. Keys are flag names, values are flag values (empty string for boolean flags).
 	ExtraArgs map[string]string
+	// ToolConfig configures individual built-in tools.
+	// Currently supports AskUserQuestion.PreviewFormat.
+	// Port of TypeScript SDK v0.2.69.
+	ToolConfig *BuiltinToolConfig
 	// MaxBufferSize sets the maximum bytes when buffering CLI stdout.
 	MaxBufferSize *int
 	// Stderr is a callback for stderr output from the CLI.
