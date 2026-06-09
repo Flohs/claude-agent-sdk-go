@@ -423,6 +423,16 @@ func (c *Client) ToggleMcpServer(ctx context.Context, name string, enabled bool)
 	return c.q.toggleMcpServer(name, enabled)
 }
 
+// SetMcpServers dynamically updates the set of MCP servers in the running session.
+// Servers not included in the map are removed; servers in the map are added or replaced.
+// Port of TypeScript SDK v0.3.163/v0.3.166.
+func (c *Client) SetMcpServers(ctx context.Context, servers map[string]McpServerConfig) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.setMcpServers(servers)
+}
+
 // StopTask stops a running task.
 func (c *Client) StopTask(ctx context.Context, taskID string) error {
 	if c.q == nil {

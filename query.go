@@ -908,6 +908,21 @@ func (q *query) rewindFiles(userMessageID string) error {
 	return err
 }
 
+func (q *query) setMcpServers(servers map[string]McpServerConfig) error {
+	serversMap := make(map[string]any, len(servers))
+	for name, cfg := range servers {
+		data, _ := json.Marshal(cfg)
+		var m map[string]any
+		_ = json.Unmarshal(data, &m)
+		serversMap[name] = m
+	}
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype":    "mcp_set_servers",
+		"mcpServers": serversMap,
+	}, 60*time.Second)
+	return err
+}
+
 func (q *query) streamInput(inputCh <-chan map[string]any) {
 	for msg := range inputCh {
 		if q.closed {
