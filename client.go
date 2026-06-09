@@ -355,6 +355,19 @@ func (c *Client) GetContextUsage(ctx context.Context) (*ContextUsage, error) {
 	return c.q.getContextUsage()
 }
 
+// GetUsageExperimental returns structured session cost, plan rate-limit, and
+// local usage-behaviors data from the running session.
+//
+// WARNING: This method is experimental and its return value schema may change
+// without notice. Do not rely on the structure of the returned map in
+// production code. Port of TypeScript SDK v0.3.169.
+func (c *Client) GetUsageExperimental(ctx context.Context) (map[string]any, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getUsageExperimental()
+}
+
 // ReloadPlugins reloads plugins and returns refreshed commands, agents, and
 // MCP server status.
 func (c *Client) ReloadPlugins(ctx context.Context) (map[string]any, error) {
