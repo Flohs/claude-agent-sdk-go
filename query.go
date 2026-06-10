@@ -979,6 +979,40 @@ func (q *query) rewindFiles(userMessageID string) error {
 	return err
 }
 
+// setMcpServers tells the CLI at runtime about additional in-process SDK MCP
+// servers. The payload includes resource capability when a server declares
+// resources so the CLI knows to call resources/list and resources/read.
+// Port of TypeScript SDK v0.3.166.
+func (q *query) setMcpServers(servers map[string]*McpSdkServerConfig) error {
+	serverPayload := make(map[string]any, len(servers))
+	for name, srv := range servers {
+		caps := map[string]any{"tools": map[string]any{}}
+		if len(srv.resources) > 0 || srv.resourceHandler != nil {
+			caps["resources"] = map[string]any{}
+		}
+		serverPayload[name] = map[string]any{
+			"type":         "sdk",
+			"name":         srv.Name,
+			"capabilities": caps,
+		}
+	}
+
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype": "mcp_set_servers",
+		"servers": serverPayload,
+	}, 30*time.Second)
+	if err != nil {
+		return err
+	}
+
+	// Register the servers in the router so subsequent mcp_message requests
+	// from the CLI are handled by the in-process implementation.
+	for name, srv := range servers {
+		q.mcpRouter.addServer(name, srv)
+	}
+	return nil
+}
+
 func (q *query) streamInput(inputCh <-chan map[string]any) {
 	for msg := range inputCh {
 		if q.closed {

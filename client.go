@@ -451,6 +451,22 @@ func (c *Client) RewindFiles(ctx context.Context, userMessageID string) error {
 	return c.q.rewindFiles(userMessageID)
 }
 
+// SetMcpServers adds or replaces in-process SDK MCP servers at runtime. The
+// CLI is notified via the mcp_set_servers control request so it can route MCP
+// calls to the named servers; subsequent mcp_message requests are handled by
+// the SDK's in-process MCP router.
+//
+// Servers that declare resources (via [NewSdkMcpServerWithResources]) have
+// their resource capability advertised to the CLI, fixing a bug where the CLI
+// would never invoke resources/list or resources/read on runtime-added servers.
+// Port of TypeScript SDK v0.3.166. Closes #349.
+func (c *Client) SetMcpServers(ctx context.Context, servers map[string]*McpSdkServerConfig) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.setMcpServers(servers)
+}
+
 // GetServerInfo returns server initialization info.
 func (c *Client) GetServerInfo() map[string]any {
 	if c.q == nil {
