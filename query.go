@@ -979,6 +979,26 @@ func (q *query) rewindFiles(userMessageID string) error {
 	return err
 }
 
+func (q *query) getUsageExperimental() (*UsageDataExperimental, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "get_usage",
+	}, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var usage UsageDataExperimental
+	if err := json.Unmarshal(data, &usage); err != nil {
+		return nil, err
+	}
+	return &usage, nil
+}
+
 func (q *query) streamInput(inputCh <-chan map[string]any) {
 	for msg := range inputCh {
 		if q.closed {

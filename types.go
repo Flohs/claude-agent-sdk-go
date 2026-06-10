@@ -641,3 +641,18 @@ type SessionListSubkeysKey struct {
 	ProjectKey string `json:"project_key"`
 	SessionID  string `json:"session_id"`
 }
+
+// UsageDataExperimental contains session cost, plan rate-limit, and local
+// usage-behavior data returned by [Client.GetUsageExperimental].
+//
+// WARNING: this type is experimental and may change or be removed without
+// notice in a future SDK release. Port of TypeScript SDK v0.3.169.
+type UsageDataExperimental struct {
+	// TotalCostUSD is the cumulative API cost for this session in US dollars.
+	TotalCostUSD *float64 `json:"total_cost_usd,omitempty"`
+	// PlanRateLimit contains plan-tier rate-limit status and quota information.
+	PlanRateLimit map[string]any `json:"plan_rate_limit,omitempty"`
+	// LocalUsage contains local usage-behavior data such as token counts,
+	// tool call counts, and other per-session statistics.
+	LocalUsage map[string]any `json:"local_usage,omitempty"`
+}
