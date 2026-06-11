@@ -868,6 +868,24 @@ func (q *query) getSettings() (map[string]any, error) {
 	return resp, nil
 }
 
+func (q *query) getUsageExperimental() (*UsageDataExperimental, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "get_usage",
+	}, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+	var usage UsageDataExperimental
+	if err := json.Unmarshal(data, &usage); err != nil {
+		return nil, err
+	}
+	return &usage, nil
+}
+
 func (q *query) reloadPlugins() (map[string]any, error) {
 	resp, err := q.sendControlRequest(map[string]any{
 		"subtype": "reload_plugins",
