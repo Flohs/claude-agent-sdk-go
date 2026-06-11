@@ -1,5 +1,26 @@
 package claude
 
+// Model string constants for use with Options.Model.
+// Callers may also pass any valid model identifier string directly.
+const (
+	// ModelFable5 is the full identifier for Claude Fable 5.
+	ModelFable5 = "claude-fable-5"
+	// ModelFable is the short alias for claude-fable-5.
+	ModelFable = "fable"
+	// ModelOpus48 is the full identifier for Claude Opus 4.8.
+	ModelOpus48 = "claude-opus-4-8"
+	// ModelOpus is the short alias for Opus.
+	ModelOpus = "opus"
+	// ModelSonnet46 is the full identifier for Claude Sonnet 4.6.
+	ModelSonnet46 = "claude-sonnet-4-6"
+	// ModelSonnet is the short alias for Sonnet.
+	ModelSonnet = "sonnet"
+	// ModelHaiku45 is the full identifier for Claude Haiku 4.5.
+	ModelHaiku45 = "claude-haiku-4-5-20251001"
+	// ModelHaiku is the short alias for Haiku.
+	ModelHaiku = "haiku"
+)
+
 // PermissionMode controls tool execution permissions.
 type PermissionMode string
 
