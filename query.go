@@ -965,6 +965,46 @@ func (q *query) toggleMcpServer(serverName string, enabled bool) error {
 	return err
 }
 
+func (q *query) setMcpServers(servers map[string]McpServerConfig) error {
+	serialized := make(map[string]any, len(servers))
+	for name, cfg := range servers {
+		// SDK servers need special handling: include capabilities so the CLI
+		// knows to call resources/list and resources/read when applicable.
+		// This fixes issue #349 (resource tools not injected for runtime servers).
+		if sdkCfg, ok := cfg.(*McpSdkServerConfig); ok {
+			capabilities := map[string]any{
+				"tools": map[string]any{},
+			}
+			if len(sdkCfg.resources) > 0 || sdkCfg.resourceHandler != nil {
+				capabilities["resources"] = map[string]any{}
+			}
+			serialized[name] = map[string]any{
+				"type":         "sdk",
+				"name":         sdkCfg.Name,
+				"capabilities": capabilities,
+			}
+			// Register the server in the router so subsequent mcp_message
+			// control requests for it are routed correctly.
+			q.mcpRouter.addServer(sdkCfg.Name, sdkCfg)
+		} else {
+			data, err := json.Marshal(cfg)
+			if err != nil {
+				return fmt.Errorf("marshal MCP server %q: %w", name, err)
+			}
+			var m map[string]any
+			if err := json.Unmarshal(data, &m); err != nil {
+				return fmt.Errorf("unmarshal MCP server %q: %w", name, err)
+			}
+			serialized[name] = m
+		}
+	}
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype":    "mcp_set_servers",
+		"mcpServers": serialized,
+	}, 60*time.Second)
+	return err
+}
+
 func (q *query) stopTask(taskID string) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype": "stop_task",
