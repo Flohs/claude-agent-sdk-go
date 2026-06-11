@@ -1316,8 +1316,8 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 		t.Fatalf("expected *HookEventMessage, got %T", msg)
 	}
 	// The embedded SystemMessage should have the correct subtype.
-	if he.SystemMessage.Subtype != "hook_started" {
-		t.Errorf("embedded SystemMessage.Subtype = %q, want hook_started", he.SystemMessage.Subtype)
+	if he.Subtype != "hook_started" {
+		t.Errorf("embedded Subtype = %q, want hook_started", he.Subtype)
 	}
 	// Verify it satisfies the Message interface.
 	var _ Message = he
