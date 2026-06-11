@@ -1204,3 +1204,121 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 		t.Errorf("expected StopDetails type 'refusal', got %v", am.StopDetails["type"])
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tests for HookEventMessage (hook_started / hook_response) — issue #328
+// Port of Python SDK PR anthropics/claude-agent-sdk-python#917.
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_HookStarted(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_started",
+		"hook_event": "PreToolUse",
+		"hook_id":    "hook_abc",
+		"hook_name":  "my_hook",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	he, ok := msg.(*HookEventMessage)
+	if !ok {
+		t.Fatalf("expected *HookEventMessage, got %T", msg)
+	}
+	if he.HookEvent != "PreToolUse" {
+		t.Errorf("HookEvent = %q, want PreToolUse", he.HookEvent)
+	}
+	if he.HookID != "hook_abc" {
+		t.Errorf("HookID = %q, want hook_abc", he.HookID)
+	}
+	if he.HookName != "my_hook" {
+		t.Errorf("HookName = %q, want my_hook", he.HookName)
+	}
+	if he.Subtype != "hook_started" {
+		t.Errorf("Subtype = %q, want hook_started", he.Subtype)
+	}
+	if he.Output != nil {
+		t.Errorf("Output = %v, want nil for hook_started", he.Output)
+	}
+	if he.ExitCode != nil {
+		t.Errorf("ExitCode = %v, want nil for hook_started", he.ExitCode)
+	}
+	if he.Outcome != "" {
+		t.Errorf("Outcome = %q, want empty for hook_started", he.Outcome)
+	}
+}
+
+func TestParseMessage_HookResponse(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_response",
+		"hook_event": "PreToolUse",
+		"hook_id":    "hook_abc",
+		"hook_name":  "my_hook",
+		"output":     map[string]any{"decision": "approve"},
+		"exit_code":  float64(0),
+		"outcome":    "approved",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	he, ok := msg.(*HookEventMessage)
+	if !ok {
+		t.Fatalf("expected *HookEventMessage, got %T", msg)
+	}
+	if he.HookEvent != "PreToolUse" {
+		t.Errorf("HookEvent = %q, want PreToolUse", he.HookEvent)
+	}
+	if he.HookID != "hook_abc" {
+		t.Errorf("HookID = %q, want hook_abc", he.HookID)
+	}
+	if he.HookName != "my_hook" {
+		t.Errorf("HookName = %q, want my_hook", he.HookName)
+	}
+	if he.Subtype != "hook_response" {
+		t.Errorf("Subtype = %q, want hook_response", he.Subtype)
+	}
+	if he.Output == nil {
+		t.Fatal("Output is nil, want map with decision")
+	}
+	if he.Output["decision"] != "approve" {
+		t.Errorf("Output[decision] = %v, want approve", he.Output["decision"])
+	}
+	if he.ExitCode == nil {
+		t.Fatal("ExitCode is nil, want 0")
+	}
+	if *he.ExitCode != 0 {
+		t.Errorf("*ExitCode = %d, want 0", *he.ExitCode)
+	}
+	if he.Outcome != "approved" {
+		t.Errorf("Outcome = %q, want approved", he.Outcome)
+	}
+}
+
+func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
+	// HookEventMessage embeds SystemMessage; it should be accessible as *SystemMessage
+	// via a type switch on the embedded field.
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_started",
+		"hook_event": "Stop",
+		"hook_id":    "hook_xyz",
+		"hook_name":  "stop_hook",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	he, ok := msg.(*HookEventMessage)
+	if !ok {
+		t.Fatalf("expected *HookEventMessage, got %T", msg)
+	}
+	// The embedded SystemMessage should have the correct subtype.
+	if he.SystemMessage.Subtype != "hook_started" {
+		t.Errorf("embedded SystemMessage.Subtype = %q, want hook_started", he.SystemMessage.Subtype)
+	}
+	// Verify it satisfies the Message interface.
+	var _ Message = he
+}
