@@ -178,7 +178,7 @@ func (c *Client) SendQueryWithContent(ctx context.Context, content any) error {
 
 	message := map[string]any{
 		"type":               "user",
-		"message":            map[string]any{"role": "user", "content": content},
+		"message":            map[string]any{"role": "user", "content": normalizePromptContent(content)},
 		"parent_tool_use_id": nil,
 		"session_id":         "default",
 	}
