@@ -1181,8 +1181,8 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 	raw := map[string]any{
 		"type": "assistant",
 		"message": map[string]any{
-			"content":     []any{},
-			"stop_reason": "refusal",
+			"content":      []any{},
+			"stop_reason":  "refusal",
 			"stop_details": map[string]any{"type": "refusal", "reason": "policy"},
 		},
 	}
@@ -1321,4 +1321,77 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	}
 	// Verify it satisfies the Message interface.
 	var _ Message = he
+}
+
+// ---------------------------------------------------------------------------
+// Tests for ModelFallbackMessage (system/model_fallback) — issue #368
+// Port of TypeScript SDK v0.3.174.
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_ModelFallback_AllTriggers(t *testing.T) {
+	triggers := []ModelFallbackTrigger{
+		ModelFallbackTriggerModelNotFound,
+		ModelFallbackTriggerPermissionDenied,
+		ModelFallbackTriggerOverloaded,
+		ModelFallbackTriggerServerError,
+		ModelFallbackTriggerLastResort,
+	}
+	for _, trigger := range triggers {
+		t.Run(string(trigger), func(t *testing.T) {
+			data := map[string]any{
+				"type":       "system",
+				"subtype":    "model_fallback",
+				"trigger":    string(trigger),
+				"from_model": "claude-opus-4-8",
+				"to_model":   "claude-sonnet-4-6",
+			}
+			msg, err := ParseMessage(data)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			m, ok := msg.(*ModelFallbackMessage)
+			if !ok {
+				t.Fatalf("expected *ModelFallbackMessage, got %T", msg)
+			}
+			if m.Trigger != trigger {
+				t.Errorf("Trigger: got %q, want %q", m.Trigger, trigger)
+			}
+			if m.FromModel != "claude-opus-4-8" {
+				t.Errorf("FromModel: got %q, want claude-opus-4-8", m.FromModel)
+			}
+			if m.ToModel != "claude-sonnet-4-6" {
+				t.Errorf("ToModel: got %q, want claude-sonnet-4-6", m.ToModel)
+			}
+			if m.Subtype != "model_fallback" {
+				t.Errorf("Subtype: got %q, want model_fallback", m.Subtype)
+			}
+			// Backward compat: also matches as *SystemMessage via embedding.
+			var _ *SystemMessage = &m.SystemMessage
+		})
+	}
+}
+
+func TestParseMessage_ModelFallback_MissingFields(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "model_fallback",
+		// trigger, from_model, to_model absent
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*ModelFallbackMessage)
+	if !ok {
+		t.Fatalf("expected *ModelFallbackMessage, got %T", msg)
+	}
+	if m.Trigger != "" {
+		t.Errorf("Trigger should be empty when absent, got %q", m.Trigger)
+	}
+	if m.FromModel != "" {
+		t.Errorf("FromModel should be empty when absent, got %q", m.FromModel)
+	}
+	if m.ToModel != "" {
+		t.Errorf("ToModel should be empty when absent, got %q", m.ToModel)
+	}
 }

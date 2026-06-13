@@ -445,6 +445,46 @@ type ElicitationCompleteMessage struct {
 	Result map[string]any `json:"result,omitempty"`
 }
 
+// ModelFallbackTrigger is the reason the CLI switched to a fallback model.
+// Port of TypeScript SDK v0.3.174.
+type ModelFallbackTrigger string
+
+const (
+	// ModelFallbackTriggerModelNotFound is set when the primary model ID is not
+	// recognised by the API.
+	ModelFallbackTriggerModelNotFound ModelFallbackTrigger = "model_not_found"
+	// ModelFallbackTriggerPermissionDenied is set when the account does not have
+	// access to the primary model.
+	ModelFallbackTriggerPermissionDenied ModelFallbackTrigger = "permission_denied"
+	// ModelFallbackTriggerOverloaded is set when the primary model is overloaded
+	// and the CLI retried on a fallback.
+	ModelFallbackTriggerOverloaded ModelFallbackTrigger = "overloaded"
+	// ModelFallbackTriggerServerError is set when the primary model returned a
+	// server-side error.
+	ModelFallbackTriggerServerError ModelFallbackTrigger = "server_error"
+	// ModelFallbackTriggerLastResort is set when all preferred models failed and
+	// the CLI fell back to a last-resort model.
+	ModelFallbackTriggerLastResort ModelFallbackTrigger = "last_resort"
+)
+
+// ModelFallbackMessage is emitted when the CLI automatically switches to a
+// fallback model. The Trigger field describes why the switch occurred;
+// FromModel is the model that was attempted and ToModel is the one actually
+// used.
+//
+// Port of TypeScript SDK v0.3.174. Previously these system/model_fallback
+// events arrived as a generic [SystemMessage]; the typed struct lets consumers
+// react programmatically without inspecting SystemMessage.Data.
+type ModelFallbackMessage struct {
+	SystemMessage
+	// Trigger is the reason the model switch occurred.
+	Trigger ModelFallbackTrigger `json:"trigger,omitempty"`
+	// FromModel is the model that failed or was unavailable.
+	FromModel string `json:"from_model,omitempty"`
+	// ToModel is the fallback model that was used instead.
+	ToModel string `json:"to_model,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 
