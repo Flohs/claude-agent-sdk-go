@@ -642,3 +642,56 @@ func TestHandleStderr_PanicInCallbackDoesNotAbortLoop(t *testing.T) {
 			totalLines, len(delivered), panicOnLine)
 	}
 }
+
+func TestBuildCommand_PluginDir(t *testing.T) {
+	t.Run("default uses --plugin-dir", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Plugins: []SdkPluginConfig{
+					{Type: "local", Path: "/my/plugin"},
+				},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--plugin-dir", "/my/plugin")
+		for _, arg := range cmd {
+			if arg == "--plugin-dir-no-mcp" {
+				t.Errorf("unexpected --plugin-dir-no-mcp flag in command: %v", cmd)
+			}
+		}
+	})
+
+	t.Run("SkipMcpDiscovery uses --plugin-dir-no-mcp", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Plugins: []SdkPluginConfig{
+					{Type: "local", Path: "/my/plugin", SkipMcpDiscovery: true},
+				},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--plugin-dir-no-mcp", "/my/plugin")
+		for _, arg := range cmd {
+			if arg == "--plugin-dir" {
+				t.Errorf("unexpected --plugin-dir flag in command when SkipMcpDiscovery is set: %v", cmd)
+			}
+		}
+	})
+
+	t.Run("mixed plugins use correct flags per entry", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Plugins: []SdkPluginConfig{
+					{Type: "local", Path: "/normal/plugin"},
+					{Type: "local", Path: "/skip/plugin", SkipMcpDiscovery: true},
+				},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--plugin-dir", "/normal/plugin")
+		assertContains(t, cmd, "--plugin-dir-no-mcp", "/skip/plugin")
+	})
+}
