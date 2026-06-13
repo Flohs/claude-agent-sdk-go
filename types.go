@@ -261,6 +261,64 @@ type TaskNotificationMessage struct {
 	TaskDescription string `json:"task_description,omitempty"`
 }
 
+// TaskUpdatedStatus represents the status values emitted in a task_updated patch.
+// Port of Python SDK v0.2.101.
+type TaskUpdatedStatus string
+
+const (
+	TaskUpdatedStatusPending   TaskUpdatedStatus = "pending"
+	TaskUpdatedStatusRunning   TaskUpdatedStatus = "running"
+	TaskUpdatedStatusPaused    TaskUpdatedStatus = "paused"
+	TaskUpdatedStatusCompleted TaskUpdatedStatus = "completed"
+	TaskUpdatedStatusFailed    TaskUpdatedStatus = "failed"
+	TaskUpdatedStatusKilled    TaskUpdatedStatus = "killed"
+)
+
+// TerminalTaskStatuses is the set of task statuses that indicate a background
+// task has reached a terminal state. It covers both task_updated vocabulary
+// (completed, failed, killed) and task_notification vocabulary (stopped) so
+// consumers can use a single check against either message type.
+// Port of Python SDK v0.2.101.
+var TerminalTaskStatuses = map[string]bool{
+	string(TaskUpdatedStatusCompleted): true,
+	string(TaskUpdatedStatusFailed):    true,
+	string(TaskUpdatedStatusKilled):    true,
+	string(TaskNotificationStatusStopped): true,
+}
+
+// TaskUpdatedMessage is emitted when a background task's state changes.
+//
+// The CLI emits system/task_updated events as a task moves through its
+// lifecycle. Patch carries the changed fields (e.g. status, end_time); when
+// Patch["status"] is terminal (see [TerminalTaskStatuses]) the task has
+// finished.
+//
+// Lifecycle note: a background task's terminal state can arrive *only* as a
+// TaskUpdatedMessage with no accompanying [TaskNotificationMessage] — for
+// example a task stopped via TaskStop reports status="killed" here, and the
+// matching notification is sometimes suppressed. Consumers that track active
+// task IDs should therefore clear them on a terminal status from *either*
+// [TaskNotificationMessage] or [TaskUpdatedMessage].
+//
+// Backward compat: TaskUpdatedMessage embeds [SystemMessage], so existing
+// isinstance checks against SystemMessage continue to match.
+// Port of Python SDK v0.2.101.
+type TaskUpdatedMessage struct {
+	SystemMessage
+	// TaskID is the identifier of the task that changed.
+	TaskID string `json:"task_id"`
+	// Patch is the subset of task state fields that changed. Clients should
+	// merge Patch into their local task map on receipt.
+	Patch map[string]any `json:"patch"`
+	// Status is the new task status derived from Patch["status"]. Empty when
+	// the patch does not include a status field.
+	Status TaskUpdatedStatus `json:"status,omitempty"`
+	// SessionID is the session this message belongs to.
+	SessionID string `json:"session_id,omitempty"`
+	// UUID uniquely identifies this message in the session transcript.
+	UUID string `json:"uuid,omitempty"`
+}
+
 // TaskStatus represents the lifecycle state of a task managed by the Task tools.
 type TaskStatus string
 

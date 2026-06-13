@@ -1181,8 +1181,8 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 	raw := map[string]any{
 		"type": "assistant",
 		"message": map[string]any{
-			"content":     []any{},
-			"stop_reason": "refusal",
+			"content":      []any{},
+			"stop_reason":  "refusal",
 			"stop_details": map[string]any{"type": "refusal", "reason": "policy"},
 		},
 	}
@@ -1321,4 +1321,144 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	}
 	// Verify it satisfies the Message interface.
 	var _ Message = he
+}
+
+// ---------------------------------------------------------------------------
+// Tests for TaskUpdatedMessage (system/task_updated) — issue #367
+// Port of Python SDK v0.2.101 / anthropics/claude-agent-sdk-python#1016.
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_TaskUpdated_TerminalStatus(t *testing.T) {
+	for _, status := range []TaskUpdatedStatus{
+		TaskUpdatedStatusCompleted,
+		TaskUpdatedStatusFailed,
+		TaskUpdatedStatusKilled,
+	} {
+		t.Run(string(status), func(t *testing.T) {
+			data := map[string]any{
+				"type":       "system",
+				"subtype":    "task_updated",
+				"task_id":    "tid-1",
+				"session_id": "sid-1",
+				"uuid":       "uid-1",
+				"patch": map[string]any{
+					"status":   string(status),
+					"end_time": float64(1234567890),
+				},
+			}
+			msg, err := ParseMessage(data)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			m, ok := msg.(*TaskUpdatedMessage)
+			if !ok {
+				t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+			}
+			if m.TaskID != "tid-1" {
+				t.Errorf("TaskID: got %q, want tid-1", m.TaskID)
+			}
+			if m.Status != status {
+				t.Errorf("Status: got %q, want %q", m.Status, status)
+			}
+			if m.Patch == nil {
+				t.Error("Patch must not be nil")
+			}
+			if m.SessionID != "sid-1" {
+				t.Errorf("SessionID: got %q, want sid-1", m.SessionID)
+			}
+			if m.UUID != "uid-1" {
+				t.Errorf("UUID: got %q, want uid-1", m.UUID)
+			}
+			if m.Subtype != "task_updated" {
+				t.Errorf("Subtype: got %q, want task_updated", m.Subtype)
+			}
+			// TerminalTaskStatuses must include this status.
+			if !TerminalTaskStatuses[string(status)] {
+				t.Errorf("TerminalTaskStatuses missing %q", status)
+			}
+			// Backward compat: also matches as *SystemMessage via embedding.
+			var _ *SystemMessage = &m.SystemMessage
+		})
+	}
+}
+
+func TestParseMessage_TaskUpdated_NonTerminalStatus(t *testing.T) {
+	for _, status := range []TaskUpdatedStatus{
+		TaskUpdatedStatusPending,
+		TaskUpdatedStatusRunning,
+		TaskUpdatedStatusPaused,
+	} {
+		t.Run(string(status), func(t *testing.T) {
+			data := map[string]any{
+				"type":    "system",
+				"subtype": "task_updated",
+				"task_id": "tid-2",
+				"patch":   map[string]any{"status": string(status)},
+			}
+			msg, err := ParseMessage(data)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			m, ok := msg.(*TaskUpdatedMessage)
+			if !ok {
+				t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+			}
+			if m.Status != status {
+				t.Errorf("Status: got %q, want %q", m.Status, status)
+			}
+			if TerminalTaskStatuses[string(status)] {
+				t.Errorf("%q should NOT be in TerminalTaskStatuses", status)
+			}
+		})
+	}
+}
+
+func TestParseMessage_TaskUpdated_MissingPatch(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "task_updated",
+		"task_id": "tid-3",
+		// no "patch" key
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*TaskUpdatedMessage)
+	if !ok {
+		t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+	}
+	if m.Patch != nil {
+		t.Errorf("Patch should be nil when absent, got %v", m.Patch)
+	}
+	if m.Status != "" {
+		t.Errorf("Status should be empty when patch absent, got %q", m.Status)
+	}
+}
+
+func TestParseMessage_TaskUpdated_NonDictPatch(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "task_updated",
+		"task_id": "tid-4",
+		"patch":   "invalid",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*TaskUpdatedMessage)
+	if !ok {
+		t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+	}
+	if m.Patch != nil {
+		t.Errorf("Patch should be nil for non-dict value, got %v", m.Patch)
+	}
+}
+
+func TestTerminalTaskStatuses_IncludesStopped(t *testing.T) {
+	// "stopped" comes from task_notification vocabulary; must also be covered.
+	if !TerminalTaskStatuses["stopped"] {
+		t.Error("TerminalTaskStatuses must include 'stopped' for task_notification compatibility")
+	}
 }
