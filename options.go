@@ -81,6 +81,13 @@ const (
 // interchangeable in all contexts.
 type EffortLevel = Effort
 
+// Model is a type alias for string that documents usage with [Options.Model].
+// Because it is an alias (not a new type), it is fully interchangeable with
+// string — no type assertion required. Use the named constants (e.g.
+// [ModelFable5], [ModelOpus48]) or any valid model identifier string directly.
+// Port of TypeScript SDK v0.3.170.
+type Model = string
+
 // SystemPrompt is the interface for system prompt configuration.
 type SystemPrompt interface {
 	systemPromptMarker()
