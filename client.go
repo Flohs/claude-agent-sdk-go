@@ -290,8 +290,13 @@ func (c *Client) ReceiveResponse(ctx context.Context) <-chan Message {
 				case <-ctx.Done():
 					return
 				}
-				if _, ok := parsed.(*ResultMessage); ok {
-					return
+				if r, ok := parsed.(*ResultMessage); ok {
+					// Only stop on the main-session result (empty Origin).
+					// Background-agent results (non-empty Origin) are forwarded
+					// but must not end the response stream.
+					if r.Origin == "" {
+						return
+					}
 				}
 			case <-ctx.Done():
 				return

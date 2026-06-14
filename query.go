@@ -39,6 +39,8 @@ type query struct {
 	initializationResult   map[string]any
 	firstResultCh          chan struct{}
 	firstResultOnce        sync.Once
+	mainResultCh           chan struct{}
+	mainResultOnce         sync.Once
 	streamCloseTimeout     float64
 	excludeDynamicSections bool
 	// lastIsErrorResultDelivered is set when a result message with is_error:true
@@ -125,6 +127,7 @@ func newQuery(cfg queryConfig) *query {
 		messageCh:              make(chan map[string]any, 100),
 		initTimeout:            initTimeout,
 		firstResultCh:          make(chan struct{}),
+		mainResultCh:           make(chan struct{}),
 		streamCloseTimeout:     streamCloseTimeoutMs / 1000.0,
 		excludeDynamicSections: cfg.excludeDynamicSections,
 		flushTimeout:           flushTimeout,
@@ -376,6 +379,12 @@ func (q *query) readMessages() {
 		if msgType == "result" {
 			q.flushBeforeResult()
 			q.firstResultOnce.Do(func() { close(q.firstResultCh) })
+			// Close mainResultCh only for the main-session result (empty origin).
+			// Background-agent results carry a non-empty origin and must not
+			// trigger stdin close, as the main turn is still running.
+			if origin, _ := msg["origin"].(string); origin == "" {
+				q.mainResultOnce.Do(func() { close(q.mainResultCh) })
+			}
 			if isErr, _ := msg["is_error"].(bool); isErr {
 				q.lastIsErrorResultDelivered = true
 			}
@@ -1050,7 +1059,7 @@ func (q *query) waitForResultAndEndInput() {
 
 	if hasMcpServers || hasHooks {
 		select {
-		case <-q.firstResultCh:
+		case <-q.mainResultCh:
 		case <-time.After(time.Duration(q.streamCloseTimeout * float64(time.Second))):
 		case <-q.ctx.Done():
 		}
