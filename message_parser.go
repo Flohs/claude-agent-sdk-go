@@ -221,6 +221,28 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			TaskDescription: stringField(data, "task_description"),
 		}, nil
 
+	case "task_updated":
+		// Terminal task completion sometimes arrives only as a task_updated
+		// patch (no separate task_notification), so expose it as a typed
+		// lifecycle message. Parsed defensively: the patch may omit uuid/
+		// session_id and parsing must never error on a lifecycle event.
+		patch, _ := data["patch"].(map[string]any)
+		if patch == nil {
+			patch = map[string]any{}
+		}
+		msg := &TaskUpdatedMessage{
+			SystemMessage: base,
+			TaskID:        stringField(data, "task_id"),
+			Patch:         patch,
+			SessionID:     stringField(data, "session_id"),
+			UUID:          stringField(data, "uuid"),
+		}
+		if s, ok := patch["status"].(string); ok && s != "" {
+			status := TaskUpdatedStatus(s)
+			msg.Status = &status
+		}
+		return msg, nil
+
 	case "api_retry":
 		msg := &ApiRetryMessage{
 			SystemMessage: base,

@@ -261,6 +261,67 @@ type TaskNotificationMessage struct {
 	TaskDescription string `json:"task_description,omitempty"`
 }
 
+// TaskUpdatedStatus represents the status field inside a task_updated patch.
+// "pending", "running", and "paused" are non-terminal; "completed", "failed",
+// and "killed" are terminal. Note that task_updated uses "killed" for tasks
+// stopped via TaskStop, whereas task_notification maps it to "stopped".
+type TaskUpdatedStatus string
+
+const (
+	TaskUpdatedStatusPending   TaskUpdatedStatus = "pending"
+	TaskUpdatedStatusRunning   TaskUpdatedStatus = "running"
+	TaskUpdatedStatusPaused    TaskUpdatedStatus = "paused"
+	TaskUpdatedStatusCompleted TaskUpdatedStatus = "completed"
+	TaskUpdatedStatusFailed    TaskUpdatedStatus = "failed"
+	TaskUpdatedStatusKilled    TaskUpdatedStatus = "killed"
+)
+
+// TerminalTaskStatuses is the set of status values that indicate a task has
+// finished and should be removed from any active-task tracking. It spans both
+// lifecycle vocabularies: task_notification reports "stopped" (the CLI's
+// mapped form of a killed task) while task_updated reports the raw "killed".
+// Consumers should treat the status on a TaskNotificationMessage and a
+// TaskUpdatedMessage the same way using this set.
+var TerminalTaskStatuses = map[string]bool{
+	"completed": true,
+	"failed":    true,
+	"stopped":   true,
+	"killed":    true,
+}
+
+// TaskUpdatedMessage is emitted when a background task's state changes.
+//
+// The CLI emits system/task_updated events as a task moves through its
+// lifecycle. Patch carries the changed fields (e.g. status, end_time); when
+// Patch["status"] is terminal (see TerminalTaskStatuses) the task has
+// finished.
+//
+// Lifecycle note: a background task's terminal state can arrive only as a
+// TaskUpdatedMessage with no accompanying TaskNotificationMessage — for
+// example a task stopped via TaskStop reports status="killed" here, and the
+// matching notification is sometimes suppressed. Consumers tracking active
+// task IDs should clear them on a terminal Status from either a
+// TaskNotificationMessage or a TaskUpdatedMessage.
+//
+// TaskUpdatedMessage embeds SystemMessage, so existing isinstance checks
+// against SystemMessage continue to match. Port of Python SDK PR #1016.
+type TaskUpdatedMessage struct {
+	SystemMessage
+	// TaskID is the identifier of the task that was updated.
+	TaskID string `json:"task_id"`
+	// Patch contains the changed fields from the update (e.g. "status",
+	// "end_time"). Always non-nil; falls back to an empty map when the CLI
+	// payload omits or sends a non-object patch.
+	Patch map[string]any `json:"patch"`
+	// Status is the new task status from Patch["status"]. Nil when the patch
+	// does not include a status field.
+	Status *TaskUpdatedStatus `json:"status,omitempty"`
+	// SessionID is the session this message belongs to. May be empty.
+	SessionID string `json:"session_id,omitempty"`
+	// UUID uniquely identifies this message in the session transcript. May be empty.
+	UUID string `json:"uuid,omitempty"`
+}
+
 // TaskStatus represents the lifecycle state of a task managed by the Task tools.
 type TaskStatus string
 
