@@ -609,6 +609,51 @@ func TestBuildCommand_SessionMirrorFlag(t *testing.T) {
 	})
 }
 
+func TestBuildCommand_PluginSkipMcpDiscovery(t *testing.T) {
+	t.Run("normal plugin uses --plugin-dir", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Plugins: []SdkPluginConfig{
+					{Type: "local", Path: "/path/to/plugin"},
+				},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--plugin-dir", "/path/to/plugin")
+		assertNotContainsFlag(t, cmd, "--plugin-dir-no-mcp")
+	})
+
+	t.Run("SkipMcpDiscovery plugin uses --plugin-dir-no-mcp", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Plugins: []SdkPluginConfig{
+					{Type: "local", Path: "/path/to/plugin2", SkipMcpDiscovery: true},
+				},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--plugin-dir-no-mcp", "/path/to/plugin2")
+		assertNotContainsFlag(t, cmd, "--plugin-dir")
+	})
+
+	t.Run("mixed plugins use correct flags each", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				Plugins: []SdkPluginConfig{
+					{Type: "local", Path: "/path/to/plugin"},
+					{Type: "local", Path: "/path/to/plugin2", SkipMcpDiscovery: true},
+				},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--plugin-dir", "/path/to/plugin")
+		assertContains(t, cmd, "--plugin-dir-no-mcp", "/path/to/plugin2")
+	})
+}
+
 // TestHandleStderr_PanicInCallbackDoesNotAbortLoop is a regression test for
 // the stderr-callback panic-isolation guarantee (port of Python SDK v0.2.82
 // PR #932). A panicking Stderr callback must not abort the reading loop —
