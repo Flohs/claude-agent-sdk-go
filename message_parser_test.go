@@ -1030,6 +1030,43 @@ func TestParseMessage_TaskNotification_SubagentTypeAndDescription(t *testing.T) 
 	}
 }
 
+func TestParseWorkerShuttingDownMessage_WithReason(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "worker_shutting_down",
+		"reason":  "graceful_shutdown",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*WorkerShuttingDownMessage)
+	if !ok {
+		t.Fatalf("expected *WorkerShuttingDownMessage, got %T", msg)
+	}
+	if m.Reason != "graceful_shutdown" {
+		t.Errorf("Reason = %q, want %q", m.Reason, "graceful_shutdown")
+	}
+}
+
+func TestParseWorkerShuttingDownMessage_Minimal(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "worker_shutting_down",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*WorkerShuttingDownMessage)
+	if !ok {
+		t.Fatalf("expected *WorkerShuttingDownMessage, got %T", msg)
+	}
+	if m.Reason != "" {
+		t.Errorf("Reason should be empty, got %q", m.Reason)
+	}
+}
+
 func TestParseMessage_MemoryRecall(t *testing.T) {
 	data := map[string]any{
 		"type":    "system",
