@@ -1322,3 +1322,84 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	// Verify it satisfies the Message interface.
 	var _ Message = he
 }
+
+func TestParseModelFallbackMessage_FullPayload(t *testing.T) {
+	data := map[string]any{
+		"type":           "system",
+		"subtype":        "model_fallback",
+		"trigger":        "overloaded",
+		"original_model": "claude-opus-4-8",
+		"model":          "claude-sonnet-4-6",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*ModelFallbackMessage)
+	if !ok {
+		t.Fatalf("expected *ModelFallbackMessage, got %T", msg)
+	}
+	if m.Trigger != ModelFallbackTriggerOverloaded {
+		t.Errorf("Trigger = %q, want %q", m.Trigger, ModelFallbackTriggerOverloaded)
+	}
+	if m.OriginalModel != "claude-opus-4-8" {
+		t.Errorf("OriginalModel = %q, want %q", m.OriginalModel, "claude-opus-4-8")
+	}
+	if m.Model != "claude-sonnet-4-6" {
+		t.Errorf("Model = %q, want %q", m.Model, "claude-sonnet-4-6")
+	}
+}
+
+func TestParseModelFallbackMessage_ServerError(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "model_fallback",
+		"trigger": "server_error",
+		"model":   "claude-sonnet-4-6",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*ModelFallbackMessage)
+	if !ok {
+		t.Fatalf("expected *ModelFallbackMessage, got %T", msg)
+	}
+	if m.Trigger != ModelFallbackTriggerServerError {
+		t.Errorf("Trigger = %q, want %q", m.Trigger, ModelFallbackTriggerServerError)
+	}
+}
+
+func TestParseModelFallbackMessage_LastResort(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "model_fallback",
+		"trigger": "last_resort",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*ModelFallbackMessage)
+	if !ok {
+		t.Fatalf("expected *ModelFallbackMessage, got %T", msg)
+	}
+	if m.Trigger != ModelFallbackTriggerLastResort {
+		t.Errorf("Trigger = %q, want %q", m.Trigger, ModelFallbackTriggerLastResort)
+	}
+}
+
+func TestParseModelFallbackMessage_Minimal(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "model_fallback",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, ok := msg.(*ModelFallbackMessage)
+	if !ok {
+		t.Fatalf("expected *ModelFallbackMessage, got %T", msg)
+	}
+}

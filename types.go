@@ -512,6 +512,42 @@ type ElicitationCompleteMessage struct {
 	Result map[string]any `json:"result,omitempty"`
 }
 
+// ModelFallbackTrigger is the machine-readable reason the CLI switched to a
+// fallback model. Port of TypeScript SDK v0.3.174.
+type ModelFallbackTrigger string
+
+const (
+	// ModelFallbackTriggerModelNotFound is set when the requested model
+	// was not found (e.g. invalid model ID).
+	ModelFallbackTriggerModelNotFound ModelFallbackTrigger = "model_not_found"
+	// ModelFallbackTriggerPermissionDenied is set when the model is not
+	// accessible due to permission restrictions.
+	ModelFallbackTriggerPermissionDenied ModelFallbackTrigger = "permission_denied"
+	// ModelFallbackTriggerOverloaded is set when the requested model is
+	// currently overloaded.
+	ModelFallbackTriggerOverloaded ModelFallbackTrigger = "overloaded"
+	// ModelFallbackTriggerServerError is set when a server error caused the
+	// fallback. Port of TypeScript SDK v0.3.174.
+	ModelFallbackTriggerServerError ModelFallbackTrigger = "server_error"
+	// ModelFallbackTriggerLastResort is set when all preferred models failed
+	// and the CLI fell back to a last-resort model. Port of TypeScript SDK v0.3.174.
+	ModelFallbackTriggerLastResort ModelFallbackTrigger = "last_resort"
+)
+
+// ModelFallbackMessage is emitted when the CLI automatically switches to a
+// fallback model. Consumers can inspect Trigger to understand why the switch
+// occurred and Model / OriginalModel to know which models were involved.
+// Port of TypeScript SDK v0.3.174.
+type ModelFallbackMessage struct {
+	SystemMessage
+	// Trigger is the machine-readable reason for the model switch.
+	Trigger ModelFallbackTrigger `json:"trigger,omitempty"`
+	// Model is the fallback model that was selected.
+	Model string `json:"model,omitempty"`
+	// OriginalModel is the model that was originally requested.
+	OriginalModel string `json:"original_model,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 
