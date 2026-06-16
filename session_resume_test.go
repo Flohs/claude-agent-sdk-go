@@ -594,6 +594,324 @@ func TestApplyMaterializedOptions_DoesNotOverrideExistingConfigDir(t *testing.T)
 	}
 }
 
+// ---------------------------------------------------------------------------
+// detectActiveTasks tests
+// ---------------------------------------------------------------------------
+
+func TestDetectActiveTasks_EmptyTranscript(t *testing.T) {
+	got := detectActiveTasks(nil)
+	if len(got) != 0 {
+		t.Errorf("expected 0 active tasks for empty transcript, got %d", len(got))
+	}
+}
+
+func TestDetectActiveTasks_NoTaskEvents(t *testing.T) {
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "user", "message": map[string]any{"content": "hello"}}),
+		entry(map[string]any{"type": "assistant", "message": map[string]any{"content": "hi"}}),
+	}
+	got := detectActiveTasks(entries)
+	if len(got) != 0 {
+		t.Errorf("expected 0 active tasks, got %d", len(got))
+	}
+}
+
+func TestDetectActiveTasks_CompletedTask(t *testing.T) {
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1"}),
+		entry(map[string]any{"type": "system", "subtype": "task_notification", "task_id": "t1", "status": "completed"}),
+	}
+	got := detectActiveTasks(entries)
+	if len(got) != 0 {
+		t.Errorf("expected 0 active tasks (task completed), got %d", len(got))
+	}
+}
+
+func TestDetectActiveTasks_FailedTask(t *testing.T) {
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1"}),
+		entry(map[string]any{"type": "system", "subtype": "task_notification", "task_id": "t1", "status": "failed"}),
+	}
+	got := detectActiveTasks(entries)
+	if len(got) != 0 {
+		t.Errorf("expected 0 active tasks (task failed), got %d", len(got))
+	}
+}
+
+func TestDetectActiveTasks_StoppedTask(t *testing.T) {
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1"}),
+		entry(map[string]any{"type": "system", "subtype": "task_notification", "task_id": "t1", "status": "stopped"}),
+	}
+	got := detectActiveTasks(entries)
+	if len(got) != 0 {
+		t.Errorf("expected 0 active tasks (task stopped), got %d", len(got))
+	}
+}
+
+func TestDetectActiveTasks_ActiveTask(t *testing.T) {
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1", "description": "do something"}),
+	}
+	got := detectActiveTasks(entries)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 active task, got %d", len(got))
+	}
+	if got[0].taskID != "t1" {
+		t.Errorf("taskID = %q, want t1", got[0].taskID)
+	}
+	if got[0].data["description"] != "do something" {
+		t.Errorf("description = %v, want 'do something'", got[0].data["description"])
+	}
+	// The "type" field should be preserved in data (it's only stripped in the meta.json writer).
+	if got[0].data["type"] != "system" {
+		t.Errorf("data[type] = %v, want system", got[0].data["type"])
+	}
+}
+
+func TestDetectActiveTasks_MultipleTasksMixedStates(t *testing.T) {
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1"}),
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t2"}),
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t3"}),
+		entry(map[string]any{"type": "system", "subtype": "task_notification", "task_id": "t1", "status": "completed"}),
+		entry(map[string]any{"type": "system", "subtype": "task_notification", "task_id": "t3", "status": "failed"}),
+	}
+	got := detectActiveTasks(entries)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 active task, got %d: %+v", len(got), got)
+	}
+	if got[0].taskID != "t2" {
+		t.Errorf("active task = %q, want t2", got[0].taskID)
+	}
+}
+
+func TestDetectActiveTasks_TaskUpdatedKilled(t *testing.T) {
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1"}),
+		entry(map[string]any{"type": "system", "subtype": "task_updated", "task_id": "t1", "status": "killed"}),
+	}
+	got := detectActiveTasks(entries)
+	if len(got) != 0 {
+		t.Errorf("expected 0 active tasks (task_updated killed), got %d", len(got))
+	}
+}
+
+func TestDetectActiveTasks_TaskUpdatedCompleted(t *testing.T) {
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1"}),
+		entry(map[string]any{"type": "system", "subtype": "task_updated", "task_id": "t1", "status": "completed"}),
+	}
+	got := detectActiveTasks(entries)
+	if len(got) != 0 {
+		t.Errorf("expected 0 active tasks (task_updated completed), got %d", len(got))
+	}
+}
+
+func TestDetectActiveTasks_DeterministicOrder(t *testing.T) {
+	// Tasks with no terminal events should come out sorted by task_id.
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t3"}),
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1"}),
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t2"}),
+	}
+	got := detectActiveTasks(entries)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 active tasks, got %d", len(got))
+	}
+	ids := []string{got[0].taskID, got[1].taskID, got[2].taskID}
+	want := []string{"t1", "t2", "t3"}
+	for i, id := range ids {
+		if id != want[i] {
+			t.Errorf("got[%d].taskID = %q, want %q", i, id, want[i])
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// materializeActiveTasks tests
+// ---------------------------------------------------------------------------
+
+func TestMaterializeActiveTasks_NoActiveTasks(t *testing.T) {
+	sessionDir := t.TempDir()
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1"}),
+		entry(map[string]any{"type": "system", "subtype": "task_notification", "task_id": "t1", "status": "completed"}),
+	}
+	if err := materializeActiveTasks(entries, sessionDir); err != nil {
+		t.Fatalf("materializeActiveTasks: %v", err)
+	}
+	// No tasks/t1 directory should be created for a completed task.
+	if _, err := os.Stat(filepath.Join(sessionDir, "tasks", "t1")); !os.IsNotExist(err) {
+		t.Errorf("expected tasks/t1 dir to not exist for completed task, stat err: %v", err)
+	}
+}
+
+func TestMaterializeActiveTasks_ActiveTaskWritesMetaJSON(t *testing.T) {
+	sessionDir := t.TempDir()
+	entries := []SessionStoreEntry{
+		entry(map[string]any{
+			"type":          "system",
+			"subtype":       "task_started",
+			"task_id":       "t1",
+			"description":   "do something",
+			"subagent_type": "general-purpose",
+		}),
+	}
+	if err := materializeActiveTasks(entries, sessionDir); err != nil {
+		t.Fatalf("materializeActiveTasks: %v", err)
+	}
+
+	metaFile := filepath.Join(sessionDir, "tasks", "t1", ".meta.json")
+	metaBytes, err := os.ReadFile(metaFile)
+	if err != nil {
+		t.Fatalf("read .meta.json: %v", err)
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(metaBytes, &meta); err != nil {
+		t.Fatalf("parse .meta.json: %v", err)
+	}
+	// "type" field should be stripped (matches agent_metadata convention).
+	if _, has := meta["type"]; has {
+		t.Error("meta.json should not contain 'type' field")
+	}
+	if meta["task_id"] != "t1" {
+		t.Errorf("task_id = %v, want t1", meta["task_id"])
+	}
+	if meta["description"] != "do something" {
+		t.Errorf("description = %v, want 'do something'", meta["description"])
+	}
+	if meta["subagent_type"] != "general-purpose" {
+		t.Errorf("subagent_type = %v, want general-purpose", meta["subagent_type"])
+	}
+}
+
+func TestMaterializeActiveTasks_MultipleActiveTasks(t *testing.T) {
+	sessionDir := t.TempDir()
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t1"}),
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t2"}),
+		entry(map[string]any{"type": "system", "subtype": "task_started", "task_id": "t3"}),
+		entry(map[string]any{"type": "system", "subtype": "task_notification", "task_id": "t2", "status": "completed"}),
+	}
+	if err := materializeActiveTasks(entries, sessionDir); err != nil {
+		t.Fatalf("materializeActiveTasks: %v", err)
+	}
+
+	// t1 and t3 should have meta.json; t2 should not.
+	for _, taskID := range []string{"t1", "t3"} {
+		metaFile := filepath.Join(sessionDir, "tasks", taskID, ".meta.json")
+		if _, err := os.Stat(metaFile); err != nil {
+			t.Errorf("expected .meta.json for task %s to exist: %v", taskID, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(sessionDir, "tasks", "t2", ".meta.json")); !os.IsNotExist(err) {
+		t.Errorf("expected .meta.json for completed task t2 to not exist")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Integration: materializeResumeSession writes task metadata for active tasks
+// ---------------------------------------------------------------------------
+
+func TestMaterializeResumeSession_ActiveTasksMetadataWritten(t *testing.T) {
+	ctx := context.Background()
+	store := NewInMemorySessionStore()
+
+	cwd := t.TempDir()
+	projectKey := ProjectKeyForDirectory(cwd)
+
+	// Seed a session with one active task (t1) and one completed task (t2).
+	entries := []SessionStoreEntry{
+		entry(map[string]any{"type": "user", "message": map[string]any{"content": "go"}}),
+		entry(map[string]any{
+			"type":          "system",
+			"subtype":       "task_started",
+			"task_id":       "t1",
+			"description":   "background task",
+			"subagent_type": "general-purpose",
+		}),
+		entry(map[string]any{
+			"type":    "system",
+			"subtype": "task_started",
+			"task_id": "t2",
+		}),
+		entry(map[string]any{
+			"type":    "system",
+			"subtype": "task_notification",
+			"task_id": "t2",
+			"status":  "completed",
+		}),
+	}
+	if err := store.Append(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionA}, entries); err != nil {
+		t.Fatalf("seed Append: %v", err)
+	}
+
+	opts := &Options{SessionStore: store, Resume: sessionA, Cwd: cwd}
+	mr, err := materializeResumeSession(ctx, opts)
+	if err != nil {
+		t.Fatalf("materializeResumeSession: %v", err)
+	}
+	if mr == nil {
+		t.Fatal("expected materializedResume, got nil")
+	}
+	defer mr.cleanup()
+
+	sessionDir := filepath.Join(mr.configDir, "projects", projectKey, sessionA)
+
+	// t1 is active → .meta.json should exist.
+	metaFile := filepath.Join(sessionDir, "tasks", "t1", ".meta.json")
+	metaBytes, err := os.ReadFile(metaFile)
+	if err != nil {
+		t.Fatalf("read active task .meta.json: %v", err)
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(metaBytes, &meta); err != nil {
+		t.Fatalf("parse .meta.json: %v", err)
+	}
+	if _, has := meta["type"]; has {
+		t.Error(".meta.json should not contain 'type' field")
+	}
+	if meta["task_id"] != "t1" {
+		t.Errorf("task_id = %v, want t1", meta["task_id"])
+	}
+
+	// t2 is completed → no .meta.json.
+	if _, err := os.Stat(filepath.Join(sessionDir, "tasks", "t2", ".meta.json")); !os.IsNotExist(err) {
+		t.Errorf("expected no .meta.json for completed task t2")
+	}
+}
+
+func TestMaterializeResumeSession_NoActiveTasks(t *testing.T) {
+	// Sessions with no task events should behave exactly as before.
+	ctx := context.Background()
+	store := NewInMemorySessionStore()
+
+	cwd := t.TempDir()
+	projectKey := ProjectKeyForDirectory(cwd)
+
+	_ = store.Append(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionA}, []SessionStoreEntry{
+		entry(map[string]any{"type": "user", "message": map[string]any{"content": "hello"}}),
+		entry(map[string]any{"type": "assistant", "message": map[string]any{"content": "hi"}}),
+	})
+
+	opts := &Options{SessionStore: store, Resume: sessionA, Cwd: cwd}
+	mr, err := materializeResumeSession(ctx, opts)
+	if err != nil {
+		t.Fatalf("materializeResumeSession: %v", err)
+	}
+	if mr == nil {
+		t.Fatal("expected materializedResume, got nil")
+	}
+	defer mr.cleanup()
+
+	// No tasks/ directory should be created.
+	sessionDir := filepath.Join(mr.configDir, "projects", projectKey, sessionA)
+	if _, err := os.Stat(filepath.Join(sessionDir, "tasks")); !os.IsNotExist(err) {
+		t.Errorf("expected tasks/ directory to not exist when no active tasks, stat err: %v", err)
+	}
+}
+
 func TestIsSafeSubpath_RejectsTraversalAndAbsolute(t *testing.T) {
 	sessionDir := t.TempDir()
 	cases := []struct {
