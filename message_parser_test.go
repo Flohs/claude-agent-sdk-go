@@ -1067,6 +1067,67 @@ func TestParseWorkerShuttingDownMessage_Minimal(t *testing.T) {
 	}
 }
 
+func TestParsePermissionDeniedAdvisoryMessage_SafetyCheck(t *testing.T) {
+	data := map[string]any{
+		"type":          "system",
+		"subtype":       "permission_denied_advisory",
+		"tool_name":     "Bash",
+		"denial_reason": "safetyCheck",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*PermissionDeniedAdvisoryMessage)
+	if !ok {
+		t.Fatalf("expected *PermissionDeniedAdvisoryMessage, got %T", msg)
+	}
+	if m.ToolName != "Bash" {
+		t.Errorf("ToolName = %q, want %q", m.ToolName, "Bash")
+	}
+	if m.DenialReason != PermissionDeniedAdvisoryReasonSafetyCheck {
+		t.Errorf("DenialReason = %q, want %q", m.DenialReason, PermissionDeniedAdvisoryReasonSafetyCheck)
+	}
+}
+
+func TestParsePermissionDeniedAdvisoryMessage_AsyncAgent(t *testing.T) {
+	data := map[string]any{
+		"type":          "system",
+		"subtype":       "permission_denied_advisory",
+		"tool_name":     "Write",
+		"denial_reason": "asyncAgent",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*PermissionDeniedAdvisoryMessage)
+	if !ok {
+		t.Fatalf("expected *PermissionDeniedAdvisoryMessage, got %T", msg)
+	}
+	if m.DenialReason != PermissionDeniedAdvisoryReasonAsyncAgent {
+		t.Errorf("DenialReason = %q, want %q", m.DenialReason, PermissionDeniedAdvisoryReasonAsyncAgent)
+	}
+}
+
+func TestParsePermissionDeniedAdvisoryMessage_Minimal(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "permission_denied_advisory",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*PermissionDeniedAdvisoryMessage)
+	if !ok {
+		t.Fatalf("expected *PermissionDeniedAdvisoryMessage, got %T", msg)
+	}
+	if m.DenialReason != "" {
+		t.Errorf("DenialReason should be empty, got %q", m.DenialReason)
+	}
+}
+
 func TestParseMessage_MemoryRecall(t *testing.T) {
 	data := map[string]any{
 		"type":    "system",
