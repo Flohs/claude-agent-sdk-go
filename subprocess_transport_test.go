@@ -702,6 +702,108 @@ func TestBuildCommand_SessionMirrorFlag(t *testing.T) {
 	})
 }
 
+func TestNormaliseDisallowedTools(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  []string
+	}{
+		{
+			name:  "server-level spec gets wildcard",
+			input: []string{"mcp__myserver"},
+			want:  []string{"mcp__myserver__*"},
+		},
+		{
+			name:  "tool-level spec unchanged",
+			input: []string{"mcp__myserver__mytool"},
+			want:  []string{"mcp__myserver__mytool"},
+		},
+		{
+			name:  "already wildcard unchanged",
+			input: []string{"mcp__myserver__*"},
+			want:  []string{"mcp__myserver__*"},
+		},
+		{
+			name:  "non-MCP tool unchanged",
+			input: []string{"Bash", "Write"},
+			want:  []string{"Bash", "Write"},
+		},
+		{
+			name:  "mixed list",
+			input: []string{"mcp__server1", "Bash", "mcp__server2__tool"},
+			want:  []string{"mcp__server1__*", "Bash", "mcp__server2__tool"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normaliseDisallowedTools(tt.input)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("got[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestBuildCommand_DisallowedTools(t *testing.T) {
+	t.Run("server-level spec expanded to wildcard", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				DisallowedTools: []string{"mcp__myserver"},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--disallowedTools", "mcp__myserver__*")
+	})
+
+	t.Run("tool-level spec passed through unchanged", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				DisallowedTools: []string{"mcp__myserver__mytool"},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--disallowedTools", "mcp__myserver__mytool")
+	})
+
+	t.Run("non-MCP tool passed through unchanged", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				DisallowedTools: []string{"Bash"},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--disallowedTools", "Bash")
+	})
+
+	t.Run("mixed list normalised correctly", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				DisallowedTools: []string{"mcp__server1", "Bash", "mcp__server2__tool"},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--disallowedTools", "mcp__server1__*,Bash,mcp__server2__tool")
+	})
+
+	t.Run("empty DisallowedTools omits flag", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{},
+		}
+		cmd := transport.buildCommand()
+		assertNotContainsFlag(t, cmd, "--disallowedTools")
+	})
+}
+
 // TestHandleStderr_PanicInCallbackDoesNotAbortLoop is a regression test for
 // the stderr-callback panic-isolation guarantee (port of Python SDK v0.2.82
 // PR #932). A panicking Stderr callback must not abort the reading loop —
