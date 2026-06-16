@@ -285,6 +285,23 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 		}
 		return msg, nil
 
+	case "task_updated":
+		// Parse defensively — never return an error for this subtype.
+		// patch falls back to an empty map if missing or wrong type.
+		patch, _ := data["patch"].(map[string]any)
+		if patch == nil {
+			patch = map[string]any{}
+		}
+		status, _ := patch["status"].(string)
+		return &TaskUpdatedMessage{
+			SystemMessage: base,
+			TaskID:        stringField(data, "task_id"),
+			Patch:         patch,
+			Status:        TaskUpdatedStatus(status),
+			SessionID:     stringField(data, "session_id"),
+			UUID:          stringField(data, "uuid"),
+		}, nil
+
 	default:
 		return &base, nil
 	}

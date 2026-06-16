@@ -1322,3 +1322,142 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	// Verify it satisfies the Message interface.
 	var _ Message = he
 }
+
+// ---------------------------------------------------------------------------
+// Tests for TaskUpdatedMessage (task_updated) — issue #378
+// Port of Python SDK v0.2.101.
+// ---------------------------------------------------------------------------
+
+func TestParseTaskUpdatedMessage_TerminalCompleted(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "task_updated",
+		"task_id":    "task123",
+		"session_id": "sess456",
+		"uuid":       "uuid789",
+		"patch":      map[string]any{"status": "completed"},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*TaskUpdatedMessage)
+	if !ok {
+		t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+	}
+	if m.TaskID != "task123" {
+		t.Errorf("TaskID = %q, want %q", m.TaskID, "task123")
+	}
+	if m.Status != TaskUpdatedStatusCompleted {
+		t.Errorf("Status = %q, want %q", m.Status, TaskUpdatedStatusCompleted)
+	}
+	if !TerminalTaskStatuses[m.Status] {
+		t.Errorf("expected completed to be terminal")
+	}
+}
+
+func TestParseTaskUpdatedMessage_TerminalKilled(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "task_updated",
+		"task_id": "task123",
+		"patch":   map[string]any{"status": "killed"},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*TaskUpdatedMessage)
+	if !ok {
+		t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+	}
+	if m.Status != TaskUpdatedStatusKilled {
+		t.Errorf("Status = %q, want %q", m.Status, TaskUpdatedStatusKilled)
+	}
+	if !TerminalTaskStatuses[m.Status] {
+		t.Errorf("expected killed to be terminal")
+	}
+}
+
+func TestParseTaskUpdatedMessage_Running(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "task_updated",
+		"task_id": "task123",
+		"patch":   map[string]any{"status": "running"},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*TaskUpdatedMessage)
+	if !ok {
+		t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+	}
+	if m.Status != TaskUpdatedStatusRunning {
+		t.Errorf("Status = %q, want %q", m.Status, TaskUpdatedStatusRunning)
+	}
+	if TerminalTaskStatuses[m.Status] {
+		t.Errorf("running should not be terminal")
+	}
+}
+
+func TestParseTaskUpdatedMessage_MissingPatch(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "task_updated",
+		"task_id": "task123",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*TaskUpdatedMessage)
+	if !ok {
+		t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+	}
+	if m.Patch == nil {
+		t.Errorf("Patch should be empty map, not nil")
+	}
+	if m.Status != "" {
+		t.Errorf("Status should be empty, got %q", m.Status)
+	}
+}
+
+func TestParseTaskUpdatedMessage_NonDictPatch(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "task_updated",
+		"task_id": "task123",
+		"patch":   "not-a-dict",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*TaskUpdatedMessage)
+	if !ok {
+		t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+	}
+	if m.Patch == nil {
+		t.Errorf("Patch should be empty map, not nil")
+	}
+}
+
+func TestTerminalTaskStatuses_KilledIsTerminal(t *testing.T) {
+	if !TerminalTaskStatuses[TaskUpdatedStatusKilled] {
+		t.Error("killed should be in TerminalTaskStatuses")
+	}
+	if !TerminalTaskStatuses["stopped"] {
+		t.Error("stopped should be in TerminalTaskStatuses")
+	}
+	if !TerminalTaskStatuses[TaskUpdatedStatusCompleted] {
+		t.Error("completed should be in TerminalTaskStatuses")
+	}
+	if !TerminalTaskStatuses[TaskUpdatedStatusFailed] {
+		t.Error("failed should be in TerminalTaskStatuses")
+	}
+	if TerminalTaskStatuses[TaskUpdatedStatusRunning] {
+		t.Error("running should NOT be in TerminalTaskStatuses")
+	}
+}

@@ -261,6 +261,61 @@ type TaskNotificationMessage struct {
 	TaskDescription string `json:"task_description,omitempty"`
 }
 
+// TaskUpdatedStatus represents the lifecycle status values emitted on
+// system/task_updated messages. These differ slightly from
+// TaskNotificationStatus: task_updated uses "killed" (not "stopped") and
+// includes "pending", "running", and "paused" states not present on
+// task_notification.
+// Port of Python SDK v0.2.101.
+type TaskUpdatedStatus string
+
+const (
+	TaskUpdatedStatusPending   TaskUpdatedStatus = "pending"
+	TaskUpdatedStatusRunning   TaskUpdatedStatus = "running"
+	TaskUpdatedStatusPaused    TaskUpdatedStatus = "paused"
+	TaskUpdatedStatusCompleted TaskUpdatedStatus = "completed"
+	TaskUpdatedStatusFailed    TaskUpdatedStatus = "failed"
+	TaskUpdatedStatusKilled    TaskUpdatedStatus = "killed"
+)
+
+// TerminalTaskStatuses is a set of status values that indicate a task has
+// reached a terminal (non-resumable) state. It spans both
+// TaskNotificationStatus ("stopped") and TaskUpdatedStatus ("killed") so
+// callers can use a single check against either message type.
+// Port of Python SDK v0.2.101.
+var TerminalTaskStatuses = map[TaskUpdatedStatus]bool{
+	TaskUpdatedStatusCompleted: true,
+	TaskUpdatedStatusFailed:    true,
+	"stopped":                  true,
+	TaskUpdatedStatusKilled:    true,
+}
+
+// TaskUpdatedMessage is emitted when a background task's state changes via a
+// system/task_updated event. Unlike TaskNotificationMessage (which fires only
+// at end-of-task), TaskUpdatedMessage fires on every status transition
+// including intermediate states (running, paused) and terminal states that
+// suppress the notification (e.g. "killed" from TaskStop).
+//
+// Consumers tracking active task IDs should clear an ID when either a
+// TaskNotificationMessage or a TaskUpdatedMessage with a terminal status
+// (present in TerminalTaskStatuses) is received.
+// Port of Python SDK v0.2.101.
+type TaskUpdatedMessage struct {
+	SystemMessage
+	// TaskID is the identifier of the task that changed state.
+	TaskID string `json:"task_id"`
+	// Patch is the full patch dict from the CLI event. The patch always
+	// includes at least {"status": "..."} but may carry additional fields.
+	Patch map[string]any `json:"patch"`
+	// Status is the new task status extracted from Patch["status"].
+	// Empty when the patch does not contain a status field.
+	Status TaskUpdatedStatus `json:"status,omitempty"`
+	// SessionID is the session this task belongs to.
+	SessionID string `json:"session_id,omitempty"`
+	// UUID uniquely identifies this message in the session transcript.
+	UUID string `json:"uuid,omitempty"`
+}
+
 // TaskStatus represents the lifecycle state of a task managed by the Task tools.
 type TaskStatus string
 
