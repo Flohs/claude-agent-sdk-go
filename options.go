@@ -81,6 +81,26 @@ const (
 // interchangeable in all contexts.
 type EffortLevel = Effort
 
+// Model is a Claude model identifier string for use with Options.Model.
+// Both full model IDs (e.g. ModelFable5) and short aliases (e.g. ModelFable)
+// are accepted by the CLI's --model flag.
+type Model = string
+
+const (
+	// ModelSonnet is the short alias for the latest Claude Sonnet model.
+	ModelSonnet Model = "sonnet"
+	// ModelOpus is the short alias for the latest Claude Opus model.
+	ModelOpus Model = "opus"
+	// ModelHaiku is the short alias for the latest Claude Haiku model.
+	ModelHaiku Model = "haiku"
+	// ModelFable is the short alias for Claude Fable 5.
+	// Port of TypeScript SDK v0.3.170.
+	ModelFable Model = "fable"
+	// ModelFable5 is the full model identifier for Claude Fable 5.
+	// Port of TypeScript SDK v0.3.170.
+	ModelFable5 Model = "claude-fable-5"
+)
+
 // SystemPrompt is the interface for system prompt configuration.
 type SystemPrompt interface {
 	systemPromptMarker()
