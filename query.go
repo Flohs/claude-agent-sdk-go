@@ -378,13 +378,6 @@ func (q *query) readMessages() {
 		// wait so a slow adapter cannot block result delivery.
 		if msgType == "result" {
 			q.flushBeforeResult()
-			q.firstResultOnce.Do(func() { close(q.firstResultCh) })
-			// Close mainResultCh only for the main-session result (empty origin).
-			// Background-agent results carry a non-empty origin and must not
-			// trigger stdin close, as the main turn is still running.
-			if origin, _ := msg["origin"].(string); origin == "" {
-				q.mainResultOnce.Do(func() { close(q.mainResultCh) })
-			}
 			if isErr, _ := msg["is_error"].(bool); isErr {
 				q.lastIsErrorResultDelivered = true
 			}
@@ -395,6 +388,20 @@ func (q *query) readMessages() {
 		case q.messageCh <- msg:
 		case <-q.ctx.Done():
 			return
+		}
+
+		// Signal firstResultCh AFTER the result message is forwarded to
+		// messageCh, so waitForResultAndEndInput / EndInput cannot fire
+		// until the result (including block-feedback from UserPromptSubmit
+		// hooks) is already accessible to consumers.
+		if msgType == "result" {
+			q.firstResultOnce.Do(func() { close(q.firstResultCh) })
+			// Close mainResultCh only for the main-session result (empty origin).
+			// Background-agent results carry a non-empty origin and must not
+			// trigger stdin close, as the main turn is still running.
+			if origin, _ := msg["origin"].(string); origin == "" {
+				q.mainResultOnce.Do(func() { close(q.mainResultCh) })
+			}
 		}
 	}
 }
