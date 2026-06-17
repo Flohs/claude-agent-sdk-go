@@ -1322,3 +1322,82 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	// Verify it satisfies the Message interface.
 	var _ Message = he
 }
+
+func TestParseAssistantMessage_ToolUseMeta(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"tool_use_meta": map[string]any{
+			"toolu_01abc": map[string]any{"displayName": "Read file"},
+			"toolu_02def": map[string]any{"displayName": "Write file"},
+		},
+		"message": map[string]any{
+			"content": []any{
+				map[string]any{"type": "tool_use", "id": "toolu_01abc", "name": "Read", "input": map[string]any{}},
+				map[string]any{"type": "tool_use", "id": "toolu_02def", "name": "Write", "input": map[string]any{}},
+			},
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	am, ok := msg.(*AssistantMessage)
+	if !ok {
+		t.Fatalf("expected *AssistantMessage, got %T", msg)
+	}
+	if len(am.ToolUseMeta) != 2 {
+		t.Fatalf("expected 2 ToolUseMeta entries, got %d", len(am.ToolUseMeta))
+	}
+	if am.ToolUseMeta["toolu_01abc"].DisplayName != "Read file" {
+		t.Errorf("toolu_01abc DisplayName = %q, want %q", am.ToolUseMeta["toolu_01abc"].DisplayName, "Read file")
+	}
+	if am.ToolUseMeta["toolu_02def"].DisplayName != "Write file" {
+		t.Errorf("toolu_02def DisplayName = %q, want %q", am.ToolUseMeta["toolu_02def"].DisplayName, "Write file")
+	}
+}
+
+func TestParseAssistantMessage_ToolUseMeta_Absent(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{},
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	am := msg.(*AssistantMessage)
+	if am.ToolUseMeta != nil {
+		t.Errorf("expected ToolUseMeta to be nil when absent, got %v", am.ToolUseMeta)
+	}
+}
+
+func TestParseAssistantMessage_ToolUseMeta_PartialEntry(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"tool_use_meta": map[string]any{
+			"toolu_01abc": map[string]any{},
+			"toolu_02bad": "not-a-map",
+		},
+		"message": map[string]any{
+			"content": []any{},
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	am := msg.(*AssistantMessage)
+	// toolu_01abc: valid entry with empty displayName
+	if _, ok := am.ToolUseMeta["toolu_01abc"]; !ok {
+		t.Error("expected toolu_01abc entry to be present")
+	}
+	if am.ToolUseMeta["toolu_01abc"].DisplayName != "" {
+		t.Errorf("expected empty DisplayName, got %q", am.ToolUseMeta["toolu_01abc"].DisplayName)
+	}
+	// toolu_02bad: non-map value is silently skipped
+	if _, ok := am.ToolUseMeta["toolu_02bad"]; ok {
+		t.Error("expected non-map entry to be skipped")
+	}
+}

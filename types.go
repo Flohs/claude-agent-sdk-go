@@ -152,6 +152,13 @@ const (
 	AssistantMessageErrorModelNotFound  AssistantMessageError = "model_not_found"
 )
 
+// ToolUseMetaEntry carries display metadata for a single tool call. The key
+// on AssistantMessage.ToolUseMeta is the corresponding tool_use_id.
+type ToolUseMetaEntry struct {
+	// DisplayName is the human-readable label shown in the UI for this tool call.
+	DisplayName string `json:"displayName,omitempty"`
+}
+
 // AssistantMessage represents an assistant message with content blocks.
 type AssistantMessage struct {
 	Content         []ContentBlock        `json:"content"`
@@ -178,6 +185,10 @@ type AssistantMessage struct {
 	// Timestamp is the ISO-8601 datetime when this message was recorded in the
 	// CLI transcript. Empty when not provided by the CLI.
 	Timestamp string `json:"timestamp,omitempty"`
+	// ToolUseMeta is an optional sidecar keyed by tool_use_id that carries
+	// display-friendly names for tool calls. Nil when not provided by the CLI.
+	// Port of TypeScript SDK v0.3.179.
+	ToolUseMeta map[string]ToolUseMetaEntry `json:"tool_use_meta,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
