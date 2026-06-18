@@ -262,7 +262,11 @@ func (c *Client) ReceiveMessages(ctx context.Context) <-chan Message {
 	return out
 }
 
-// ReceiveResponse returns a channel that yields messages until (and including) a ResultMessage.
+// ReceiveResponse returns a channel that yields messages until (and including)
+// the main-session ResultMessage. Background-agent results (ResultMessage with
+// a non-empty Origin field) are forwarded to the caller but do not stop the
+// stream — only the main-session result (Origin == "") ends the response.
+// Port of TypeScript SDK v0.3.176. ([#375])
 func (c *Client) ReceiveResponse(ctx context.Context) <-chan Message {
 	out := make(chan Message, 100)
 
@@ -290,8 +294,13 @@ func (c *Client) ReceiveResponse(ctx context.Context) <-chan Message {
 				case <-ctx.Done():
 					return
 				}
-				if _, ok := parsed.(*ResultMessage); ok {
-					return
+				if result, ok := parsed.(*ResultMessage); ok {
+					// Only stop on the main-session result (empty Origin).
+					// Background-agent results (non-empty Origin) are forwarded
+					// but must not end the stream prematurely.
+					if result.Origin == "" {
+						return
+					}
 				}
 			case <-ctx.Done():
 				return
