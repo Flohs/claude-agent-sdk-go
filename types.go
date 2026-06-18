@@ -541,6 +541,23 @@ type ContextUsage struct {
 	UsageByCategory map[string]int `json:"usage_by_category,omitempty"`
 }
 
+// UsageDataExperimental contains structured session cost, plan rate-limit, and
+// local usage-behavior data for the current session.
+//
+// WARNING: This type is experimental and may change or be removed without
+// notice. Port of TypeScript SDK v0.3.169.
+type UsageDataExperimental struct {
+	// TotalCostUSD is the total cost in US dollars for the session so far.
+	// Nil when not available.
+	TotalCostUSD *float64 `json:"total_cost_usd,omitempty"`
+	// PlanRateLimit contains plan rate-limit metadata. The exact schema
+	// depends on the CLI version; callers should treat the keys as opaque.
+	PlanRateLimit map[string]any `json:"plan_rate_limit,omitempty"`
+	// LocalUsage contains local usage-behavior data. The exact schema
+	// depends on the CLI version.
+	LocalUsage map[string]any `json:"local_usage,omitempty"`
+}
+
 // SDKSessionInfo contains session metadata returned by ListSessions and GetSessionInfo.
 type SDKSessionInfo struct {
 	SessionID    string  `json:"session_id"`
