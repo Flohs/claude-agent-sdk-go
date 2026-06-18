@@ -1298,8 +1298,6 @@ func TestParseMessage_HookResponse(t *testing.T) {
 }
 
 func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
-	// HookEventMessage embeds SystemMessage; it should be accessible as *SystemMessage
-	// via a type switch on the embedded field.
 	data := map[string]any{
 		"type":       "system",
 		"subtype":    "hook_started",
@@ -1315,10 +1313,132 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *HookEventMessage, got %T", msg)
 	}
-	// The embedded SystemMessage should have the correct subtype.
 	if he.Subtype != "hook_started" {
 		t.Errorf("embedded Subtype = %q, want hook_started", he.Subtype)
 	}
-	// Verify it satisfies the Message interface.
 	var _ Message = he
+}
+
+// ---------------------------------------------------------------------------
+// Tests for ToolUseMeta sidecar (#396)
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_AssistantMessage_ToolUseMeta_WithNameAndIconURL(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model": "claude-opus-4-7",
+			"content": []any{
+				map[string]any{
+					"type":  "tool_use",
+					"id":    "toolu_01abc",
+					"name":  "my_tool",
+					"input": map[string]any{},
+				},
+			},
+		},
+		"tool_use_meta": map[string]any{
+			"toolu_01abc": map[string]any{
+				"name":     "My Friendly Tool",
+				"icon_url": "https://example.com/icon.png",
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	if asst.ToolUseMeta == nil {
+		t.Fatal("expected ToolUseMeta to be non-nil")
+	}
+	entry, ok := asst.ToolUseMeta["toolu_01abc"]
+	if !ok {
+		t.Fatal("expected entry for 'toolu_01abc' in ToolUseMeta")
+	}
+	if entry.Name != "My Friendly Tool" {
+		t.Errorf("Name = %q, want 'My Friendly Tool'", entry.Name)
+	}
+	if entry.IconURL != "https://example.com/icon.png" {
+		t.Errorf("IconURL = %q, want 'https://example.com/icon.png'", entry.IconURL)
+	}
+}
+
+func TestParseMessage_AssistantMessage_ToolUseMeta_Absent(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model": "claude-opus-4-7",
+			"content": []any{
+				map[string]any{
+					"type":  "tool_use",
+					"id":    "toolu_02xyz",
+					"name":  "other_tool",
+					"input": map[string]any{},
+				},
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	if asst.ToolUseMeta != nil {
+		t.Errorf("expected ToolUseMeta to be nil when absent, got %v", asst.ToolUseMeta)
+	}
+}
+
+func TestParseMessage_AssistantMessage_ToolUseMeta_MultipleEntries(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model": "claude-opus-4-7",
+			"content": []any{
+				map[string]any{"type": "tool_use", "id": "toolu_aaa", "name": "tool_a", "input": map[string]any{}},
+				map[string]any{"type": "tool_use", "id": "toolu_bbb", "name": "tool_b", "input": map[string]any{}},
+			},
+		},
+		"tool_use_meta": map[string]any{
+			"toolu_aaa": map[string]any{
+				"name":     "Tool A Label",
+				"icon_url": "https://cdn.example.com/a.svg",
+			},
+			"toolu_bbb": map[string]any{
+				"name":     "Tool B Label",
+				"icon_url": "",
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	if asst.ToolUseMeta == nil {
+		t.Fatal("expected ToolUseMeta to be non-nil")
+	}
+	if len(asst.ToolUseMeta) != 2 {
+		t.Fatalf("expected 2 ToolUseMeta entries, got %d", len(asst.ToolUseMeta))
+	}
+	a, ok := asst.ToolUseMeta["toolu_aaa"]
+	if !ok {
+		t.Fatal("missing entry for toolu_aaa")
+	}
+	if a.Name != "Tool A Label" {
+		t.Errorf("toolu_aaa Name = %q, want 'Tool A Label'", a.Name)
+	}
+	if a.IconURL != "https://cdn.example.com/a.svg" {
+		t.Errorf("toolu_aaa IconURL = %q, want 'https://cdn.example.com/a.svg'", a.IconURL)
+	}
+	b, ok := asst.ToolUseMeta["toolu_bbb"]
+	if !ok {
+		t.Fatal("missing entry for toolu_bbb")
+	}
+	if b.Name != "Tool B Label" {
+		t.Errorf("toolu_bbb Name = %q, want 'Tool B Label'", b.Name)
+	}
+	if b.IconURL != "" {
+		t.Errorf("toolu_bbb IconURL = %q, want empty string", b.IconURL)
+	}
 }
