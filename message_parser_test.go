@@ -1204,3 +1204,140 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 		t.Errorf("expected StopDetails type 'refusal', got %v", am.StopDetails["type"])
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tests for HookEventMessage (#328)
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_HookStarted(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_started",
+		"hook_event": "PreToolUse",
+		"hook_id":    "hook-uuid-123",
+		"hook_name":  "myHook",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*HookEventMessage)
+	if !ok {
+		t.Fatalf("expected *HookEventMessage, got %T", msg)
+	}
+	if m.HookEvent != "PreToolUse" {
+		t.Errorf("HookEvent = %q, want PreToolUse", m.HookEvent)
+	}
+	if m.HookID != "hook-uuid-123" {
+		t.Errorf("HookID = %q, want hook-uuid-123", m.HookID)
+	}
+	if m.HookName != "myHook" {
+		t.Errorf("HookName = %q, want myHook", m.HookName)
+	}
+	if m.Output != nil {
+		t.Errorf("Output = %v, want nil for hook_started", m.Output)
+	}
+	if m.ExitCode != nil {
+		t.Errorf("ExitCode = %v, want nil for hook_started", m.ExitCode)
+	}
+	if m.Outcome != "" {
+		t.Errorf("Outcome = %q, want empty for hook_started", m.Outcome)
+	}
+	if m.Subtype != "hook_started" {
+		t.Errorf("Subtype = %q, want hook_started", m.Subtype)
+	}
+}
+
+func TestParseMessage_HookResponse_Full(t *testing.T) {
+	exitCode := 0
+	_ = exitCode
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_response",
+		"hook_event": "PostToolUse",
+		"hook_id":    "hook-uuid-456",
+		"hook_name":  "postHook",
+		"output":     map[string]any{"decision": "approve", "reason": "looks good"},
+		"exit_code":  float64(1),
+		"outcome":    "success",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*HookEventMessage)
+	if !ok {
+		t.Fatalf("expected *HookEventMessage, got %T", msg)
+	}
+	if m.HookEvent != "PostToolUse" {
+		t.Errorf("HookEvent = %q, want PostToolUse", m.HookEvent)
+	}
+	if m.HookID != "hook-uuid-456" {
+		t.Errorf("HookID = %q, want hook-uuid-456", m.HookID)
+	}
+	if m.Output == nil {
+		t.Fatal("Output is nil, want non-nil")
+	}
+	if m.Output["decision"] != "approve" {
+		t.Errorf("Output[decision] = %v, want approve", m.Output["decision"])
+	}
+	if m.ExitCode == nil {
+		t.Fatal("ExitCode is nil, want non-nil")
+	}
+	if *m.ExitCode != 1 {
+		t.Errorf("*ExitCode = %d, want 1", *m.ExitCode)
+	}
+	if m.Outcome != "success" {
+		t.Errorf("Outcome = %q, want success", m.Outcome)
+	}
+	if m.Subtype != "hook_response" {
+		t.Errorf("Subtype = %q, want hook_response", m.Subtype)
+	}
+}
+
+func TestParseMessage_HookResponse_ExitCodeZero(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_response",
+		"hook_event": "Stop",
+		"hook_id":    "hook-uuid-789",
+		"hook_name":  "stopHook",
+		"exit_code":  float64(0),
+		"outcome":    "ok",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*HookEventMessage)
+	if !ok {
+		t.Fatalf("expected *HookEventMessage, got %T", msg)
+	}
+	if m.ExitCode == nil {
+		t.Fatal("ExitCode is nil, want pointer to 0")
+	}
+	if *m.ExitCode != 0 {
+		t.Errorf("*ExitCode = %d, want 0", *m.ExitCode)
+	}
+}
+
+func TestParseMessage_HookEventMessage_ImplementsMessage(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_started",
+		"hook_event": "PreToolUse",
+		"hook_id":    "h1",
+		"hook_name":  "h",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var _ Message = msg
+	switch msg.(type) {
+	case *HookEventMessage:
+		// expected
+	default:
+		t.Errorf("expected *HookEventMessage in type switch, got %T", msg)
+	}
+}
