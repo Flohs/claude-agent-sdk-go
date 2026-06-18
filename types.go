@@ -560,6 +560,20 @@ type ContextUsage struct {
 	UsageByCategory map[string]int `json:"usage_by_category,omitempty"`
 }
 
+// UsageDataExperimental contains session cost, plan rate-limit, and local
+// usage data returned by Client.GetUsageExperimental.
+//
+// WARNING: This API shape is experimental and may change or be removed
+// without notice. Port of TypeScript SDK v0.3.169.
+type UsageDataExperimental struct {
+	// TotalCostUSD is the cumulative cost for this session in US dollars.
+	TotalCostUSD *float64 `json:"total_cost_usd,omitempty"`
+	// PlanRateLimit contains plan-tier rate-limit status.
+	PlanRateLimit map[string]any `json:"plan_rate_limit,omitempty"`
+	// LocalUsage contains local usage-behavior data.
+	LocalUsage map[string]any `json:"local_usage,omitempty"`
+}
+
 // SDKSessionInfo contains session metadata returned by ListSessions and GetSessionInfo.
 type SDKSessionInfo struct {
 	SessionID    string  `json:"session_id"`
