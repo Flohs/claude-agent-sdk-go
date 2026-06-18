@@ -424,15 +424,15 @@ func TestParseMessage_TaskProgress_SummaryAbsent(t *testing.T) {
 func TestParseMessage_ResultMessage(t *testing.T) {
 	cost := 0.05
 	data := map[string]any{
-		"type":           "result",
-		"subtype":        "success",
-		"duration_ms":    float64(1000),
+		"type":            "result",
+		"subtype":         "success",
+		"duration_ms":     float64(1000),
 		"duration_api_ms": float64(800),
-		"is_error":       false,
-		"num_turns":      float64(3),
-		"session_id":     "sess-1",
-		"total_cost_usd": cost,
-		"result":         "done",
+		"is_error":        false,
+		"num_turns":       float64(3),
+		"session_id":      "sess-1",
+		"total_cost_usd":  cost,
+		"result":          "done",
 	}
 
 	msg, err := ParseMessage(data)
@@ -1298,8 +1298,6 @@ func TestParseMessage_HookResponse(t *testing.T) {
 }
 
 func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
-	// HookEventMessage embeds SystemMessage; it should be accessible as *SystemMessage
-	// via a type switch on the embedded field.
 	data := map[string]any{
 		"type":       "system",
 		"subtype":    "hook_started",
@@ -1315,10 +1313,121 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *HookEventMessage, got %T", msg)
 	}
-	// The embedded SystemMessage should have the correct subtype.
 	if he.Subtype != "hook_started" {
 		t.Errorf("embedded Subtype = %q, want hook_started", he.Subtype)
 	}
-	// Verify it satisfies the Message interface.
 	var _ Message = he
+}
+
+// ---------------------------------------------------------------------------
+// Tests for RateLimitInfo credit-limit fields (#398)
+// ---------------------------------------------------------------------------
+
+func TestParseRateLimitInfo_ErrorCode(t *testing.T) {
+	data := map[string]any{
+		"type":       "rate_limit_event",
+		"session_id": "s1",
+		"rate_limit_info": map[string]any{
+			"status":     "rejected",
+			"error_code": "credit_balance_too_low",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*RateLimitEvent)
+	if event.RateLimitInfo.ErrorCode == nil {
+		t.Fatal("ErrorCode is nil, want 'credit_balance_too_low'")
+	}
+	if *event.RateLimitInfo.ErrorCode != "credit_balance_too_low" {
+		t.Errorf("ErrorCode = %q, want 'credit_balance_too_low'", *event.RateLimitInfo.ErrorCode)
+	}
+}
+
+func TestParseRateLimitInfo_CanUserPurchaseCredits_True(t *testing.T) {
+	data := map[string]any{
+		"type": "rate_limit_event",
+		"rate_limit_info": map[string]any{
+			"status":                    "rejected",
+			"can_user_purchase_credits": true,
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*RateLimitEvent)
+	if event.RateLimitInfo.CanUserPurchaseCredits == nil {
+		t.Fatal("CanUserPurchaseCredits is nil, want true")
+	}
+	if !*event.RateLimitInfo.CanUserPurchaseCredits {
+		t.Errorf("CanUserPurchaseCredits = false, want true")
+	}
+}
+
+func TestParseRateLimitInfo_CanUserPurchaseCredits_False(t *testing.T) {
+	data := map[string]any{
+		"type": "rate_limit_event",
+		"rate_limit_info": map[string]any{
+			"status":                    "rejected",
+			"can_user_purchase_credits": false,
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*RateLimitEvent)
+	if event.RateLimitInfo.CanUserPurchaseCredits == nil {
+		t.Fatal("CanUserPurchaseCredits is nil, want false")
+	}
+	if *event.RateLimitInfo.CanUserPurchaseCredits {
+		t.Errorf("CanUserPurchaseCredits = true, want false")
+	}
+}
+
+func TestParseRateLimitInfo_HasChargeableSavedPaymentMethod(t *testing.T) {
+	data := map[string]any{
+		"type": "rate_limit_event",
+		"rate_limit_info": map[string]any{
+			"status":                              "rejected",
+			"has_chargeable_saved_payment_method": true,
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*RateLimitEvent)
+	if event.RateLimitInfo.HasChargeableSavedPaymentMethod == nil {
+		t.Fatal("HasChargeableSavedPaymentMethod is nil, want true")
+	}
+	if !*event.RateLimitInfo.HasChargeableSavedPaymentMethod {
+		t.Errorf("HasChargeableSavedPaymentMethod = false, want true")
+	}
+}
+
+func TestParseRateLimitInfo_CreditLimitFields_AbsentLeaveNil(t *testing.T) {
+	data := map[string]any{
+		"type": "rate_limit_event",
+		"rate_limit_info": map[string]any{
+			"status": "allowed",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*RateLimitEvent)
+	info := event.RateLimitInfo
+	if info.ErrorCode != nil {
+		t.Errorf("ErrorCode = %v, want nil when absent", *info.ErrorCode)
+	}
+	if info.CanUserPurchaseCredits != nil {
+		t.Errorf("CanUserPurchaseCredits = %v, want nil when absent", *info.CanUserPurchaseCredits)
+	}
+	if info.HasChargeableSavedPaymentMethod != nil {
+		t.Errorf("HasChargeableSavedPaymentMethod = %v, want nil when absent", *info.HasChargeableSavedPaymentMethod)
+	}
 }
