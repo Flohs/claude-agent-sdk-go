@@ -363,6 +363,9 @@ func parseRateLimitInfo(m map[string]any) RateLimitInfo {
 	info.OverageStatus = optionalStringField(m, "overage_status")
 	info.OverageResetsAt = optionalStringField(m, "overage_resets_at")
 	info.OverageDisabledReason = optionalStringField(m, "overage_disabled_reason")
+	info.ErrorCode = optionalStringField(m, "error_code")
+	info.CanUserPurchaseCredits = optionalBoolField(m, "can_user_purchase_credits")
+	info.HasChargeableSavedPaymentMethod = optionalBoolField(m, "has_chargeable_saved_payment_method")
 	if v, ok := m["utilization"].(float64); ok {
 		info.Utilization = &v
 	}
@@ -475,6 +478,14 @@ func boolField(m map[string]any, key string) bool {
 
 func optionalStringField(m map[string]any, key string) *string {
 	v, ok := m[key].(string)
+	if !ok {
+		return nil
+	}
+	return &v
+}
+
+func optionalBoolField(m map[string]any, key string) *bool {
+	v, ok := m[key].(bool)
 	if !ok {
 		return nil
 	}
