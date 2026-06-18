@@ -641,3 +641,22 @@ type SessionListSubkeysKey struct {
 	ProjectKey string `json:"project_key"`
 	SessionID  string `json:"session_id"`
 }
+
+// HookEventMessage is a system message emitted for hook lifecycle events when
+// Options.IncludeHookEvents is true. Subtypes: "hook_started", "hook_response".
+// Port of Python SDK PR anthropics/claude-agent-sdk-python#917.
+type HookEventMessage struct {
+	SystemMessage
+	// HookEvent is the hook event type (e.g. "PreToolUse", "PostToolUse", "Stop").
+	HookEvent string `json:"hook_event"`
+	// HookID is the unique identifier for this hook invocation.
+	HookID string `json:"hook_id"`
+	// HookName is the name of the hook callback.
+	HookName string `json:"hook_name"`
+	// Output is the hook callback's return value (hook_response only).
+	Output map[string]any `json:"output,omitempty"`
+	// ExitCode is the hook process exit code (hook_response only).
+	ExitCode *int `json:"exit_code,omitempty"`
+	// Outcome is the result outcome string (hook_response only).
+	Outcome string `json:"outcome,omitempty"`
+}

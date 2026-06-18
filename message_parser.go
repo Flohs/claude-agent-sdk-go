@@ -266,6 +266,27 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Result:        result,
 		}, nil
 
+	case "hook_started", "hook_response":
+		msg := &HookEventMessage{
+			SystemMessage: base,
+			HookEvent:     stringField(data, "hook_event"),
+			HookID:        stringField(data, "hook_id"),
+			HookName:      stringField(data, "hook_name"),
+			Outcome:       stringField(data, "outcome"),
+		}
+		if output, ok := data["output"].(map[string]any); ok {
+			msg.Output = output
+		}
+		if v, ok := data["exit_code"]; ok {
+			if code := intFromAny(v); code != 0 {
+				msg.ExitCode = &code
+			} else if data["exit_code"] != nil {
+				zero := 0
+				msg.ExitCode = &zero
+			}
+		}
+		return msg, nil
+
 	default:
 		return &base, nil
 	}
