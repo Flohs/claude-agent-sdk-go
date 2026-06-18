@@ -220,6 +220,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			TaskID:        stringField(data, "task_id"),
 			SessionID:     stringField(data, "session_id"),
 			UUID:          stringField(data, "uuid"),
+			Patch:         map[string]any{},
 		}
 		if patch, ok := data["patch"].(map[string]any); ok {
 			msg.Patch = patch

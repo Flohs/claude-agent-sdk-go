@@ -424,15 +424,15 @@ func TestParseMessage_TaskProgress_SummaryAbsent(t *testing.T) {
 func TestParseMessage_ResultMessage(t *testing.T) {
 	cost := 0.05
 	data := map[string]any{
-		"type":           "result",
-		"subtype":        "success",
-		"duration_ms":    float64(1000),
+		"type":            "result",
+		"subtype":         "success",
+		"duration_ms":     float64(1000),
 		"duration_api_ms": float64(800),
-		"is_error":       false,
-		"num_turns":      float64(3),
-		"session_id":     "sess-1",
-		"total_cost_usd": cost,
-		"result":         "done",
+		"is_error":        false,
+		"num_turns":       float64(3),
+		"session_id":      "sess-1",
+		"total_cost_usd":  cost,
+		"result":          "done",
 	}
 
 	msg, err := ParseMessage(data)
@@ -1298,8 +1298,6 @@ func TestParseMessage_HookResponse(t *testing.T) {
 }
 
 func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
-	// HookEventMessage embeds SystemMessage; it should be accessible as *SystemMessage
-	// via a type switch on the embedded field.
 	data := map[string]any{
 		"type":       "system",
 		"subtype":    "hook_started",
@@ -1315,10 +1313,167 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *HookEventMessage, got %T", msg)
 	}
-	// The embedded SystemMessage should have the correct subtype.
 	if he.Subtype != "hook_started" {
 		t.Errorf("embedded Subtype = %q, want hook_started", he.Subtype)
 	}
-	// Verify it satisfies the Message interface.
 	var _ Message = he
+}
+
+// ---------------------------------------------------------------------------
+// Tests for TaskUpdatedMessage and TerminalTaskStatuses (#378)
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_TaskUpdated_TerminalStatus(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "task_updated",
+		"task_id":    "task-abc",
+		"session_id": "sess-xyz",
+		"uuid":       "upd-uuid-1",
+		"patch": map[string]any{
+			"status":   "killed",
+			"end_time": "2026-06-18T10:00:00Z",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tu, ok := msg.(*TaskUpdatedMessage)
+	if !ok {
+		t.Fatalf("expected *TaskUpdatedMessage, got %T", msg)
+	}
+	if tu.TaskID != "task-abc" {
+		t.Errorf("TaskID = %q, want task-abc", tu.TaskID)
+	}
+	if tu.SessionID != "sess-xyz" {
+		t.Errorf("SessionID = %q, want sess-xyz", tu.SessionID)
+	}
+	if tu.UUID != "upd-uuid-1" {
+		t.Errorf("UUID = %q, want upd-uuid-1", tu.UUID)
+	}
+	if tu.Status != TaskUpdatedStatusKilled {
+		t.Errorf("Status = %q, want killed", tu.Status)
+	}
+	if tu.Patch["status"] != "killed" {
+		t.Errorf("Patch[status] = %v, want killed", tu.Patch["status"])
+	}
+	if tu.Patch["end_time"] != "2026-06-18T10:00:00Z" {
+		t.Errorf("Patch[end_time] = %v", tu.Patch["end_time"])
+	}
+	if tu.Subtype != "task_updated" {
+		t.Errorf("Subtype = %q, want task_updated", tu.Subtype)
+	}
+}
+
+func TestParseMessage_TaskUpdated_NonTerminalStatus(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "task_updated",
+		"task_id":    "task-123",
+		"session_id": "sess-1",
+		"uuid":       "upd-uuid-2",
+		"patch": map[string]any{
+			"status": "running",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tu := msg.(*TaskUpdatedMessage)
+	if tu.Status != TaskUpdatedStatusRunning {
+		t.Errorf("Status = %q, want running", tu.Status)
+	}
+	if TerminalTaskStatuses[tu.Status] {
+		t.Errorf("running should not be terminal")
+	}
+}
+
+func TestParseMessage_TaskUpdated_Minimal(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "task_updated",
+		"task_id": "task-min",
+		"patch": map[string]any{
+			"progress": float64(42),
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tu := msg.(*TaskUpdatedMessage)
+	if tu.TaskID != "task-min" {
+		t.Errorf("TaskID = %q, want task-min", tu.TaskID)
+	}
+	if tu.UUID != "" {
+		t.Errorf("UUID = %q, want empty", tu.UUID)
+	}
+	if tu.SessionID != "" {
+		t.Errorf("SessionID = %q, want empty", tu.SessionID)
+	}
+	if tu.Status != "" {
+		t.Errorf("Status = %q, want empty (no status in patch)", tu.Status)
+	}
+	if tu.Patch["progress"] != float64(42) {
+		t.Errorf("Patch[progress] = %v, want 42", tu.Patch["progress"])
+	}
+}
+
+func TestParseMessage_TaskUpdated_MissingPatch(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "task_updated",
+		"task_id": "task-nopatch",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tu := msg.(*TaskUpdatedMessage)
+	if tu.Patch == nil {
+		t.Fatal("Patch should not be nil when missing")
+	}
+	if len(tu.Patch) != 0 {
+		t.Errorf("Patch should be empty map, got %v", tu.Patch)
+	}
+}
+
+func TestParseMessage_TaskUpdated_NonDictPatch(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "task_updated",
+		"task_id": "task-badpatch",
+		"patch":   "not-a-dict",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tu := msg.(*TaskUpdatedMessage)
+	if tu.Patch == nil {
+		t.Fatal("Patch should not be nil for non-dict patch")
+	}
+	if len(tu.Patch) != 0 {
+		t.Errorf("Patch should be empty map for non-dict input, got %v", tu.Patch)
+	}
+}
+
+func TestTerminalTaskStatuses_Killed(t *testing.T) {
+	if !TerminalTaskStatuses[TaskUpdatedStatusKilled] {
+		t.Error("TerminalTaskStatuses[\"killed\"] should be true")
+	}
+}
+
+func TestTerminalTaskStatuses_Stopped(t *testing.T) {
+	if !TerminalTaskStatuses["stopped"] {
+		t.Error("TerminalTaskStatuses[\"stopped\"] should be true")
+	}
+}
+
+func TestTerminalTaskStatuses_Running_NotTerminal(t *testing.T) {
+	if TerminalTaskStatuses[TaskUpdatedStatusRunning] {
+		t.Error("TerminalTaskStatuses[\"running\"] should be false")
+	}
 }
