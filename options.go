@@ -1,26 +1,5 @@
 package claude
 
-// Model string constants for use with Options.Model.
-// Callers may also pass any valid model identifier string directly.
-const (
-	// ModelFable5 is the full identifier for Claude Fable 5.
-	ModelFable5 = "claude-fable-5"
-	// ModelFable is the short alias for claude-fable-5.
-	ModelFable = "fable"
-	// ModelOpus48 is the full identifier for Claude Opus 4.8.
-	ModelOpus48 = "claude-opus-4-8"
-	// ModelOpus is the short alias for Opus.
-	ModelOpus = "opus"
-	// ModelSonnet46 is the full identifier for Claude Sonnet 4.6.
-	ModelSonnet46 = "claude-sonnet-4-6"
-	// ModelSonnet is the short alias for Sonnet.
-	ModelSonnet = "sonnet"
-	// ModelHaiku45 is the full identifier for Claude Haiku 4.5.
-	ModelHaiku45 = "claude-haiku-4-5-20251001"
-	// ModelHaiku is the short alias for Haiku.
-	ModelHaiku = "haiku"
-)
-
 // PermissionMode controls tool execution permissions.
 type PermissionMode string
 
@@ -80,6 +59,25 @@ const (
 // naming convention. Both names resolve to the same underlying type and are
 // interchangeable in all contexts.
 type EffortLevel = Effort
+
+// Model is a Claude model identifier. Use the named constants (e.g. ModelFable5,
+// ModelSonnet46, ModelOpus48) or pass an arbitrary string for custom or future models.
+// Port of TypeScript SDK v0.3.170.
+type Model = string
+
+const (
+	// Full model IDs
+	ModelFable5   Model = "claude-fable-5"
+	ModelOpus48   Model = "claude-opus-4-8"
+	ModelSonnet46 Model = "claude-sonnet-4-6"
+	ModelHaiku45  Model = "claude-haiku-4-5-20251001"
+
+	// Short aliases accepted by the CLI --model flag
+	ModelFable   Model = "fable"
+	ModelOpus    Model = "opus"
+	ModelSonnet  Model = "sonnet"
+	ModelHaiku   Model = "haiku"
+)
 
 // SystemPrompt is the interface for system prompt configuration.
 type SystemPrompt interface {
