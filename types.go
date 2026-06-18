@@ -169,10 +169,6 @@ type AssistantMessage struct {
 	// StopReason is why the model stopped generating (e.g. "end_turn",
 	// "tool_use", "max_tokens"). Empty when not provided.
 	StopReason string `json:"stop_reason,omitempty"`
-	// StopDetails contains structured metadata when StopReason is "refusal" or
-	// another stop condition that carries additional context. Nil when not
-	// provided by the CLI.
-	StopDetails map[string]any `json:"stop_details,omitempty"`
 	// RequestID is the API request identifier for this message.
 	RequestID string `json:"request_id,omitempty"`
 	// Timestamp is the ISO-8601 datetime when this message was recorded in the
@@ -373,16 +369,6 @@ type MirrorErrorMessage struct {
 	SessionID string      `json:"session_id,omitempty"`
 }
 
-// ApiRetryError represents the machine-readable error category on [ApiRetryMessage].
-type ApiRetryError string
-
-const (
-	// ApiRetryErrorRateLimit is set when the API returned a 429 rate-limit response.
-	ApiRetryErrorRateLimit ApiRetryError = "rate_limit"
-	// ApiRetryErrorOverloaded is set when the API returned a 529 server-overloaded response.
-	ApiRetryErrorOverloaded ApiRetryError = "overloaded"
-)
-
 // ApiRetryMessage is emitted before each API retry attempt when the CLI
 // encounters a transient API error. Port of TypeScript SDK v0.2.77.
 type ApiRetryMessage struct {
@@ -398,10 +384,6 @@ type ApiRetryMessage struct {
 	ErrorStatus *int `json:"error_status,omitempty"`
 	// ErrorMessage is a human-readable description of the error that triggered the retry.
 	ErrorMessage string `json:"error_message,omitempty"`
-	// Error is the machine-readable error category: "rate_limit" for 429
-	// responses and "overloaded" for 529 responses. Empty when not provided by
-	// the CLI. Port of TypeScript SDK v0.3.150.
-	Error ApiRetryError `json:"error,omitempty"`
 }
 
 // MemoryRecallMessage is emitted when Claude loads memory files during a session.
@@ -424,6 +406,17 @@ type ElicitationCompleteMessage struct {
 	// Result contains the user's response to the elicitation form. The shape
 	// matches the server-provided JSON schema from the original elicit request.
 	Result map[string]any `json:"result,omitempty"`
+}
+
+// WorkerShuttingDownMessage is emitted when a Remote Control worker exits
+// gracefully. Consumers can use this to distinguish a clean worker shutdown
+// from an unexpected disconnect or connection loss.
+// Port of TypeScript SDK v0.3.178.
+type WorkerShuttingDownMessage struct {
+	SystemMessage
+	// Reason is an optional human-readable description of why the worker
+	// is shutting down. Empty when not provided by the CLI.
+	Reason string `json:"reason,omitempty"`
 }
 
 // HookDecision represents a hook's permission decision value.
@@ -460,9 +453,6 @@ type ResultMessage struct {
 	NumTurns      int    `json:"num_turns"`
 	SessionID     string `json:"session_id"`
 	StopReason    string `json:"stop_reason,omitempty"`
-	// StopDetails contains structured metadata accompanying the stop reason,
-	// e.g. when StopReason is "refusal". Nil when not provided by the CLI.
-	StopDetails map[string]any `json:"stop_details,omitempty"`
 	// TerminalReason describes why the session terminated (e.g. "completed",
 	// "aborted_tools", "max_turns", "blocking_limit"). Empty when not
 	// provided by the CLI.
@@ -577,9 +567,6 @@ type ServerCapabilities struct {
 	// SupportsAdaptiveThinking is true when the model supports adaptive
 	// thinking mode (ThinkingConfigAdaptive).
 	SupportsAdaptiveThinking bool `json:"supportsAdaptiveThinking"`
-	// SupportsFastMode is true when the current model supports fast mode
-	// (e.g. Opus fast mode). Port of TypeScript SDK v0.2.69.
-	SupportsFastMode bool `json:"supportsFastMode"`
 	// MemoryPaths is the list of memory file paths loaded at session initialization.
 	// Empty when no memory files are configured.
 	MemoryPaths []string `json:"memoryPaths,omitempty"`
