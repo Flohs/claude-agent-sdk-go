@@ -424,15 +424,15 @@ func TestParseMessage_TaskProgress_SummaryAbsent(t *testing.T) {
 func TestParseMessage_ResultMessage(t *testing.T) {
 	cost := 0.05
 	data := map[string]any{
-		"type":           "result",
-		"subtype":        "success",
-		"duration_ms":    float64(1000),
+		"type":            "result",
+		"subtype":         "success",
+		"duration_ms":     float64(1000),
 		"duration_api_ms": float64(800),
-		"is_error":       false,
-		"num_turns":      float64(3),
-		"session_id":     "sess-1",
-		"total_cost_usd": cost,
-		"result":         "done",
+		"is_error":        false,
+		"num_turns":       float64(3),
+		"session_id":      "sess-1",
+		"total_cost_usd":  cost,
+		"result":          "done",
 	}
 
 	msg, err := ParseMessage(data)
@@ -1202,5 +1202,109 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 	}
 	if am.StopDetails["type"] != "refusal" {
 		t.Errorf("expected StopDetails type 'refusal', got %v", am.StopDetails["type"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests for RateLimitInfo new fields (#398): ErrorCode, CanUserPurchaseCredits,
+// HasChargeableSavedPaymentMethod. Port of TypeScript SDK v0.3.181.
+// ---------------------------------------------------------------------------
+
+func TestParseRateLimitInfo_ErrorCode(t *testing.T) {
+	data := map[string]any{
+		"type":       "rate_limit_event",
+		"session_id": "s1",
+		"rate_limit_info": map[string]any{
+			"status":     "rejected",
+			"error_code": "credits_exhausted",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*RateLimitEvent)
+	if event.RateLimitInfo.ErrorCode == nil {
+		t.Fatal("ErrorCode is nil, want 'credits_exhausted'")
+	}
+	if *event.RateLimitInfo.ErrorCode != "credits_exhausted" {
+		t.Errorf("ErrorCode = %q, want 'credits_exhausted'", *event.RateLimitInfo.ErrorCode)
+	}
+}
+
+func TestParseRateLimitInfo_CanUserPurchaseCredits(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value bool
+	}{
+		{"true", true},
+		{"false", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := map[string]any{
+				"type": "rate_limit_event",
+				"rate_limit_info": map[string]any{
+					"status":                   "rejected",
+					"can_user_purchase_credits": tc.value,
+				},
+			}
+			msg, err := ParseMessage(data)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			event := msg.(*RateLimitEvent)
+			if event.RateLimitInfo.CanUserPurchaseCredits == nil {
+				t.Fatal("CanUserPurchaseCredits is nil")
+			}
+			if *event.RateLimitInfo.CanUserPurchaseCredits != tc.value {
+				t.Errorf("CanUserPurchaseCredits = %v, want %v", *event.RateLimitInfo.CanUserPurchaseCredits, tc.value)
+			}
+		})
+	}
+}
+
+func TestParseRateLimitInfo_HasChargeableSavedPaymentMethod(t *testing.T) {
+	data := map[string]any{
+		"type": "rate_limit_event",
+		"rate_limit_info": map[string]any{
+			"status":                              "rejected",
+			"has_chargeable_saved_payment_method": true,
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*RateLimitEvent)
+	if event.RateLimitInfo.HasChargeableSavedPaymentMethod == nil {
+		t.Fatal("HasChargeableSavedPaymentMethod is nil")
+	}
+	if !*event.RateLimitInfo.HasChargeableSavedPaymentMethod {
+		t.Errorf("HasChargeableSavedPaymentMethod = false, want true")
+	}
+}
+
+func TestParseRateLimitInfo_NewFieldsAbsent(t *testing.T) {
+	// Backward compat: older CLI payloads without the new fields leave pointers nil.
+	data := map[string]any{
+		"type": "rate_limit_event",
+		"rate_limit_info": map[string]any{
+			"status": "allowed",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*RateLimitEvent)
+	info := event.RateLimitInfo
+	if info.ErrorCode != nil {
+		t.Errorf("ErrorCode = %v, want nil", *info.ErrorCode)
+	}
+	if info.CanUserPurchaseCredits != nil {
+		t.Errorf("CanUserPurchaseCredits = %v, want nil", *info.CanUserPurchaseCredits)
+	}
+	if info.HasChargeableSavedPaymentMethod != nil {
+		t.Errorf("HasChargeableSavedPaymentMethod = %v, want nil", *info.HasChargeableSavedPaymentMethod)
 	}
 }
