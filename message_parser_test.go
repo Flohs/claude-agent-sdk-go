@@ -424,15 +424,15 @@ func TestParseMessage_TaskProgress_SummaryAbsent(t *testing.T) {
 func TestParseMessage_ResultMessage(t *testing.T) {
 	cost := 0.05
 	data := map[string]any{
-		"type":           "result",
-		"subtype":        "success",
-		"duration_ms":    float64(1000),
+		"type":            "result",
+		"subtype":         "success",
+		"duration_ms":     float64(1000),
 		"duration_api_ms": float64(800),
-		"is_error":       false,
-		"num_turns":      float64(3),
-		"session_id":     "sess-1",
-		"total_cost_usd": cost,
-		"result":         "done",
+		"is_error":        false,
+		"num_turns":       float64(3),
+		"session_id":      "sess-1",
+		"total_cost_usd":  cost,
+		"result":          "done",
 	}
 
 	msg, err := ParseMessage(data)
@@ -1298,8 +1298,6 @@ func TestParseMessage_HookResponse(t *testing.T) {
 }
 
 func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
-	// HookEventMessage embeds SystemMessage; it should be accessible as *SystemMessage
-	// via a type switch on the embedded field.
 	data := map[string]any{
 		"type":       "system",
 		"subtype":    "hook_started",
@@ -1315,10 +1313,52 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *HookEventMessage, got %T", msg)
 	}
-	// The embedded SystemMessage should have the correct subtype.
 	if he.Subtype != "hook_started" {
 		t.Errorf("embedded Subtype = %q, want hook_started", he.Subtype)
 	}
-	// Verify it satisfies the Message interface.
 	var _ Message = he
+}
+
+// ---------------------------------------------------------------------------
+// WorkerShuttingDownMessage (#380)
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_WorkerShuttingDown(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "worker_shutting_down",
+		"reason":  "graceful_shutdown",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*WorkerShuttingDownMessage)
+	if !ok {
+		t.Fatalf("expected *WorkerShuttingDownMessage, got %T", msg)
+	}
+	if m.Reason != "graceful_shutdown" {
+		t.Errorf("Reason = %q, want graceful_shutdown", m.Reason)
+	}
+	if m.Subtype != "worker_shutting_down" {
+		t.Errorf("Subtype = %q, want worker_shutting_down", m.Subtype)
+	}
+}
+
+func TestParseMessage_WorkerShuttingDown_NoReason(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "worker_shutting_down",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*WorkerShuttingDownMessage)
+	if !ok {
+		t.Fatalf("expected *WorkerShuttingDownMessage, got %T", msg)
+	}
+	if m.Reason != "" {
+		t.Errorf("Reason = %q, want empty when absent", m.Reason)
+	}
 }
