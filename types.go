@@ -512,6 +512,15 @@ type ElicitationCompleteMessage struct {
 	Result map[string]any `json:"result,omitempty"`
 }
 
+// WorkerShuttingDownMessage is emitted when a Remote Control worker exits
+// gracefully. Consumers can use this to distinguish a clean worker shutdown
+// from an unexpected disconnect. Port of TypeScript SDK v0.3.178.
+type WorkerShuttingDownMessage struct {
+	SystemMessage
+	// Reason is an optional human-readable shutdown reason.
+	Reason string `json:"reason,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 
