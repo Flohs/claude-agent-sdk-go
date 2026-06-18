@@ -167,6 +167,7 @@ type ToolUseMetaEntry struct {
 // Port of TypeScript SDK v0.3.179.
 type ToolUseMeta map[string]ToolUseMetaEntry
 
+
 // AssistantMessage represents an assistant message with content blocks.
 type AssistantMessage struct {
 	Content         []ContentBlock        `json:"content"`
