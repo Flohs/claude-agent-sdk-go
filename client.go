@@ -355,20 +355,6 @@ func (c *Client) GetContextUsage(ctx context.Context) (*ContextUsage, error) {
 	return c.q.getContextUsage()
 }
 
-// GetSettings returns the effective merged settings for the running session,
-// including the "applied" sub-object with runtime-resolved values such as the
-// actual model and effort level selected after alias resolution.
-//
-// This is distinct from ResolveSettings, which reads settings files from disk
-// without spawning the CLI. GetSettings queries the live subprocess for its
-// current runtime state. Port of TypeScript SDK v0.2.72.
-func (c *Client) GetSettings(ctx context.Context) (map[string]any, error) {
-	if c.q == nil {
-		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
-	}
-	return c.q.getSettings()
-}
-
 // ReloadPlugins reloads plugins and returns refreshed commands, agents, and
 // MCP server status.
 func (c *Client) ReloadPlugins(ctx context.Context) (map[string]any, error) {
@@ -505,6 +491,29 @@ func (c *Client) GetServerCapabilities() *ServerCapabilities {
 		}
 	}
 	return caps
+}
+
+// GetSettings returns the effective merged settings for the running session,
+// including the "applied" section with runtime-resolved values such as the
+// actual model after alias resolution. Port of TypeScript SDK v0.2.72.
+func (c *Client) GetSettings(ctx context.Context) (map[string]any, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getSettings()
+}
+
+// GetUsageExperimental returns structured session cost, plan rate-limit, and
+// local usage-behavior data for the current session.
+//
+// WARNING: This API is experimental and may change or be removed without
+// notice. Do not build production code that depends on the exact shape of the
+// returned data. Port of TypeScript SDK v0.3.169.
+func (c *Client) GetUsageExperimental(ctx context.Context) (*UsageDataExperimental, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getUsageExperimental()
 }
 
 // Close disconnects from Claude Code and cleans up resources.

@@ -858,11 +858,6 @@ func (q *query) getContextUsage() (*ContextUsage, error) {
 	return &usage, nil
 }
 
-func (q *query) getSettings() (map[string]any, error) {
-	resp, err := q.sendControlRequest(map[string]any{"subtype": "get_settings"}, 60*time.Second)
-	return resp, err
-}
-
 func (q *query) reloadPlugins() (map[string]any, error) {
 	resp, err := q.sendControlRequest(map[string]any{
 		"subtype": "reload_plugins",
@@ -982,6 +977,43 @@ func (q *query) rewindFiles(userMessageID string) error {
 		"user_message_id": userMessageID,
 	}, 60*time.Second)
 	return err
+}
+
+func (q *query) getSettings() (map[string]any, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "get_settings",
+	}, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, nil
+	}
+	// Return the full response as the settings map
+	return resp, nil
+}
+
+func (q *query) getUsageExperimental() (*UsageDataExperimental, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "get_usage",
+	}, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return &UsageDataExperimental{}, nil
+	}
+	result := &UsageDataExperimental{}
+	if v, ok := resp["total_cost_usd"].(float64); ok {
+		result.TotalCostUSD = &v
+	}
+	if v, ok := resp["plan_rate_limit"].(map[string]any); ok {
+		result.PlanRateLimit = v
+	}
+	if v, ok := resp["local_usage"].(map[string]any); ok {
+		result.LocalUsage = v
+	}
+	return result, nil
 }
 
 func (q *query) streamInput(inputCh <-chan map[string]any) {
