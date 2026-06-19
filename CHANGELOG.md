@@ -4,6 +4,7 @@
 
 ### Added
 
+- `Model` type alias (`= string`) and model name constants: `ModelFable5` (`"claude-fable-5"`), `ModelOpus48`, `ModelSonnet46`, `ModelHaiku45` (full IDs) and `ModelFable`, `ModelOpus`, `ModelSonnet`, `ModelHaiku` (short aliases accepted by the CLI `--model` flag). Port of TypeScript SDK v0.3.170. ([#348](https://github.com/Flohs/claude-agent-sdk-go/issues/348))
 - `AdvisorToolConfig` struct (fields: `Model`, `MaxUses`, `Caching`, `AllowedCallers`) and `Advisor any` field on `AgentDefinition`. Set `Advisor` to `true` to enable the advisor tool with default config, or provide `*AdvisorToolConfig` for fine-grained control. Enables the executor/advisor pattern without dropping to the raw Anthropic SDK. Port of Python SDK PR anthropics/claude-agent-sdk-python#880. ([#279](https://github.com/Flohs/claude-agent-sdk-go/issues/279))
 - `AlwaysLoad bool` field (`json:"alwaysLoad,omitempty"`) on `McpStdioServerConfig`, `McpSSEServerConfig`, and `McpHTTPServerConfig`. When `true`, the CLI waits for the server to connect before executing the first query (blocking behavior). By default servers connect in the background since CLI v2.1.142. Port of TypeScript SDK v0.3.142. ([#272](https://github.com/Flohs/claude-agent-sdk-go/issues/272))
 - `SandboxFilesystemConfig` struct with fields `AllowWrite`, `DenyWrite`, `DenyRead`, `AllowRead`, and `AllowManagedReadPathsOnly` for controlling filesystem access in sandboxed commands. Port of Python SDK PR anthropics/claude-agent-sdk-python#862. ([#280](https://github.com/Flohs/claude-agent-sdk-go/issues/280))

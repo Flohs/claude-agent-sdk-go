@@ -19,6 +19,25 @@ const (
 	SdkBetaContext1M SdkBeta = "context-1m-2025-08-07"
 )
 
+// Model is a Claude model identifier passed to Options.Model. Use the named
+// constants for well-known models or pass any string for custom/future models.
+// Type alias so it is interchangeable with string — no breaking change.
+type Model = string
+
+const (
+	// Full model identifiers
+	ModelFable5   Model = "claude-fable-5"
+	ModelOpus48   Model = "claude-opus-4-8"
+	ModelSonnet46 Model = "claude-sonnet-4-6"
+	ModelHaiku45  Model = "claude-haiku-4-5-20251001"
+
+	// Short aliases accepted by the CLI --model flag
+	ModelFable   Model = "fable"
+	ModelOpus    Model = "opus"
+	ModelSonnet  Model = "sonnet"
+	ModelHaiku   Model = "haiku"
+)
+
 // SessionStoreFlushMode controls how the transcript mirror batcher delivers
 // frames to a [SessionStore].
 type SessionStoreFlushMode string
