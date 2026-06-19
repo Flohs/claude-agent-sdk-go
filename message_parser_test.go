@@ -1204,3 +1204,90 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 		t.Errorf("expected StopDetails type 'refusal', got %v", am.StopDetails["type"])
 	}
 }
+
+func TestParseMessage_AssistantMessage_ToolUseMeta(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model":   "claude-sonnet-4-6",
+			"content": []any{map[string]any{"type": "text", "text": "ok"}},
+		},
+		"tool_use_meta": map[string]any{
+			"toolu_01": map[string]any{
+				"display_name": "Search the web",
+			},
+			"toolu_02": map[string]any{
+				"display_name": "My MCP Tool",
+				"icon_url":     "https://example.com/icon.png",
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	if asst.ToolUseMeta == nil {
+		t.Fatal("ToolUseMeta is nil")
+	}
+	if len(asst.ToolUseMeta) != 2 {
+		t.Errorf("len(ToolUseMeta) = %d, want 2", len(asst.ToolUseMeta))
+	}
+	entry1 := asst.ToolUseMeta["toolu_01"]
+	if entry1.DisplayName != "Search the web" {
+		t.Errorf("toolu_01.DisplayName = %q, want 'Search the web'", entry1.DisplayName)
+	}
+	if entry1.IconURL != "" {
+		t.Errorf("toolu_01.IconURL = %q, want empty", entry1.IconURL)
+	}
+	entry2 := asst.ToolUseMeta["toolu_02"]
+	if entry2.DisplayName != "My MCP Tool" {
+		t.Errorf("toolu_02.DisplayName = %q, want 'My MCP Tool'", entry2.DisplayName)
+	}
+	if entry2.IconURL != "https://example.com/icon.png" {
+		t.Errorf("toolu_02.IconURL = %q, want 'https://example.com/icon.png'", entry2.IconURL)
+	}
+}
+
+func TestParseMessage_AssistantMessage_ToolUseMeta_Absent(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model":   "claude-sonnet-4-6",
+			"content": []any{map[string]any{"type": "text", "text": "ok"}},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	if asst.ToolUseMeta != nil {
+		t.Errorf("ToolUseMeta = %v, want nil when absent", asst.ToolUseMeta)
+	}
+}
+
+func TestParseMessage_AssistantMessage_ToolUseMeta_IconURL(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model":   "claude-sonnet-4-6",
+			"content": []any{map[string]any{"type": "text", "text": "ok"}},
+		},
+		"tool_use_meta": map[string]any{
+			"toolu_01": map[string]any{
+				"display_name": "My Tool",
+				"icon_url":     "https://cdn.example.com/mcp-server-icon.png",
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	entry := asst.ToolUseMeta["toolu_01"]
+	if entry.IconURL != "https://cdn.example.com/mcp-server-icon.png" {
+		t.Errorf("IconURL = %q, want icon URL", entry.IconURL)
+	}
+}

@@ -178,6 +178,10 @@ type AssistantMessage struct {
 	// Timestamp is the ISO-8601 datetime when this message was recorded in the
 	// CLI transcript. Empty when not provided by the CLI.
 	Timestamp string `json:"timestamp,omitempty"`
+	// ToolUseMeta is an optional sidecar map from tool_use_id to display
+	// metadata for each tool call in this message. Nil when not provided
+	// by the CLI. Port of TypeScript SDK v0.3.179 / v0.3.181.
+	ToolUseMeta map[string]ToolUseMetaEntry `json:"tool_use_meta,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
@@ -640,4 +644,16 @@ type SessionSummaryEntry struct {
 type SessionListSubkeysKey struct {
 	ProjectKey string `json:"project_key"`
 	SessionID  string `json:"session_id"`
+}
+
+// ToolUseMetaEntry is a display-metadata sidecar for a single tool call in
+// an assistant message. Keyed by tool_use_id in AssistantMessage.ToolUseMeta.
+// Port of TypeScript SDK v0.3.179.
+type ToolUseMetaEntry struct {
+	// DisplayName is a human-readable label for this tool call, suitable for
+	// display in a UI instead of the raw wire tool name.
+	DisplayName string `json:"display_name,omitempty"`
+	// IconURL is the URL of the icon for this tool's MCP server, populated
+	// from MCP server directory metadata. Port of TypeScript SDK v0.3.181.
+	IconURL string `json:"icon_url,omitempty"`
 }
