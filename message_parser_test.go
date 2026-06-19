@@ -1204,3 +1204,65 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 		t.Errorf("expected StopDetails type 'refusal', got %v", am.StopDetails["type"])
 	}
 }
+
+func TestParseMessage_ModelFallback_AllTriggers(t *testing.T) {
+	triggers := []ModelFallbackTrigger{
+		ModelFallbackTriggerModelNotFound,
+		ModelFallbackTriggerPermissionDenied,
+		ModelFallbackTriggerOverloaded,
+		ModelFallbackTriggerServerError,
+		ModelFallbackTriggerLastResort,
+	}
+	for _, trigger := range triggers {
+		data := map[string]any{
+			"type":           "system",
+			"subtype":        "model_fallback",
+			"trigger":        string(trigger),
+			"model":          "claude-sonnet-4-6",
+			"original_model": "claude-opus-4-8",
+		}
+		msg, err := ParseMessage(data)
+		if err != nil {
+			t.Fatalf("trigger %q: unexpected error: %v", trigger, err)
+		}
+		mf, ok := msg.(*ModelFallbackMessage)
+		if !ok {
+			t.Fatalf("trigger %q: expected *ModelFallbackMessage, got %T", trigger, msg)
+		}
+		if mf.Trigger != trigger {
+			t.Errorf("trigger %q: Trigger = %q, want %q", trigger, mf.Trigger, trigger)
+		}
+		if mf.Model != "claude-sonnet-4-6" {
+			t.Errorf("trigger %q: Model = %q, want claude-sonnet-4-6", trigger, mf.Model)
+		}
+		if mf.OriginalModel != "claude-opus-4-8" {
+			t.Errorf("trigger %q: OriginalModel = %q, want claude-opus-4-8", trigger, mf.OriginalModel)
+		}
+		// Should also satisfy Message interface
+		var _ Message = mf
+	}
+}
+
+func TestParseMessage_ModelFallback_MissingFields(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "model_fallback",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	mf, ok := msg.(*ModelFallbackMessage)
+	if !ok {
+		t.Fatalf("expected *ModelFallbackMessage, got %T", msg)
+	}
+	if mf.Trigger != "" {
+		t.Errorf("Trigger = %q, want empty", mf.Trigger)
+	}
+	if mf.Model != "" {
+		t.Errorf("Model = %q, want empty", mf.Model)
+	}
+	if mf.OriginalModel != "" {
+		t.Errorf("OriginalModel = %q, want empty", mf.OriginalModel)
+	}
+}

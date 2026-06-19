@@ -373,6 +373,36 @@ type MirrorErrorMessage struct {
 	SessionID string      `json:"session_id,omitempty"`
 }
 
+// ModelFallbackTrigger is the reason the CLI automatically switched to a
+// fallback model. Port of TypeScript SDK v0.3.174.
+type ModelFallbackTrigger string
+
+const (
+	// ModelFallbackTriggerModelNotFound is set when the requested model was not found.
+	ModelFallbackTriggerModelNotFound ModelFallbackTrigger = "model_not_found"
+	// ModelFallbackTriggerPermissionDenied is set when the model was denied by policy.
+	ModelFallbackTriggerPermissionDenied ModelFallbackTrigger = "permission_denied"
+	// ModelFallbackTriggerOverloaded is set when the model was overloaded.
+	ModelFallbackTriggerOverloaded ModelFallbackTrigger = "overloaded"
+	// ModelFallbackTriggerServerError is set when the model returned a server error.
+	ModelFallbackTriggerServerError ModelFallbackTrigger = "server_error"
+	// ModelFallbackTriggerLastResort is set when all preferred models failed.
+	ModelFallbackTriggerLastResort ModelFallbackTrigger = "last_resort"
+)
+
+// ModelFallbackMessage is emitted when the CLI automatically switches to a
+// fallback model. SDK consumers receive this for all fallback triggers.
+// Port of TypeScript SDK v0.3.174.
+type ModelFallbackMessage struct {
+	SystemMessage
+	// Trigger is the reason the model switch occurred.
+	Trigger ModelFallbackTrigger `json:"trigger,omitempty"`
+	// Model is the fallback model that was selected.
+	Model string `json:"model,omitempty"`
+	// OriginalModel is the model that was originally requested.
+	OriginalModel string `json:"original_model,omitempty"`
+}
+
 // ApiRetryError represents the machine-readable error category on [ApiRetryMessage].
 type ApiRetryError string
 
