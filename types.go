@@ -210,6 +210,57 @@ const (
 	TaskNotificationStatusStopped   TaskNotificationStatus = "stopped"
 )
 
+// TaskUpdatedStatus represents the status of a task in a task_updated event.
+// Port of Python SDK PR anthropics/claude-agent-sdk-python#1016.
+type TaskUpdatedStatus string
+
+const (
+	TaskUpdatedStatusPending   TaskUpdatedStatus = "pending"
+	TaskUpdatedStatusRunning   TaskUpdatedStatus = "running"
+	TaskUpdatedStatusPaused    TaskUpdatedStatus = "paused"
+	TaskUpdatedStatusCompleted TaskUpdatedStatus = "completed"
+	TaskUpdatedStatusFailed    TaskUpdatedStatus = "failed"
+	TaskUpdatedStatusKilled    TaskUpdatedStatus = "killed"
+)
+
+// TerminalTaskStatuses is the set of task statuses that indicate a task has
+// finished. It spans both task_updated ("killed") and task_notification
+// ("stopped") vocabularies so consumers can use a single check.
+// Port of Python SDK PR anthropics/claude-agent-sdk-python#1016.
+var TerminalTaskStatuses = map[TaskUpdatedStatus]bool{
+	TaskUpdatedStatusCompleted: true,
+	TaskUpdatedStatusFailed:    true,
+	TaskUpdatedStatusKilled:    true,
+	"stopped":                  true, // task_notification vocabulary
+}
+
+// TaskUpdatedMessage is emitted when a background task's state changes.
+// The CLI emits system/task_updated events as a task moves through its lifecycle.
+// Patch carries the changed fields (e.g. status, end_time). When
+// Patch["status"] is terminal (see TerminalTaskStatuses) the task has finished.
+//
+// Lifecycle note: a background task's terminal state can arrive *only* as a
+// TaskUpdatedMessage with no accompanying TaskNotificationMessage — for example
+// a task stopped via TaskStop reports status="killed" here. Consumers that
+// track active task IDs should clear them on a terminal status from either
+// TaskNotificationMessage or TaskUpdatedMessage.
+//
+// Port of Python SDK PR anthropics/claude-agent-sdk-python#1016.
+type TaskUpdatedMessage struct {
+	SystemMessage
+	// TaskID is the identifier of the updated task.
+	TaskID string `json:"task_id"`
+	// Patch contains the changed fields from the task state update.
+	Patch map[string]any `json:"patch"`
+	// Status is the new task status extracted from Patch["status"].
+	// Empty when patch is absent or has no status field.
+	Status TaskUpdatedStatus `json:"status,omitempty"`
+	// SessionID is the session this update belongs to.
+	SessionID string `json:"session_id,omitempty"`
+	// UUID uniquely identifies this message.
+	UUID string `json:"uuid,omitempty"`
+}
+
 // TaskStartedMessage is emitted when a task starts.
 type TaskStartedMessage struct {
 	SystemMessage
