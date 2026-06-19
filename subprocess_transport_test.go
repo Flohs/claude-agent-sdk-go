@@ -579,6 +579,45 @@ func TestBuildCommand_ThinkingDisplay(t *testing.T) {
 	})
 }
 
+func TestBuildCommand_Plugin_SkipMcpDiscovery(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			Plugins: []SdkPluginConfig{
+				{Type: "local", Path: "/plugins/my-plugin", SkipMcpDiscovery: true},
+			},
+		},
+	}
+	cmd := transport.buildCommand()
+	// Should use --plugin-dir-no-mcp instead of --plugin-dir
+	args := strings.Join(cmd, " ")
+	if !strings.Contains(args, "--plugin-dir-no-mcp /plugins/my-plugin") {
+		t.Errorf("expected --plugin-dir-no-mcp, got: %s", args)
+	}
+	if strings.Contains(args, "--plugin-dir /plugins/my-plugin") {
+		t.Errorf("should not have --plugin-dir when SkipMcpDiscovery=true, got: %s", args)
+	}
+}
+
+func TestBuildCommand_Plugin_NoSkipMcpDiscovery(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			Plugins: []SdkPluginConfig{
+				{Type: "local", Path: "/plugins/my-plugin", SkipMcpDiscovery: false},
+			},
+		},
+	}
+	cmd := transport.buildCommand()
+	args := strings.Join(cmd, " ")
+	if !strings.Contains(args, "--plugin-dir /plugins/my-plugin") {
+		t.Errorf("expected --plugin-dir, got: %s", args)
+	}
+	if strings.Contains(args, "--plugin-dir-no-mcp") {
+		t.Errorf("should not have --plugin-dir-no-mcp when SkipMcpDiscovery=false, got: %s", args)
+	}
+}
+
 func TestBuildCommand_AgentProgressSummaries(t *testing.T) {
 	t.Run("false omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{cliPath: "claude", options: &Options{}}
