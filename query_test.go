@@ -730,3 +730,70 @@ func TestWarmQuery_Close_Idempotent(t *testing.T) {
 		t.Fatal("WarmQuery.Close did not return within 5 seconds")
 	}
 }
+
+func TestReadMessages_ResultForwardedBeforeFirstResultSignal(t *testing.T) {
+	// Verifies that q.firstResultCh is closed AFTER the result message is
+	// put on messageCh, so waitForResultAndEndInput cannot call EndInput
+	// before block-feedback messages are accessible to consumers.
+	mt := newMockTransport()
+	q := newQuery(queryConfig{
+		transport: mt,
+		hooks: map[HookEvent][]HookMatcher{
+			HookEventUserPromptSubmit: {
+				{
+					Matcher: "",
+					Hooks: []HookCallback{
+						func(ctx context.Context, input HookInput, toolUseID string, hctx HookContext) (HookJSONOutput, error) {
+							return HookJSONOutput{"decision": "block", "reason": "blocked"}, nil
+						},
+					},
+				},
+			},
+		},
+	})
+	q.start()
+
+	// Feed a result message (simulating the CLI's block-feedback result)
+	resultMsg := map[string]any{
+		"type":     "result",
+		"is_error": true,
+	}
+
+	// Drain messageCh in the background so sends don't block.
+	// Capture whether a "result" message arrived before firstResultCh closes.
+	resultInCh := make(chan struct{})
+	go func() {
+		for msg := range q.messageCh {
+			if tp, _ := msg["type"].(string); tp == "result" {
+				// Signal that the result reached the consumer channel.
+				select {
+				case <-resultInCh:
+				default:
+					close(resultInCh)
+				}
+			}
+		}
+	}()
+
+	// Inject the result message, then close the transport so readMessages exits.
+	mt.messages <- resultMsg
+	_ = mt.Close()
+
+	// The result should appear in messageCh before we check firstResultCh.
+	select {
+	case <-resultInCh:
+		// good - message reached consumer
+	case <-time.After(time.Second):
+		t.Fatal("result message did not reach messageCh within 1s")
+	}
+
+	// firstResultCh should be closed now (signal comes after message forwarding).
+	select {
+	case <-q.firstResultCh:
+		// good
+	case <-time.After(time.Second):
+		t.Fatal("firstResultCh not closed after result message was forwarded")
+	}
+
+	_ = q.close()
+}
