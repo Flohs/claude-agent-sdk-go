@@ -809,6 +809,14 @@ func (t *SubprocessTransport) buildCommand() []string {
 		}
 	}
 
+	// Tool config
+	if opts.ToolConfig != nil {
+		data, err := json.Marshal(opts.ToolConfig)
+		if err == nil && string(data) != "{}" && string(data) != "null" {
+			cmd = append(cmd, "--tool-config", string(data))
+		}
+	}
+
 	// Always use streaming mode
 	cmd = append(cmd, "--input-format", "stream-json")
 
