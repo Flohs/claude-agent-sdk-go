@@ -125,6 +125,22 @@ type AdvisorToolConfig struct {
 	AllowedCallers []string `json:"allowed_callers,omitempty"`
 }
 
+// AskUserQuestionToolConfig configures the AskUserQuestion built-in tool.
+// Port of TypeScript SDK v0.2.69.
+type AskUserQuestionToolConfig struct {
+	// PreviewFormat sets the content format used for the preview field.
+	// Typical values: "markdown", "text".
+	PreviewFormat string `json:"previewFormat,omitempty"`
+}
+
+// BuiltinToolConfig configures individual built-in tools. Pass a pointer to
+// Options.ToolConfig to enable per-tool configuration.
+// Port of TypeScript SDK v0.2.69.
+type BuiltinToolConfig struct {
+	// AskUserQuestion configures the AskUserQuestion tool.
+	AskUserQuestion *AskUserQuestionToolConfig `json:"askUserQuestion,omitempty"`
+}
+
 // AgentDefinition is an agent definition configuration.
 type AgentDefinition struct {
 	Description     string   `json:"description"`
@@ -390,6 +406,10 @@ type Options struct {
 	Effort Effort
 	// OutputFormat configures structured output format.
 	OutputFormat map[string]any
+	// ToolConfig configures individual built-in tools. Currently supports
+	// AskUserQuestion.PreviewFormat to control the content format of the
+	// preview field. Port of TypeScript SDK v0.2.69.
+	ToolConfig *BuiltinToolConfig
 	// EnableFileCheckpointing enables file change tracking for rewind support.
 	EnableFileCheckpointing bool
 	// TraceParent is the W3C `traceparent` header value to propagate to the
