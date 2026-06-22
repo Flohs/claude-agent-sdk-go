@@ -167,9 +167,9 @@ func (c *Client) SendQueryWithContent(ctx context.Context, content any) error {
 		return &ConnectionError{SDKError: SDKError{Message: "Transport is not ready. The subprocess may have exited."}}
 	}
 
-	switch content.(type) {
+	switch v := content.(type) {
 	case string:
-		// ok
+		content = escapeSlashCommand(v)
 	case []any:
 		// ok
 	default:

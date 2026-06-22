@@ -44,6 +44,17 @@ import (
 	"os"
 )
 
+// escapeSlashCommand prefixes a leading slash-followed-by-whitespace with a
+// space so the CLI treats the input as a plain text prompt rather than an
+// (invalid) slash command. E.g. "/ add tests" → " / add tests".
+// Port of TypeScript SDK v0.3.172.
+func escapeSlashCommand(s string) string {
+	if len(s) >= 2 && s[0] == '/' && (s[1] == ' ' || s[1] == '\t') {
+		return " " + s
+	}
+	return s
+}
+
 // Query sends a one-shot prompt to Claude Code and returns messages via channel.
 //
 // This is the simplest way to interact with Claude Code. For interactive
@@ -121,7 +132,7 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 		userMessage := map[string]any{
 			"type":               "user",
 			"session_id":         "",
-			"message":            map[string]any{"role": "user", "content": prompt},
+			"message":            map[string]any{"role": "user", "content": escapeSlashCommand(prompt)},
 			"parent_tool_use_id": nil,
 		}
 		data, _ := json.Marshal(userMessage)
@@ -194,7 +205,7 @@ func (w *WarmQuery) Query(ctx context.Context, prompt string) (<-chan Message, <
 		userMessage := map[string]any{
 			"type":               "user",
 			"session_id":         "",
-			"message":            map[string]any{"role": "user", "content": prompt},
+			"message":            map[string]any{"role": "user", "content": escapeSlashCommand(prompt)},
 			"parent_tool_use_id": nil,
 		}
 		data, _ := json.Marshal(userMessage)
