@@ -1,24 +1,28 @@
 package claude
 
-// Model string constants for use with Options.Model.
-// Callers may also pass any valid model identifier string directly.
+// Model is a Claude model identifier string for use with Options.Model.
+// Both full model IDs (e.g. ModelFable5) and short aliases (e.g. ModelFable)
+// are accepted by the CLI's --model flag.
+// Port of TypeScript SDK v0.3.170.
+type Model = string
+
 const (
 	// ModelFable5 is the full identifier for Claude Fable 5.
-	ModelFable5 = "claude-fable-5"
-	// ModelFable is the short alias for claude-fable-5.
-	ModelFable = "fable"
+	ModelFable5 Model = "claude-fable-5"
+	// ModelFable is the short alias for Claude Fable 5.
+	ModelFable Model = "fable"
 	// ModelOpus48 is the full identifier for Claude Opus 4.8.
-	ModelOpus48 = "claude-opus-4-8"
+	ModelOpus48 Model = "claude-opus-4-8"
 	// ModelOpus is the short alias for Opus.
-	ModelOpus = "opus"
+	ModelOpus Model = "opus"
 	// ModelSonnet46 is the full identifier for Claude Sonnet 4.6.
-	ModelSonnet46 = "claude-sonnet-4-6"
+	ModelSonnet46 Model = "claude-sonnet-4-6"
 	// ModelSonnet is the short alias for Sonnet.
-	ModelSonnet = "sonnet"
+	ModelSonnet Model = "sonnet"
 	// ModelHaiku45 is the full identifier for Claude Haiku 4.5.
-	ModelHaiku45 = "claude-haiku-4-5-20251001"
+	ModelHaiku45 Model = "claude-haiku-4-5-20251001"
 	// ModelHaiku is the short alias for Haiku.
-	ModelHaiku = "haiku"
+	ModelHaiku Model = "haiku"
 )
 
 // PermissionMode controls tool execution permissions.
@@ -81,25 +85,6 @@ const (
 // interchangeable in all contexts.
 type EffortLevel = Effort
 
-// Model is a Claude model identifier string for use with Options.Model.
-// Both full model IDs (e.g. ModelFable5) and short aliases (e.g. ModelFable)
-// are accepted by the CLI's --model flag.
-type Model = string
-
-const (
-	// ModelSonnet is the short alias for the latest Claude Sonnet model.
-	ModelSonnet Model = "sonnet"
-	// ModelOpus is the short alias for the latest Claude Opus model.
-	ModelOpus Model = "opus"
-	// ModelHaiku is the short alias for the latest Claude Haiku model.
-	ModelHaiku Model = "haiku"
-	// ModelFable is the short alias for Claude Fable 5.
-	// Port of TypeScript SDK v0.3.170.
-	ModelFable Model = "fable"
-	// ModelFable5 is the full model identifier for Claude Fable 5.
-	// Port of TypeScript SDK v0.3.170.
-	ModelFable5 Model = "claude-fable-5"
-)
 
 // SystemPrompt is the interface for system prompt configuration.
 type SystemPrompt interface {
