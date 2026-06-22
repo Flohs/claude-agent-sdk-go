@@ -553,6 +553,36 @@ type WorkerShuttingDownMessage struct {
 	Reason string `json:"reason,omitempty"`
 }
 
+// PermissionDeniedAdvisoryReason is the machine-readable reason a tool call
+// was denied in a permission_denied_advisory system message.
+// Port of TypeScript SDK v0.3.178.
+type PermissionDeniedAdvisoryReason string
+
+const (
+	// PermissionDeniedAdvisoryReasonSafetyCheck is set when the denial was
+	// triggered by a safety-check policy.
+	PermissionDeniedAdvisoryReasonSafetyCheck PermissionDeniedAdvisoryReason = "safetyCheck"
+	// PermissionDeniedAdvisoryReasonAsyncAgent is set when the denial was
+	// triggered because the tool was called from an async agent context that
+	// does not allow the operation.
+	PermissionDeniedAdvisoryReasonAsyncAgent PermissionDeniedAdvisoryReason = "asyncAgent"
+)
+
+// PermissionDeniedAdvisoryMessage is emitted when a tool call is denied and
+// the CLI sends an advisory notification. The DenialReason field lets
+// consumers programmatically distinguish safety-policy denials from
+// async-agent context denials without inspecting raw JSON.
+// Port of TypeScript SDK v0.3.178.
+type PermissionDeniedAdvisoryMessage struct {
+	SystemMessage
+	// ToolName is the name of the tool that was denied.
+	ToolName string `json:"tool_name,omitempty"`
+	// DenialReason is the machine-readable reason for the denial.
+	// One of PermissionDeniedAdvisoryReasonSafetyCheck or
+	// PermissionDeniedAdvisoryReasonAsyncAgent when provided by the CLI.
+	DenialReason PermissionDeniedAdvisoryReason `json:"denial_reason,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 
