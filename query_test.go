@@ -102,17 +102,17 @@ func TestWaitForResultAndEndInput_WithMcpServers_WaitsForResult(t *testing.T) {
 		t.Fatal("EndInput should not be called before first result")
 	}
 
-	// Signal first result
-	q.firstResultOnce.Do(func() { close(q.firstResultCh) })
+	// Signal main-session result (empty origin).
+	q.mainResultOnce.Do(func() { close(q.mainResultCh) })
 
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Fatal("waitForResultAndEndInput did not return after first result")
+		t.Fatal("waitForResultAndEndInput did not return after main-session result")
 	}
 
 	if !mt.getEndInputCalled() {
-		t.Fatal("expected EndInput to be called after first result")
+		t.Fatal("expected EndInput to be called after main-session result")
 	}
 }
 
@@ -147,17 +147,17 @@ func TestWaitForResultAndEndInput_WithHooks_WaitsForResult(t *testing.T) {
 		t.Fatal("EndInput should not be called before first result when hooks are configured")
 	}
 
-	// Signal first result
-	q.firstResultOnce.Do(func() { close(q.firstResultCh) })
+	// Signal main-session result (empty origin).
+	q.mainResultOnce.Do(func() { close(q.mainResultCh) })
 
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Fatal("waitForResultAndEndInput did not return after first result")
+		t.Fatal("waitForResultAndEndInput did not return after main-session result")
 	}
 
 	if !mt.getEndInputCalled() {
-		t.Fatal("expected EndInput to be called after first result")
+		t.Fatal("expected EndInput to be called after main-session result")
 	}
 }
 
@@ -221,13 +221,13 @@ func TestStreamInput_UsesWaitForResultAndEndInput(t *testing.T) {
 		t.Fatal("streamInput should wait for first result before calling EndInput")
 	}
 
-	// Signal first result
-	q.firstResultOnce.Do(func() { close(q.firstResultCh) })
+	// Signal main-session result (empty origin).
+	q.mainResultOnce.Do(func() { close(q.mainResultCh) })
 
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Fatal("streamInput did not complete after first result")
+		t.Fatal("streamInput did not complete after main-session result")
 	}
 
 	if !mt.getEndInputCalled() {
@@ -239,6 +239,51 @@ func TestStreamInput_UsesWaitForResultAndEndInput(t *testing.T) {
 	defer mt.mu.Unlock()
 	if len(mt.written) == 0 {
 		t.Fatal("expected at least one message to be written")
+	}
+}
+
+func TestWaitForResultAndEndInput_BackgroundAgentResultDoesNotTriggerEndInput(t *testing.T) {
+	// A result with non-empty origin (background agent) must not unblock
+	// waitForResultAndEndInput — only the main-session result (empty origin) should.
+	mt := newMockTransport()
+	q := newQuery(queryConfig{
+		transport: mt,
+		mcpServers: map[string]*McpSdkServerConfig{
+			"test-server": {Name: "test"},
+		},
+	})
+
+	done := make(chan struct{})
+	go func() {
+		q.waitForResultAndEndInput()
+		close(done)
+	}()
+
+	// Signal that a background-agent result arrived (non-empty origin).
+	// firstResultCh closes, but mainResultCh must stay open.
+	q.firstResultOnce.Do(func() { close(q.firstResultCh) })
+
+	// waitForResultAndEndInput must still be blocked.
+	time.Sleep(50 * time.Millisecond)
+	select {
+	case <-done:
+		t.Fatal("waitForResultAndEndInput returned after background-agent result; should still be waiting")
+	default:
+	}
+	if mt.getEndInputCalled() {
+		t.Fatal("EndInput must not be called on background-agent result")
+	}
+
+	// Now signal the main-session result.
+	q.mainResultOnce.Do(func() { close(q.mainResultCh) })
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("waitForResultAndEndInput did not return after main-session result")
+	}
+	if !mt.getEndInputCalled() {
+		t.Fatal("expected EndInput to be called after main-session result")
 	}
 }
 
