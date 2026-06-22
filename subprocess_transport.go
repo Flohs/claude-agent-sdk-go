@@ -607,7 +607,7 @@ func (t *SubprocessTransport) buildCommand() []string {
 	}
 
 	if len(opts.DisallowedTools) > 0 {
-		cmd = append(cmd, "--disallowedTools", strings.Join(opts.DisallowedTools, ","))
+		cmd = append(cmd, "--disallowedTools", strings.Join(normaliseDisallowedTools(opts.DisallowedTools), ","))
 	}
 
 	if opts.Model != "" {
@@ -813,6 +813,27 @@ func (t *SubprocessTransport) buildCommand() []string {
 	cmd = append(cmd, "--input-format", "stream-json")
 
 	return cmd
+}
+
+// normaliseDisallowedTools expands server-level MCP disallow specs to
+// the explicit wildcard form. "mcp__server" (one __ pair) becomes
+// "mcp__server__*" so the CLI correctly denies all tools from the named
+// server. Tool-level specs ("mcp__server__tool") and non-MCP names are
+// passed through unchanged.
+// Port of TypeScript SDK v0.3.178.
+func normaliseDisallowedTools(tools []string) []string {
+	out := make([]string, len(tools))
+	for i, t := range tools {
+		// A server-level spec starts with "mcp__" and has exactly one double-
+		// underscore separator (mcp__servername). Tool-level specs have two
+		// (mcp__servername__toolname) or already end in __*.
+		if strings.HasPrefix(t, "mcp__") && strings.Count(t, "__") == 1 {
+			out[i] = t + "__*"
+		} else {
+			out[i] = t
+		}
+	}
+	return out
 }
 
 func (t *SubprocessTransport) buildSettingsValue() string {
