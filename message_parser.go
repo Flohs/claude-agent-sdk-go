@@ -266,6 +266,14 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Result:        result,
 		}, nil
 
+	case "worker_shutting_down":
+		return &WorkerShuttingDownMessage{
+			SystemMessage: base,
+			Reason:        stringField(data, "reason"),
+			UUID:          stringField(data, "uuid"),
+			SessionID:     stringField(data, "session_id"),
+		}, nil
+
 	default:
 		return &base, nil
 	}

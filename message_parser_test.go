@@ -1204,3 +1204,48 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 		t.Errorf("expected StopDetails type 'refusal', got %v", am.StopDetails["type"])
 	}
 }
+
+func TestParseSystemMessage_WorkerShuttingDown(t *testing.T) {
+	raw := map[string]any{
+		"type":       "system",
+		"subtype":    "worker_shutting_down",
+		"reason":     "idle timeout",
+		"uuid":       "uuid-wsd-1",
+		"session_id": "sess-wsd-1",
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	wsd, ok := msg.(*WorkerShuttingDownMessage)
+	if !ok {
+		t.Fatalf("expected *WorkerShuttingDownMessage, got %T", msg)
+	}
+	if wsd.Reason != "idle timeout" {
+		t.Errorf("expected Reason 'idle timeout', got %q", wsd.Reason)
+	}
+	if wsd.UUID != "uuid-wsd-1" {
+		t.Errorf("expected UUID 'uuid-wsd-1', got %q", wsd.UUID)
+	}
+	if wsd.SessionID != "sess-wsd-1" {
+		t.Errorf("expected SessionID 'sess-wsd-1', got %q", wsd.SessionID)
+	}
+}
+
+func TestParseSystemMessage_WorkerShuttingDown_NoReason(t *testing.T) {
+	raw := map[string]any{
+		"type":    "system",
+		"subtype": "worker_shutting_down",
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	wsd, ok := msg.(*WorkerShuttingDownMessage)
+	if !ok {
+		t.Fatalf("expected *WorkerShuttingDownMessage, got %T", msg)
+	}
+	if wsd.Reason != "" {
+		t.Errorf("expected empty Reason, got %q", wsd.Reason)
+	}
+}
