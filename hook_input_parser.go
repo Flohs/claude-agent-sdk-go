@@ -182,6 +182,7 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			ToolInput:     mapField(input, "tool_input"),
 			ToolUseID:     stringField(input, "tool_use_id"),
 			Reason:        stringField(input, "reason"),
+			DenialReason:  DenialReason(stringField(input, "denial_reason")),
 		}, nil
 
 	case HookEventElicitationResult:

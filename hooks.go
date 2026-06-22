@@ -381,6 +381,8 @@ type PermissionDeniedHookInput struct {
 	ToolUseID string `json:"tool_use_id"`
 	// Reason is the human-readable reason for the denial.
 	Reason string `json:"reason"`
+	// DenialReason is the machine-readable denial category.
+	DenialReason DenialReason `json:"denial_reason,omitempty"`
 }
 
 func (*PermissionDeniedHookInput) hookInputMarker() {}

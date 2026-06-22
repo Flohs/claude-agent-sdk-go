@@ -2,6 +2,17 @@ package claude
 
 import "context"
 
+// DenialReason is the machine-readable reason why a tool call was denied.
+type DenialReason string
+
+const (
+	// DenialReasonSafetyCheck means the tool call was blocked by a safety check.
+	DenialReasonSafetyCheck DenialReason = "safetyCheck"
+	// DenialReasonAsyncAgent means the tool call was blocked because it was
+	// made by an async agent that lacks permission to use the tool.
+	DenialReasonAsyncAgent DenialReason = "asyncAgent"
+)
+
 // PermissionBehavior represents the behavior of a permission rule.
 type PermissionBehavior string
 
