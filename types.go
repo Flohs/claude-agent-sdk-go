@@ -440,6 +440,36 @@ type MirrorErrorMessage struct {
 	SessionID string      `json:"session_id,omitempty"`
 }
 
+// ModelFallbackTrigger is the reason why the CLI fell back to a different model.
+// Port of TypeScript SDK v0.3.174.
+type ModelFallbackTrigger string
+
+const (
+	// ModelFallbackTriggerModelNotFound is set when the requested model was not found.
+	ModelFallbackTriggerModelNotFound ModelFallbackTrigger = "model_not_found"
+	// ModelFallbackTriggerPermissionDenied is set when the model was denied by policy.
+	ModelFallbackTriggerPermissionDenied ModelFallbackTrigger = "permission_denied"
+	// ModelFallbackTriggerOverloaded is set when the model was overloaded.
+	ModelFallbackTriggerOverloaded ModelFallbackTrigger = "overloaded"
+	// ModelFallbackTriggerServerError is set when the model returned a server error.
+	ModelFallbackTriggerServerError ModelFallbackTrigger = "server_error"
+	// ModelFallbackTriggerLastResort is set when all preferred models failed and the CLI chose a last-resort fallback.
+	ModelFallbackTriggerLastResort ModelFallbackTrigger = "last_resort"
+)
+
+// ModelFallbackMessage is emitted when the CLI falls back to a different model.
+// Received for all fallback triggers: model_not_found, permission_denied,
+// overloaded, server_error, and last_resort. Port of TypeScript SDK v0.3.174.
+type ModelFallbackMessage struct {
+	SystemMessage
+	// Trigger is the reason the model fallback occurred.
+	Trigger ModelFallbackTrigger `json:"trigger,omitempty"`
+	// Model is the fallback model that was selected.
+	Model string `json:"model,omitempty"`
+	// OriginalModel is the model that was originally requested.
+	OriginalModel string `json:"original_model,omitempty"`
+}
+
 // HookEventMessage is a system message emitted for hook lifecycle events when
 // Options.IncludeHookEvents is true. Subtypes: "hook_started", "hook_response".
 // Port of Python SDK PR anthropics/claude-agent-sdk-python#917.

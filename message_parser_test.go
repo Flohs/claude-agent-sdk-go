@@ -1322,3 +1322,47 @@ func TestParseMessage_HookEventMessage_ImplementsSystemMessage(t *testing.T) {
 	// Verify it satisfies the Message interface.
 	var _ Message = he
 }
+
+func TestParseSystemMessage_ModelFallback(t *testing.T) {
+	tests := []struct {
+		name    string
+		trigger string
+		want    ModelFallbackTrigger
+	}{
+		{"model_not_found", "model_not_found", ModelFallbackTriggerModelNotFound},
+		{"permission_denied", "permission_denied", ModelFallbackTriggerPermissionDenied},
+		{"overloaded", "overloaded", ModelFallbackTriggerOverloaded},
+		{"server_error", "server_error", ModelFallbackTriggerServerError},
+		{"last_resort", "last_resort", ModelFallbackTriggerLastResort},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := map[string]any{
+				"type":           "system",
+				"subtype":        "model_fallback",
+				"trigger":        tt.trigger,
+				"model":          "claude-sonnet-4-6",
+				"original_model": "claude-fable-5",
+				"session_id":     "sess1",
+				"uuid":           "uuid1",
+			}
+			msg, err := ParseMessage(data)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			mf, ok := msg.(*ModelFallbackMessage)
+			if !ok {
+				t.Fatalf("expected *ModelFallbackMessage, got %T", msg)
+			}
+			if mf.Trigger != tt.want {
+				t.Errorf("Trigger: got %q, want %q", mf.Trigger, tt.want)
+			}
+			if mf.Model != "claude-sonnet-4-6" {
+				t.Errorf("Model: got %q, want %q", mf.Model, "claude-sonnet-4-6")
+			}
+			if mf.OriginalModel != "claude-fable-5" {
+				t.Errorf("OriginalModel: got %q, want %q", mf.OriginalModel, "claude-fable-5")
+			}
+		})
+	}
+}
