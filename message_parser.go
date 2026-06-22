@@ -201,6 +201,20 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 		}
 		return msg, nil
 
+	case "task_updated":
+		var patch map[string]any
+		if p, ok := data["patch"].(map[string]any); ok {
+			patch = p
+		}
+		return &TaskUpdatedMessage{
+			SystemMessage: base,
+			TaskID:        stringField(data, "task_id"),
+			Status:        TaskUpdatedStatus(stringField(data, "status")),
+			Patch:         patch,
+			UUID:          stringField(data, "uuid"),
+			SessionID:     stringField(data, "session_id"),
+		}, nil
+
 	case "task_notification":
 		var usage *TaskUsage
 		if u := data["usage"]; u != nil {

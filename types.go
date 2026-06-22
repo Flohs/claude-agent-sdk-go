@@ -210,6 +210,45 @@ const (
 	TaskNotificationStatusStopped   TaskNotificationStatus = "stopped"
 )
 
+// TaskUpdatedStatus represents the lifecycle state reported in a task_updated system message.
+type TaskUpdatedStatus string
+
+const (
+	TaskUpdatedStatusPending    TaskUpdatedStatus = "pending"
+	TaskUpdatedStatusInProgress TaskUpdatedStatus = "in_progress"
+	TaskUpdatedStatusCompleted  TaskUpdatedStatus = "completed"
+	TaskUpdatedStatusFailed     TaskUpdatedStatus = "failed"
+	TaskUpdatedStatusStopped    TaskUpdatedStatus = "stopped"
+	TaskUpdatedStatusDeleted    TaskUpdatedStatus = "deleted"
+)
+
+// TerminalTaskStatuses is the set of [TaskUpdatedStatus] values that represent
+// a terminal (non-resumable) task state. Consumers tracking active background
+// tasks can use this to prune their bookkeeping when a task_updated message
+// arrives without a corresponding TaskNotificationMessage.
+// Port of Python SDK v0.2.101.
+var TerminalTaskStatuses = map[TaskUpdatedStatus]bool{
+	TaskUpdatedStatusCompleted: true,
+	TaskUpdatedStatusFailed:    true,
+	TaskUpdatedStatusStopped:   true,
+	TaskUpdatedStatusDeleted:   true,
+}
+
+// TaskUpdatedMessage is emitted when a background task transitions state. For
+// terminal statuses (completed, failed, stopped, deleted), see
+// [TerminalTaskStatuses]. Consumers that track active background tasks should
+// handle this message to avoid hanging when a task finishes without a
+// corresponding [TaskNotificationMessage]. Port of Python SDK v0.2.101.
+type TaskUpdatedMessage struct {
+	SystemMessage
+	TaskID    string            `json:"task_id"`
+	Status    TaskUpdatedStatus `json:"status"`
+	// Patch contains the changed fields on the task object.
+	Patch     map[string]any    `json:"patch,omitempty"`
+	UUID      string            `json:"uuid"`
+	SessionID string            `json:"session_id"`
+}
+
 // TaskStartedMessage is emitted when a task starts.
 type TaskStartedMessage struct {
 	SystemMessage
