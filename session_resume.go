@@ -140,6 +140,15 @@ func materializeResumeSession(ctx context.Context, opts *Options) (*materialized
 		}
 	}
 
+	// Restore in-flight background agent / remote agent / MCP task state by
+	// scanning the main transcript for task_started events that have no
+	// matching terminal task_notification entry.  Port of TypeScript SDK
+	// v0.3.176.
+	sessionDir := filepath.Join(projectDir, sessionID)
+	if err := materializeActiveTasks(entries, sessionDir); err != nil {
+		return nil, err
+	}
+
 	cleanupOnError = false
 	return &materializedResume{
 		configDir:       tempDir,
@@ -440,6 +449,138 @@ func materializeSubkeys(ctx context.Context, store SessionStore, subkeyer Sessio
 			if err := os.WriteFile(metaFile, metaJSON, 0o600); err != nil {
 				return fmt.Errorf("session_store resume: write metadata %s: %w", metaFile, err)
 			}
+		}
+	}
+	return nil
+}
+
+// activeTaskEntry holds the snapshot of a task_started transcript entry for
+// a task that was still in-flight when the session was interrupted.
+type activeTaskEntry struct {
+	taskID string
+	data   map[string]any
+}
+
+// detectActiveTasks scans a slice of main-transcript entries and returns
+// the task_started entries whose tasks had not yet reached a terminal state
+// (completed, failed, or stopped) at the time the session was interrupted.
+//
+// Terminal state indicators used:
+//   - type:"system", subtype:"task_notification" with status "completed",
+//     "failed", or "stopped"
+//   - type:"system", subtype:"task_updated" with status "completed",
+//     "failed", or "killed"
+//
+// Entries are processed in order; the last status wins if a task transitions
+// through multiple states.
+func detectActiveTasks(entries []SessionStoreEntry) []activeTaskEntry {
+	// started maps task_id → the task_started entry data.
+	started := make(map[string]map[string]any)
+	// terminated tracks task IDs that have reached a terminal state.
+	terminated := make(map[string]bool)
+
+	for _, e := range entries {
+		if e == nil {
+			continue
+		}
+		eType, _ := e["type"].(string)
+		if eType != "system" {
+			continue
+		}
+		subtype, _ := e["subtype"].(string)
+		switch subtype {
+		case "task_started":
+			taskID, _ := e["task_id"].(string)
+			if taskID == "" {
+				continue
+			}
+			// Re-start: if a task is restarted, treat as a fresh start.
+			delete(terminated, taskID)
+			// Copy the entry so callers cannot mutate our map.
+			snap := make(map[string]any, len(e))
+			for k, v := range e {
+				snap[k] = v
+			}
+			started[taskID] = snap
+
+		case "task_notification":
+			taskID, _ := e["task_id"].(string)
+			status, _ := e["status"].(string)
+			if taskID == "" {
+				continue
+			}
+			switch status {
+			case "completed", "failed", "stopped":
+				terminated[taskID] = true
+			}
+
+		case "task_updated":
+			taskID, _ := e["task_id"].(string)
+			status, _ := e["status"].(string)
+			if taskID == "" {
+				continue
+			}
+			switch status {
+			case "completed", "failed", "killed":
+				terminated[taskID] = true
+			}
+		}
+	}
+
+	var active []activeTaskEntry
+	for taskID, data := range started {
+		if !terminated[taskID] {
+			active = append(active, activeTaskEntry{taskID: taskID, data: data})
+		}
+	}
+	// Sort by task_id for deterministic output in tests and logs.
+	for i := 1; i < len(active); i++ {
+		j := i
+		for j > 0 && active[j].taskID < active[j-1].taskID {
+			active[j], active[j-1] = active[j-1], active[j]
+			j--
+		}
+	}
+	return active
+}
+
+// materializeActiveTasks writes a .meta.json sidecar for each still-active
+// task under sessionDir/tasks/<taskID>/.meta.json so the CLI can resume
+// tracking those tasks when it --resumes the session.
+//
+// The file layout mirrors the agent_metadata sidecar convention already used
+// by materializeSubkeys: a JSON object whose keys are the fields from the
+// original task_started entry (minus the synthetic "type" field).
+//
+// Port of TypeScript SDK v0.3.176: "Fixed background agent, remote agent,
+// and MCP task state not being restored when resuming a session via the SDK."
+func materializeActiveTasks(entries []SessionStoreEntry, sessionDir string) error {
+	active := detectActiveTasks(entries)
+	if len(active) == 0 {
+		return nil
+	}
+
+	for _, t := range active {
+		taskDir := filepath.Join(sessionDir, "tasks", t.taskID)
+		if err := os.MkdirAll(taskDir, 0o700); err != nil {
+			return fmt.Errorf("session_store resume: create task dir %s: %w", taskDir, err)
+		}
+		// Build the metadata object: drop the "type" field (synthetic) to
+		// match the agent_metadata sidecar convention.
+		meta := make(map[string]any, len(t.data))
+		for k, v := range t.data {
+			if k == "type" {
+				continue
+			}
+			meta[k] = v
+		}
+		metaJSON, err := json.Marshal(meta)
+		if err != nil {
+			return fmt.Errorf("session_store resume: marshal task metadata for %s: %w", t.taskID, err)
+		}
+		metaFile := filepath.Join(taskDir, ".meta.json")
+		if err := os.WriteFile(metaFile, metaJSON, 0o600); err != nil {
+			return fmt.Errorf("session_store resume: write task metadata %s: %w", metaFile, err)
 		}
 	}
 	return nil
