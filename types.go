@@ -178,12 +178,27 @@ type AssistantMessage struct {
 	// Timestamp is the ISO-8601 datetime when this message was recorded in the
 	// CLI transcript. Empty when not provided by the CLI.
 	Timestamp string `json:"timestamp,omitempty"`
+	// ToolUseMeta is an optional sidecar map keyed by tool_use_id with
+	// display-friendly metadata for each tool call. Nil when not provided by
+	// the CLI. Port of TypeScript SDK v0.3.179 / v0.3.181.
+	ToolUseMeta map[string]ToolUseMetaEntry `json:"tool_use_meta,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
 }
 
 func (AssistantMessage) messageMarker() {}
+
+// ToolUseMetaEntry is display metadata for a single tool call in the
+// [AssistantMessage.ToolUseMeta] sidecar. DisplayName is a human-readable
+// label; IconURL is populated from MCP server directory metadata when
+// available. Port of TypeScript SDK v0.3.179 / v0.3.181.
+type ToolUseMetaEntry struct {
+	// DisplayName is the human-readable label for the tool call.
+	DisplayName string `json:"displayName,omitempty"`
+	// IconURL is the URL of the tool's icon from MCP server directory metadata.
+	IconURL string `json:"icon_url,omitempty"`
+}
 
 // SystemMessage represents a system message with metadata.
 type SystemMessage struct {

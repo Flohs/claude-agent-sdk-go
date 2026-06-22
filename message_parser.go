@@ -135,9 +135,31 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		msg.StopDetails = sd
 	}
 
+	if raw, ok := data["tool_use_meta"].(map[string]any); ok {
+		msg.ToolUseMeta = parseToolUseMeta(raw)
+	}
+
 	msg.RawData = data
 
 	return msg, nil
+}
+
+func parseToolUseMeta(raw map[string]any) map[string]ToolUseMetaEntry {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make(map[string]ToolUseMetaEntry, len(raw))
+	for id, v := range raw {
+		m, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		out[id] = ToolUseMetaEntry{
+			DisplayName: stringField(m, "displayName"),
+			IconURL:     stringField(m, "icon_url"),
+		}
+	}
+	return out
 }
 
 func parseSystemMessage(data map[string]any) (Message, error) {
