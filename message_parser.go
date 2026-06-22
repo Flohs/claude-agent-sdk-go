@@ -321,6 +321,12 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			OriginalModel: stringField(data, "original_model"),
 		}, nil
 
+	case "worker_shutting_down":
+		return &WorkerShuttingDownMessage{
+			SystemMessage: base,
+			Reason:        stringField(data, "reason"),
+		}, nil
+
 	default:
 		return &base, nil
 	}
