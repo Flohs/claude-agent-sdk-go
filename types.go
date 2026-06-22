@@ -261,6 +261,54 @@ type TaskNotificationMessage struct {
 	TaskDescription string `json:"task_description,omitempty"`
 }
 
+// TaskUpdatedStatus represents the lifecycle status reported in a task_updated patch.
+// Port of Python SDK v0.2.101.
+type TaskUpdatedStatus string
+
+const (
+	TaskUpdatedStatusPending   TaskUpdatedStatus = "pending"
+	TaskUpdatedStatusRunning   TaskUpdatedStatus = "running"
+	TaskUpdatedStatusPaused    TaskUpdatedStatus = "paused"
+	TaskUpdatedStatusCompleted TaskUpdatedStatus = "completed"
+	TaskUpdatedStatusFailed    TaskUpdatedStatus = "failed"
+	TaskUpdatedStatusKilled    TaskUpdatedStatus = "killed"
+)
+
+// TerminalTaskStatuses is the set of [TaskUpdatedStatus] values that indicate
+// a task has finished. A background task may reach a terminal state only via a
+// task_updated message (with no accompanying TaskNotificationMessage); callers
+// tracking active tasks should check this set to avoid hanging.
+// Port of Python SDK v0.2.101.
+var TerminalTaskStatuses = map[TaskUpdatedStatus]bool{
+	TaskUpdatedStatusCompleted: true,
+	TaskUpdatedStatusFailed:    true,
+	TaskUpdatedStatusKilled:    true,
+	// "stopped" appears in TaskNotificationMessage.Status but may also surface
+	// in task_updated patches; include it for cross-vocabulary completeness.
+	"stopped": true,
+}
+
+// TaskUpdatedMessage is emitted as a system/task_updated event when a
+// background task's state changes. Background tasks may report a terminal
+// state only via this message — with no accompanying
+// [TaskNotificationMessage] — so consumers tracking active tasks must check
+// [TerminalTaskStatuses] on this message to avoid hanging.
+// Port of Python SDK v0.2.101.
+type TaskUpdatedMessage struct {
+	SystemMessage
+	// TaskID is the identifier of the task that changed.
+	TaskID string `json:"task_id"`
+	// Patch contains the changed fields (e.g. {"status": "completed"}).
+	Patch map[string]any `json:"patch"`
+	// Status is extracted from Patch["status"] for convenience. Empty when
+	// the patch does not contain a status change.
+	Status TaskUpdatedStatus `json:"status,omitempty"`
+	// SessionID is the session this event belongs to.
+	SessionID string `json:"session_id,omitempty"`
+	// UUID uniquely identifies this event.
+	UUID string `json:"uuid,omitempty"`
+}
+
 // TaskStatus represents the lifecycle state of a task managed by the Task tools.
 type TaskStatus string
 
