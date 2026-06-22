@@ -1038,6 +1038,29 @@ func (q *query) rewindFiles(userMessageID string) error {
 	return err
 }
 
+func (q *query) getUsageExperimental() (*UsageDataExperimental, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "get_usage",
+	}, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return &UsageDataExperimental{}, nil
+	}
+	result := &UsageDataExperimental{}
+	if v, ok := resp["total_cost_usd"].(float64); ok {
+		result.TotalCostUSD = &v
+	}
+	if v, ok := resp["plan_rate_limit"].(map[string]any); ok {
+		result.PlanRateLimit = v
+	}
+	if v, ok := resp["local_usage"].(map[string]any); ok {
+		result.LocalUsage = v
+	}
+	return result, nil
+}
+
 func (q *query) streamInput(inputCh <-chan map[string]any) {
 	for msg := range inputCh {
 		if q.closed {

@@ -482,6 +482,16 @@ func (c *Client) RewindFiles(ctx context.Context, userMessageID string) error {
 	return c.q.rewindFiles(userMessageID)
 }
 
+// GetUsageExperimental returns session cost, plan rate-limit, and local
+// usage-behavior data. The method name signals that the returned data shape
+// may change without notice. Port of TypeScript SDK v0.3.169. ([#350])
+func (c *Client) GetUsageExperimental(ctx context.Context) (*UsageDataExperimental, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getUsageExperimental()
+}
+
 // GetServerInfo returns server initialization info.
 func (c *Client) GetServerInfo() map[string]any {
 	if c.q == nil {
