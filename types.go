@@ -601,13 +601,16 @@ const (
 
 // RateLimitInfo contains detailed rate limit information.
 type RateLimitInfo struct {
-	Status                RateLimitStatus `json:"status"`
-	ResetsAt              *string         `json:"resets_at,omitempty"`
-	RateLimitType         *string         `json:"rate_limit_type,omitempty"`
-	Utilization           *float64        `json:"utilization,omitempty"`
-	OverageStatus         *string         `json:"overage_status,omitempty"`
-	OverageResetsAt       *string         `json:"overage_resets_at,omitempty"`
-	OverageDisabledReason *string         `json:"overage_disabled_reason,omitempty"`
+	Status                       RateLimitStatus `json:"status"`
+	ResetsAt                     *string         `json:"resets_at,omitempty"`
+	RateLimitType                *string         `json:"rate_limit_type,omitempty"`
+	Utilization                  *float64        `json:"utilization,omitempty"`
+	OverageStatus                *string         `json:"overage_status,omitempty"`
+	OverageResetsAt              *string         `json:"overage_resets_at,omitempty"`
+	OverageDisabledReason        *string         `json:"overage_disabled_reason,omitempty"`
+	ErrorCode                    *string         `json:"error_code,omitempty"`
+	CanUserPurchaseCredits       *bool           `json:"can_user_purchase_credits,omitempty"`
+	HasChargeableSavedPaymentMethod *bool        `json:"has_chargeable_saved_payment_method,omitempty"`
 }
 
 // RateLimitEvent represents a rate limit status change from the CLI.
