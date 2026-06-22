@@ -233,6 +233,20 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 				return &ConnectionError{SDKError: SDKError{Message: fmt.Sprintf("Working directory does not exist: %s", t.cwd)}}
 			}
 		}
+		// If the binary exists on disk but cannot execute, it is likely a
+		// libc mismatch (e.g. musl binary on a glibc host) or wrong architecture.
+		// Provide a diagnostic that points to Options.CLIPath. Port of TS SDK v0.3.178.
+		if _, statErr := os.Stat(t.cliPath); statErr == nil {
+			return &NotFoundError{
+				ConnectionError: ConnectionError{SDKError: SDKError{Message: fmt.Sprintf(
+					"Failed to execute Claude Code at %s: %v\n"+
+						"This may be caused by a libc mismatch (e.g. a musl-compiled binary "+
+						"running on a glibc host, or vice versa) or an incompatible architecture.\n"+
+						"Install a compatible binary or set Options.CLIPath to point to an alternative.",
+					t.cliPath, err)}},
+				CLIPath: t.cliPath,
+			}
+		}
 		return &NotFoundError{
 			ConnectionError: ConnectionError{SDKError: SDKError{Message: "Claude Code not found"}},
 			CLIPath:         t.cliPath,
