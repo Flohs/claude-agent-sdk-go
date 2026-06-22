@@ -447,6 +447,19 @@ func (c *Client) ToggleMcpServer(ctx context.Context, name string, enabled bool)
 	return c.q.toggleMcpServer(name, enabled)
 }
 
+// SetMcpServers updates the set of MCP servers available in the running session.
+// Servers included in the map are added or refreshed; servers omitted from the
+// map are disconnected. Builtin servers (e.g. "claude-in-chrome") can be added
+// even if the CLI was launched without them. SDK MCP servers with resources
+// correctly advertise the resources capability so that resource tools are
+// injected. Port of TypeScript SDK v0.3.163 and v0.3.166.
+func (c *Client) SetMcpServers(ctx context.Context, servers map[string]McpServerConfig) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.setMcpServers(servers)
+}
+
 // StopTask stops a running task.
 func (c *Client) StopTask(ctx context.Context, taskID string) error {
 	if c.q == nil {
