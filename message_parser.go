@@ -135,6 +135,19 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		msg.StopDetails = sd
 	}
 
+	if rawMeta, ok := data["tool_use_meta"].(map[string]any); ok {
+		meta := make(ToolUseMeta, len(rawMeta))
+		for id, v := range rawMeta {
+			if entry, ok := v.(map[string]any); ok {
+				meta[id] = ToolUseMetaEntry{
+					Name:    stringField(entry, "name"),
+					IconURL: stringField(entry, "icon_url"),
+				}
+			}
+		}
+		msg.ToolUseMeta = meta
+	}
+
 	msg.RawData = data
 
 	return msg, nil

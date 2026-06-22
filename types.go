@@ -152,6 +152,21 @@ const (
 	AssistantMessageErrorModelNotFound  AssistantMessageError = "model_not_found"
 )
 
+// ToolUseMetaEntry holds display-friendly metadata for a single tool call.
+// Port of TypeScript SDK v0.3.179.
+type ToolUseMetaEntry struct {
+	// Name is the human-readable display name for the tool call (e.g. the MCP
+	// tool's user-facing label instead of its wire name).
+	Name string `json:"name,omitempty"`
+	// IconURL is an optional icon URL sourced from the MCP server's directory
+	// metadata. Empty when not provided.
+	IconURL string `json:"icon_url,omitempty"`
+}
+
+// ToolUseMeta maps tool-use IDs to their display-friendly metadata.
+// Port of TypeScript SDK v0.3.179.
+type ToolUseMeta map[string]ToolUseMetaEntry
+
 // AssistantMessage represents an assistant message with content blocks.
 type AssistantMessage struct {
 	Content         []ContentBlock        `json:"content"`
@@ -178,6 +193,10 @@ type AssistantMessage struct {
 	// Timestamp is the ISO-8601 datetime when this message was recorded in the
 	// CLI transcript. Empty when not provided by the CLI.
 	Timestamp string `json:"timestamp,omitempty"`
+	// ToolUseMeta is an optional sidecar carrying display-friendly names and
+	// icon URLs for each tool call in Content, keyed by tool-use ID. Nil when
+	// not provided by the CLI. Port of TypeScript SDK v0.3.179.
+	ToolUseMeta ToolUseMeta `json:"tool_use_meta,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
