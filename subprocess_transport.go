@@ -711,6 +711,9 @@ func (t *SubprocessTransport) buildCommand() []string {
 	for _, plugin := range opts.Plugins {
 		if plugin.Type == "local" {
 			cmd = append(cmd, "--plugin-dir", plugin.Path)
+			if plugin.SkipMcpDiscovery {
+				cmd = append(cmd, "--plugin-skip-mcp-discovery", plugin.Path)
+			}
 		}
 	}
 
