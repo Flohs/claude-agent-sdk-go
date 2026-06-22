@@ -522,6 +522,18 @@ type RateLimitInfo struct {
 	OverageStatus         *string         `json:"overage_status,omitempty"`
 	OverageResetsAt       *string         `json:"overage_resets_at,omitempty"`
 	OverageDisabledReason *string         `json:"overage_disabled_reason,omitempty"`
+	// ErrorCode is the machine-readable rate-limit error code (e.g.
+	// "insufficient_credits"). Empty when not provided by the CLI.
+	// Port of TypeScript SDK v0.3.181.
+	ErrorCode string `json:"error_code,omitempty"`
+	// CanUserPurchaseCredits is true when the current user's plan allows
+	// purchasing additional credits to resolve the rate limit.
+	// Port of TypeScript SDK v0.3.181.
+	CanUserPurchaseCredits *bool `json:"can_user_purchase_credits,omitempty"`
+	// HasChargeableSavedPaymentMethod is true when the user has a payment
+	// method on file that can be charged immediately.
+	// Port of TypeScript SDK v0.3.181.
+	HasChargeableSavedPaymentMethod *bool `json:"has_chargeable_saved_payment_method,omitempty"`
 }
 
 // RateLimitEvent represents a rate limit status change from the CLI.

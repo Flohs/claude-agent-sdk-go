@@ -366,7 +366,18 @@ func parseRateLimitInfo(m map[string]any) RateLimitInfo {
 	if v, ok := m["utilization"].(float64); ok {
 		info.Utilization = &v
 	}
+	info.ErrorCode = stringField(m, "error_code")
+	info.CanUserPurchaseCredits = optionalBoolField(m, "can_user_purchase_credits")
+	info.HasChargeableSavedPaymentMethod = optionalBoolField(m, "has_chargeable_saved_payment_method")
 	return info
+}
+
+func optionalBoolField(m map[string]any, key string) *bool {
+	v, ok := m[key].(bool)
+	if !ok {
+		return nil
+	}
+	return &v
 }
 
 func parseContentBlocks(raw []any) ([]ContentBlock, error) {
