@@ -166,6 +166,12 @@ func (ThinkingConfigDisabled) thinkingConfigMarker() {}
 type SdkPluginConfig struct {
 	Type string `json:"type"` // "local"
 	Path string `json:"path"`
+	// SkipMcpDiscovery, when true, causes the CLI to load the plugin without
+	// reading its .mcp.json / manifest mcpServers. Use this when the SDK host
+	// owns the plugin's MCP connections and wants to avoid duplicate
+	// registration. Passed as --plugin-dir-no-mcp to the CLI.
+	// Requires CLI >= v2.1.172. Port of TypeScript SDK v0.3.172.
+	SkipMcpDiscovery bool `json:"skipMcpDiscovery,omitempty"`
 }
 
 // SandboxNetworkConfig contains network configuration for sandbox.
