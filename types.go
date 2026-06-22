@@ -426,6 +426,39 @@ type ElicitationCompleteMessage struct {
 	Result map[string]any `json:"result,omitempty"`
 }
 
+// Model name constants for use with Options.Model, Options.FallbackModel,
+// AgentDefinition.Model, AdvisorToolConfig.Model, and similar fields.
+// Port of TypeScript SDK v0.3.170.
+const (
+	ModelClaudeFable5 = "claude-fable-5"
+	ModelFable5       = "fable" // short alias accepted by the CLI
+)
+
+// ModelFallbackTrigger is the reason the CLI switched to a fallback model.
+type ModelFallbackTrigger string
+
+const (
+	ModelFallbackTriggerModelNotFound    ModelFallbackTrigger = "model_not_found"
+	ModelFallbackTriggerPermissionDenied ModelFallbackTrigger = "permission_denied"
+	ModelFallbackTriggerServerError      ModelFallbackTrigger = "server_error"
+	ModelFallbackTriggerLastResort       ModelFallbackTrigger = "last_resort"
+	ModelFallbackTriggerOverloaded       ModelFallbackTrigger = "overloaded"
+)
+
+// ModelFallbackMessage is emitted when the CLI switches to a fallback model.
+// Port of TypeScript SDK v0.3.174.
+type ModelFallbackMessage struct {
+	SystemMessage
+	// Trigger is the reason for the fallback.
+	Trigger ModelFallbackTrigger `json:"trigger"`
+	// OriginalModel is the model that was requested.
+	OriginalModel string `json:"original_model,omitempty"`
+	// FallbackModel is the model actually used.
+	FallbackModel string `json:"fallback_model,omitempty"`
+	UUID          string `json:"uuid,omitempty"`
+	SessionID     string `json:"session_id,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 

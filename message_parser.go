@@ -266,6 +266,16 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Result:        result,
 		}, nil
 
+	case "model_fallback":
+		return &ModelFallbackMessage{
+			SystemMessage: base,
+			Trigger:       ModelFallbackTrigger(stringField(data, "trigger")),
+			OriginalModel: stringField(data, "original_model"),
+			FallbackModel: stringField(data, "fallback_model"),
+			UUID:          stringField(data, "uuid"),
+			SessionID:     stringField(data, "session_id"),
+		}, nil
+
 	default:
 		return &base, nil
 	}

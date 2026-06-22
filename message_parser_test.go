@@ -1204,3 +1204,50 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 		t.Errorf("expected StopDetails type 'refusal', got %v", am.StopDetails["type"])
 	}
 }
+
+func TestParseSystemMessage_ModelFallback(t *testing.T) {
+	triggers := []ModelFallbackTrigger{
+		ModelFallbackTriggerModelNotFound,
+		ModelFallbackTriggerPermissionDenied,
+		ModelFallbackTriggerServerError,
+		ModelFallbackTriggerLastResort,
+		ModelFallbackTriggerOverloaded,
+	}
+
+	for _, trigger := range triggers {
+		t.Run(string(trigger), func(t *testing.T) {
+			raw := map[string]any{
+				"type":           "system",
+				"subtype":        "model_fallback",
+				"trigger":        string(trigger),
+				"original_model": "claude-fable-5",
+				"fallback_model": "claude-sonnet-4-6",
+				"uuid":           "uuid-mf-1",
+				"session_id":     "sess-mf-1",
+			}
+			msg, err := ParseMessage(raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			mfm, ok := msg.(*ModelFallbackMessage)
+			if !ok {
+				t.Fatalf("expected *ModelFallbackMessage, got %T", msg)
+			}
+			if mfm.Trigger != trigger {
+				t.Errorf("expected trigger %q, got %q", trigger, mfm.Trigger)
+			}
+			if mfm.OriginalModel != "claude-fable-5" {
+				t.Errorf("expected OriginalModel 'claude-fable-5', got %q", mfm.OriginalModel)
+			}
+			if mfm.FallbackModel != "claude-sonnet-4-6" {
+				t.Errorf("expected FallbackModel 'claude-sonnet-4-6', got %q", mfm.FallbackModel)
+			}
+			if mfm.UUID != "uuid-mf-1" {
+				t.Errorf("expected UUID 'uuid-mf-1', got %q", mfm.UUID)
+			}
+			if mfm.SessionID != "sess-mf-1" {
+				t.Errorf("expected SessionID 'sess-mf-1', got %q", mfm.SessionID)
+			}
+		})
+	}
+}
