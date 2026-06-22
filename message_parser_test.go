@@ -1377,7 +1377,7 @@ func TestParseMessage_TaskUpdated_TerminalStatus(t *testing.T) {
 				t.Errorf("TerminalTaskStatuses missing %q", status)
 			}
 			// Backward compat: also matches as *SystemMessage via embedding.
-			var _ *SystemMessage = &m.SystemMessage
+			var _ = &m.SystemMessage
 		})
 	}
 }
