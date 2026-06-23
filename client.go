@@ -482,6 +482,16 @@ func (c *Client) RewindFiles(ctx context.Context, userMessageID string) error {
 	return c.q.rewindFiles(userMessageID)
 }
 
+// RewindConversation rewinds the conversation history to the state at a
+// specific user message and sets a durable resume anchor so the rewound
+// state persists across reconnects. Port of TypeScript SDK v0.3.186.
+func (c *Client) RewindConversation(ctx context.Context, userMessageID string) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.rewindConversation(userMessageID)
+}
+
 // GetUsageExperimental returns session cost, plan rate-limit, and local
 // usage-behavior data. The method name signals that the returned data shape
 // may change without notice. Port of TypeScript SDK v0.3.169. ([#350])

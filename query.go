@@ -1045,6 +1045,14 @@ func (q *query) rewindFiles(userMessageID string) error {
 	return err
 }
 
+func (q *query) rewindConversation(userMessageID string) error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype":         "rewind_conversation",
+		"user_message_id": userMessageID,
+	}, 60*time.Second)
+	return err
+}
+
 func (q *query) getUsageExperimental() (*UsageDataExperimental, error) {
 	resp, err := q.sendControlRequest(map[string]any{
 		"subtype": "get_usage",

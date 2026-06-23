@@ -104,6 +104,13 @@ const (
 	ServerToolTextEditorCodeExecution ServerToolName = "text_editor_code_execution"
 	ServerToolSearchRegex             ServerToolName = "tool_search_tool_regex"
 	ServerToolSearchBM25              ServerToolName = "tool_search_tool_bm25"
+	// ServerToolReadMcpResource is the server tool name for reading a single MCP
+	// resource by URI. Port of TypeScript SDK v0.3.186.
+	ServerToolReadMcpResource    ServerToolName = "read_mcp_resource"
+	// ServerToolReadMcpResourceDir is the server tool name for listing MCP
+	// resource directory contents by URI. A dedicated tool as of TypeScript SDK
+	// v0.3.186; previously a fallback inside ReadMcpResourceTool.
+	ServerToolReadMcpResourceDir ServerToolName = "read_mcp_resource_dir"
 )
 
 // ServerToolUseBlock represents a server-side tool use (e.g. advisor,
