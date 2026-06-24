@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-06-24
+
 ### Added
 
 - `ServerToolReadMcpResource` (`"read_mcp_resource"`) and `ServerToolReadMcpResourceDir` (`"read_mcp_resource_dir"`) constants added to the `ServerToolName` block. `ServerToolReadMcpResourceDir` is a dedicated tool for MCP resource directory listing, previously a fallback inside `ReadMcpResourceTool`. Port of TypeScript SDK v0.3.186. ([#437](https://github.com/Flohs/claude-agent-sdk-go/issues/437))
