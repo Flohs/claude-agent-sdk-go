@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	claude "github.com/Flohs/claude-agent-sdk-go"
+	claude "github.com/Flohs/claude-agent-sdk-go/v2"
 	"github.com/redis/go-redis/v9"
 )
 

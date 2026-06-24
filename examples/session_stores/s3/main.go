@@ -21,7 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	claude "github.com/Flohs/claude-agent-sdk-go"
+	claude "github.com/Flohs/claude-agent-sdk-go/v2"
 )
 
 func main() {

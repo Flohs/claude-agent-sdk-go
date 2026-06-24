@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-06-24
+
+### Changed
+
+- **Module path:** the Go module path is now `github.com/Flohs/claude-agent-sdk-go/v2` (was `github.com/Flohs/claude-agent-sdk-go`), as required by Go's [semantic import versioning](https://go.dev/ref/mod#major-version-suffixes) for major version 2 and above. Releases v2.0.0–v2.2.0 declared the bare path and were therefore not installable (`go get` failed with `module path must match major version "…/v2"`); v2.3.0 is the first installable v2 release. Consumers must import `github.com/Flohs/claude-agent-sdk-go/v2` and install with `go get github.com/Flohs/claude-agent-sdk-go/v2@v2.3.0`. Example modules, the README, and the pkg.go.dev badge were updated to the new path. ([#445](https://github.com/Flohs/claude-agent-sdk-go/issues/445))
+
 ## [2.2.0] - 2026-06-24
 
 ### Added

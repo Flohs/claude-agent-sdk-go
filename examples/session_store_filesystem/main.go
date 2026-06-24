@@ -34,7 +34,7 @@ import (
 	"path/filepath"
 	"time"
 
-	claude "github.com/Flohs/claude-agent-sdk-go"
+	claude "github.com/Flohs/claude-agent-sdk-go/v2"
 )
 
 // fakeEntry constructs a minimal SessionStoreEntry that round-trips
