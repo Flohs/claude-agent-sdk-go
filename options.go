@@ -247,6 +247,29 @@ type SandboxFilesystemConfig struct {
 	AllowManagedReadPathsOnly *bool `json:"allowManagedReadPathsOnly,omitempty"`
 }
 
+// SandboxCredentialFileEntry declares a single file or directory path whose reads
+// are denied inside sandboxed commands. Mode is always "deny".
+type SandboxCredentialFileEntry struct {
+	Path string `json:"path"`
+	Mode string `json:"mode"`
+}
+
+// SandboxCredentialEnvVarEntry declares a single environment variable to unset
+// inside sandboxed commands. Mode is always "deny".
+type SandboxCredentialEnvVarEntry struct {
+	Name string `json:"name"`
+	Mode string `json:"mode"`
+}
+
+// SandboxCredentialsConfig declares credential sources to protect in sandboxed commands.
+// Files listed in Files are denied for reads; variables in EnvVars are unset.
+// Only explicitly listed entries are restricted — there is no built-in deny list.
+// Mode is deny-only. Port of TypeScript SDK v0.3.187.
+type SandboxCredentialsConfig struct {
+	Files   []SandboxCredentialFileEntry   `json:"files,omitempty"`
+	EnvVars []SandboxCredentialEnvVarEntry `json:"envVars,omitempty"`
+}
+
 // SandboxSettings controls bash command sandboxing.
 type SandboxSettings struct {
 	Enabled                    *bool                    `json:"enabled,omitempty"`
@@ -267,6 +290,10 @@ type SandboxSettings struct {
 	// EnableWeakerNetworkIsolation allows system TLS access on macOS when
 	// network isolation is enabled. Has no effect on Linux.
 	EnableWeakerNetworkIsolation *bool `json:"enableWeakerNetworkIsolation,omitempty"`
+	// Credentials configures credential sources to protect in sandboxed commands.
+	// File paths are denied for reads; environment variables are unset.
+	// Port of TypeScript SDK v0.3.187.
+	Credentials *SandboxCredentialsConfig `json:"credentials,omitempty"`
 }
 
 // Options configures a Claude SDK query or client.
