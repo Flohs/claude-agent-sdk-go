@@ -656,8 +656,19 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--settings", settingsValue)
 	}
 
-	if opts.ManagedSettings != "" {
-		cmd = append(cmd, "--managed-settings", opts.ManagedSettings)
+	managedSettings := opts.ManagedSettings
+	if opts.FastMode {
+		ms := make(map[string]any)
+		if managedSettings != "" {
+			_ = json.Unmarshal([]byte(managedSettings), &ms)
+		}
+		ms["isFast"] = true
+		if data, err := json.Marshal(ms); err == nil {
+			managedSettings = string(data)
+		}
+	}
+	if managedSettings != "" {
+		cmd = append(cmd, "--managed-settings", managedSettings)
 	}
 
 	for _, dir := range opts.AddDirs {

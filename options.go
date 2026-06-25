@@ -465,4 +465,9 @@ type Options struct {
 	// when empty. Set to [SessionStoreFlushModeEager] for near-real-time
 	// delivery. Has no effect when SessionStore is nil.
 	SessionStoreFlush SessionStoreFlushMode
+	// FastMode enables fast inference mode for supported models (e.g. Opus).
+	// When true, the SDK merges {"isFast": true} into the managed-settings
+	// layer so that settingSources cannot reset the flag between turns.
+	// Port of TypeScript SDK v0.3.191.
+	FastMode bool
 }
