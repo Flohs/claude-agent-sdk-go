@@ -5,6 +5,8 @@
 ### Added
 
 - `NotebookEditOperation` string type with constants `NotebookEditOperationReplace` (`"replace"`), `NotebookEditOperationInsert` (`"insert"`), `NotebookEditOperationInsertAfter` (`"insert_after"`), and `NotebookEditOperationDelete` (`"delete"`). `NotebookEditToolInput` struct (`NotebookPath`, `CellID`, `EditMode NotebookEditOperation`, `NewSource`, `CellType`) for use with `PreToolUseHookInput.ToolInput` when `ToolName` is `"NotebookEdit"`. `NotebookEditResult` struct with `OldSource string` (populated for replace and delete operations; empty for insert and insert_after). Port of TypeScript SDK v0.3.191. ([#447](https://github.com/Flohs/claude-agent-sdk-go/issues/447))
+- `RateLimitTypeSevenDayOverageIncluded` (`"seven_day_overage_included"`) constant for the `RateLimitType` (string alias) identifying a seven-day rolling overage-included rate-limit window. Port of TypeScript SDK v0.3.191. ([#448](https://github.com/Flohs/claude-agent-sdk-go/issues/448))
+- `ModelScopedUsage` struct (`Model string`, `InputTokens int`, `OutputTokens int`, `CacheCreationInputTokens int`, `CacheReadInputTokens int`) and `ModelScoped []ModelScopedUsage` field on `UsageDataExperimental`. `Client.GetUsageExperimental` now populates per-model token usage breakdowns when the CLI provides them. Port of TypeScript SDK v0.3.191. ([#448](https://github.com/Flohs/claude-agent-sdk-go/issues/448))
 
 ## [2.3.0] - 2026-06-24
 

@@ -1073,6 +1073,29 @@ func (q *query) getUsageExperimental() (*UsageDataExperimental, error) {
 	if v, ok := resp["local_usage"].(map[string]any); ok {
 		result.LocalUsage = v
 	}
+	if entries, ok := resp["model_scoped"].([]any); ok {
+		for _, entry := range entries {
+			if m, ok := entry.(map[string]any); ok {
+				u := ModelScopedUsage{}
+				if s, ok := m["model"].(string); ok {
+					u.Model = s
+				}
+				if n, ok := m["input_tokens"].(float64); ok {
+					u.InputTokens = int(n)
+				}
+				if n, ok := m["output_tokens"].(float64); ok {
+					u.OutputTokens = int(n)
+				}
+				if n, ok := m["cache_creation_input_tokens"].(float64); ok {
+					u.CacheCreationInputTokens = int(n)
+				}
+				if n, ok := m["cache_read_input_tokens"].(float64); ok {
+					u.CacheReadInputTokens = int(n)
+				}
+				result.ModelScoped = append(result.ModelScoped, u)
+			}
+		}
+	}
 	return result, nil
 }
 
