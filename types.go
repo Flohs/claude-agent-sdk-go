@@ -355,6 +355,45 @@ type ExitPlanModeToolInput struct {
 	PlanFilePath string `json:"planFilePath,omitempty"`
 }
 
+// NotebookEditOperation specifies which edit operation to perform on a notebook cell.
+// Port of TypeScript SDK v0.3.191.
+type NotebookEditOperation string
+
+const (
+	// NotebookEditOperationReplace replaces the content of an existing cell.
+	NotebookEditOperationReplace NotebookEditOperation = "replace"
+	// NotebookEditOperationInsert inserts a new cell before the target cell.
+	NotebookEditOperationInsert NotebookEditOperation = "insert"
+	// NotebookEditOperationInsertAfter inserts a new cell after the target cell.
+	NotebookEditOperationInsertAfter NotebookEditOperation = "insert_after"
+	// NotebookEditOperationDelete deletes the target cell.
+	NotebookEditOperationDelete NotebookEditOperation = "delete"
+)
+
+// NotebookEditToolInput is the typed input for the NotebookEdit tool.
+// Accessible from [PreToolUseHookInput].ToolInput when ToolName is "NotebookEdit".
+// Port of TypeScript SDK v0.3.191.
+type NotebookEditToolInput struct {
+	// NotebookPath is the filesystem path to the Jupyter notebook file.
+	NotebookPath string `json:"notebook_path"`
+	// CellID identifies the target cell by its notebook-assigned identifier.
+	CellID string `json:"cell_id"`
+	// EditMode specifies the operation to perform on the cell.
+	EditMode NotebookEditOperation `json:"edit_mode"`
+	// NewSource is the replacement source text. Required for replace, insert, and insert_after.
+	NewSource string `json:"new_source,omitempty"`
+	// CellType is the type of cell to create ("code" or "markdown"). Used for insert/insert_after.
+	CellType string `json:"cell_type,omitempty"`
+}
+
+// NotebookEditResult is the result returned by the NotebookEdit tool.
+// Port of TypeScript SDK v0.3.191.
+type NotebookEditResult struct {
+	// OldSource contains the prior cell content before the edit. Present only for
+	// replace and delete operations; empty for insert and insert_after.
+	OldSource string `json:"old_source,omitempty"`
+}
+
 // TaskCreateInput is the input schema for the TaskCreate tool.
 type TaskCreateInput struct {
 	Subject     string         `json:"subject"`

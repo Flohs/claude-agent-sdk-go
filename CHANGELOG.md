@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `NotebookEditOperation` string type with constants `NotebookEditOperationReplace` (`"replace"`), `NotebookEditOperationInsert` (`"insert"`), `NotebookEditOperationInsertAfter` (`"insert_after"`), and `NotebookEditOperationDelete` (`"delete"`). `NotebookEditToolInput` struct (`NotebookPath`, `CellID`, `EditMode NotebookEditOperation`, `NewSource`, `CellType`) for use with `PreToolUseHookInput.ToolInput` when `ToolName` is `"NotebookEdit"`. `NotebookEditResult` struct with `OldSource string` (populated for replace and delete operations; empty for insert and insert_after). Port of TypeScript SDK v0.3.191. ([#447](https://github.com/Flohs/claude-agent-sdk-go/issues/447))
+
 ## [2.3.0] - 2026-06-24
 
 ### Changed
