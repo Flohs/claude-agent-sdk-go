@@ -96,10 +96,17 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		}
 	}
 
-	contentRaw, ok := message["content"].([]any)
-	if !ok {
+	rawContent, hasContent := message["content"]
+	if !hasContent || rawContent == nil {
 		return nil, &MessageParseError{
 			SDKError: SDKError{Message: "Missing 'content' field in assistant message"},
+			Data:     data,
+		}
+	}
+	contentRaw, ok := rawContent.([]any)
+	if !ok {
+		return nil, &MessageParseError{
+			SDKError: SDKError{Message: fmt.Sprintf("Invalid assistant content: expected list, got %T", rawContent)},
 			Data:     data,
 		}
 	}
