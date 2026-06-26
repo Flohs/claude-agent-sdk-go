@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows, spawning the CLI subprocess no longer flashes a brief console window. `SubprocessTransport.Connect` now sets `cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}` (Windows-only, isolated via build tags) before calling `cmd.Start()`. Port of TypeScript SDK v0.3.193. ([#453](https://github.com/Flohs/claude-agent-sdk-go/issues/453))
+
 ### Added
 
 - `NotebookEditOperation` string type with constants `NotebookEditOperationReplace` (`"replace"`), `NotebookEditOperationInsert` (`"insert"`), `NotebookEditOperationInsertAfter` (`"insert_after"`), and `NotebookEditOperationDelete` (`"delete"`). `NotebookEditToolInput` struct (`NotebookPath`, `CellID`, `EditMode NotebookEditOperation`, `NewSource`, `CellType`) for use with `PreToolUseHookInput.ToolInput` when `ToolName` is `"NotebookEdit"`. `NotebookEditResult` struct with `OldSource string` (populated for replace and delete operations; empty for insert and insert_after). Port of TypeScript SDK v0.3.191. ([#447](https://github.com/Flohs/claude-agent-sdk-go/issues/447))

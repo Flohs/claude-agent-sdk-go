@@ -227,6 +227,7 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 		return &ConnectionError{SDKError: SDKError{Message: fmt.Sprintf("Failed to create stderr pipe: %v", err)}}
 	}
 
+	setPlatformProcAttr(cmd)
 	if err := cmd.Start(); err != nil {
 		if t.cwd != "" {
 			if _, statErr := os.Stat(t.cwd); os.IsNotExist(statErr) {
