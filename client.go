@@ -482,6 +482,18 @@ func (c *Client) RewindFiles(ctx context.Context, userMessageID string) error {
 	return c.q.rewindFiles(userMessageID)
 }
 
+// Reinitialize re-sends the initialize control request and re-delivers any
+// pending permission or dialog prompts queued since the last initialization.
+// Call this after a transport gap to restore session state without creating a
+// new Client. Port of TypeScript SDK v0.3.195.
+func (c *Client) Reinitialize(ctx context.Context) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	_, err := c.q.initialize()
+	return err
+}
+
 // RewindConversation rewinds the conversation history to the state at a
 // specific user message and sets a durable resume anchor so the rewound
 // state persists across reconnects. Port of TypeScript SDK v0.3.186.
