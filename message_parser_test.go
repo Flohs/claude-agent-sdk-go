@@ -1464,3 +1464,42 @@ func TestParseSystemMessage_ModelFallback(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tests for non-dict content block validation — issue #459
+// Port of Python SDK PR anthropics/claude-agent-sdk-python#1058 (commit d47b180).
+// ---------------------------------------------------------------------------
+
+func TestParseMessage_NonDictContentBlock_AssistantReturnsError(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{"unexpected_string"},
+			"model":   "claude-sonnet-4-6",
+		},
+	}
+	_, err := ParseMessage(data)
+	if err == nil {
+		t.Fatal("expected error for non-dict content block in assistant message, got nil")
+	}
+	if _, ok := err.(*MessageParseError); !ok {
+		t.Fatalf("expected *MessageParseError, got %T: %v", err, err)
+	}
+}
+
+func TestParseMessage_NonDictContentBlock_UserReturnsError(t *testing.T) {
+	data := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"role":    "user",
+			"content": []any{42},
+		},
+	}
+	_, err := ParseMessage(data)
+	if err == nil {
+		t.Fatal("expected error for non-dict content block in user message, got nil")
+	}
+	if _, ok := err.(*MessageParseError); !ok {
+		t.Fatalf("expected *MessageParseError, got %T: %v", err, err)
+	}
+}
