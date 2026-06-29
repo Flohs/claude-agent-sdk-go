@@ -6,6 +6,7 @@
 
 - On Windows, spawning the CLI subprocess no longer flashes a brief console window. `SubprocessTransport.Connect` now sets `cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}` (Windows-only, isolated via build tags) before calling `cmd.Start()`. Port of TypeScript SDK v0.3.193. ([#453](https://github.com/Flohs/claude-agent-sdk-go/issues/453))
 - `parseAssistantMessage` now distinguishes a missing `content` field from a present-but-wrong-type field. A `nil` or absent key returns `"Missing 'content' field in assistant message"` as before; a non-nil value that is not a JSON array (e.g. a string) now returns `"Invalid assistant content: expected list, got <type>"`, matching the improved error parity from Python SDK PR #1058 (commit `d47b180`). ([#454](https://github.com/Flohs/claude-agent-sdk-go/issues/454))
+- `parseContentBlocks` now returns a `*MessageParseError` when any element in the content array is not a JSON object (e.g. a bare string or number), instead of silently dropping the block. Previously a content array like `["unexpected_string"]` would produce an empty content slice with no error, making malformed data invisible to consumers. Port of Python SDK PR anthropics/claude-agent-sdk-python#1058 (commit `d47b180`). ([#459](https://github.com/Flohs/claude-agent-sdk-go/issues/459))
 
 ### Added
 

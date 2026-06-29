@@ -456,7 +456,11 @@ func parseContentBlocks(raw []any) ([]ContentBlock, error) {
 	for _, item := range raw {
 		blockMap, ok := item.(map[string]any)
 		if !ok {
-			continue
+			return nil, &MessageParseError{
+				SDKError: SDKError{
+					Message: fmt.Sprintf("Invalid content block: expected object, got %T", item),
+				},
+			}
 		}
 		blockType, _ := blockMap["type"].(string)
 		switch blockType {
