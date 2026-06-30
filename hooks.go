@@ -104,6 +104,13 @@ type BaseHookInput struct {
 	Cwd            string `json:"cwd"`
 	PermissionMode string `json:"permission_mode"`
 	HookEventName  string `json:"hook_event_name"`
+	// PromptID is a UUID that correlates all hook events emitted during a
+	// single user prompt with each other and with OpenTelemetry prompt-level
+	// spans. The same value is emitted as the prompt.id OTel attribute, so
+	// hook output can be joined to OTel traces at prompt grain. Empty until
+	// the first user input of the process lifetime; absent on SessionStart.
+	// Port of TypeScript SDK v0.3.196.
+	PromptID string `json:"prompt_id,omitempty"`
 }
 
 // SubagentContext carries optional sub-agent attribution fields.

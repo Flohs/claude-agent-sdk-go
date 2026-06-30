@@ -1362,3 +1362,97 @@ func TestParseHookInput_TaskCreated(t *testing.T) {
 		t.Errorf("AgentID: got %q", m.AgentID)
 	}
 }
+
+func TestBaseHookInput_PromptID_Present(t *testing.T) {
+	// prompt_id is populated when the CLI includes it (after the first user turn).
+	input := merge(base("PreToolUse"), HookInput{
+		"tool_name":   "Bash",
+		"tool_input":  map[string]any{"command": "echo hello"},
+		"tool_use_id": "toolu_abc",
+		"prompt_id":   "prompt-uuid-1234",
+	})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	typed := result.(*PreToolUseHookInput)
+	if typed.PromptID != "prompt-uuid-1234" {
+		t.Errorf("PromptID: got %q, want %q", typed.PromptID, "prompt-uuid-1234")
+	}
+}
+
+func TestBaseHookInput_PromptID_Absent(t *testing.T) {
+	// prompt_id is absent before the first user turn (e.g. on SessionStart).
+	input := base("SessionStart")
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	typed := result.(*SessionStartHookInput)
+	if typed.PromptID != "" {
+		t.Errorf("PromptID: got %q, want empty", typed.PromptID)
+	}
+}
+
+func TestBaseHookInput_PromptID_JSONRoundTrip(t *testing.T) {
+	// When prompt_id is present it must survive JSON marshal/unmarshal.
+	raw := `{
+		"session_id":      "sess-1",
+		"transcript_path": "/tmp/t.jsonl",
+		"cwd":             "/home/user",
+		"permission_mode": "default",
+		"hook_event_name": "PreToolUse",
+		"tool_name":       "Bash",
+		"tool_input":      {"command": "ls"},
+		"tool_use_id":     "toolu_xyz",
+		"prompt_id":       "prompt-uuid-5678"
+	}`
+
+	var typed PreToolUseHookInput
+	if err := json.Unmarshal([]byte(raw), &typed); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if typed.PromptID != "prompt-uuid-5678" {
+		t.Errorf("PromptID: got %q, want 'prompt-uuid-5678'", typed.PromptID)
+	}
+
+	// Marshal back: prompt_id must appear in output when non-empty.
+	out, err := json.Marshal(&typed)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatalf("re-unmarshal error: %v", err)
+	}
+	if m["prompt_id"] != "prompt-uuid-5678" {
+		t.Errorf("marshaled prompt_id: got %v, want 'prompt-uuid-5678'", m["prompt_id"])
+	}
+}
+
+func TestBaseHookInput_PromptID_OmittedWhenEmpty(t *testing.T) {
+	// When prompt_id is absent it must not appear in marshaled JSON (omitempty).
+	raw := `{
+		"session_id":      "sess-1",
+		"transcript_path": "/tmp/t.jsonl",
+		"cwd":             "/home/user",
+		"permission_mode": "default",
+		"hook_event_name": "Stop",
+		"stop_hook_active": false
+	}`
+	var typed StopHookInput
+	if err := json.Unmarshal([]byte(raw), &typed); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	out, err := json.Marshal(&typed)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatalf("re-unmarshal error: %v", err)
+	}
+	if _, ok := m["prompt_id"]; ok {
+		t.Error("prompt_id should be omitted from JSON when empty")
+	}
+}
