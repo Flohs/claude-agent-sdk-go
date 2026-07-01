@@ -270,6 +270,7 @@ func parseBaseHookInput(m map[string]any) BaseHookInput {
 		Cwd:            stringField(m, "cwd"),
 		PermissionMode: stringField(m, "permission_mode"),
 		HookEventName:  stringField(m, "hook_event_name"),
+		PromptID:       stringField(m, "prompt_id"),
 	}
 }
 
