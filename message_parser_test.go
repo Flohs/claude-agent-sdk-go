@@ -55,6 +55,32 @@ func TestParseMessage_UserMessage_StringContent(t *testing.T) {
 	if user.UUID != "test-uuid" {
 		t.Fatalf("expected uuid 'test-uuid', got %s", user.UUID)
 	}
+	if user.IsMeta {
+		t.Fatalf("expected IsMeta false when absent, got true")
+	}
+}
+
+func TestParseMessage_UserMessage_IsMeta(t *testing.T) {
+	data := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"content": "synthetic",
+		},
+		"isMeta": true,
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	user, ok := msg.(*UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+	if !user.IsMeta {
+		t.Fatalf("expected IsMeta true, got false")
+	}
 }
 
 func TestParseMessage_AssistantMessage(t *testing.T) {
