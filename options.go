@@ -1,5 +1,10 @@
 package claude
 
+import (
+	"fmt"
+	"os"
+)
+
 // Model string constants for use with Options.Model.
 // Callers may also pass any valid model identifier string directly.
 const (
@@ -470,4 +475,24 @@ type Options struct {
 	// layer so that settingSources cannot reset the flag between turns.
 	// Port of TypeScript SDK v0.3.191.
 	FastMode bool
+}
+
+// warnCanUseToolPermissionConflicts emits a non-fatal stderr warning when
+// CanUseTool is configured alongside AllowedTools or
+// PermissionModeBypassPermissions, since either can silently short-circuit
+// the CanUseTool callback for matching tools. Port of TypeScript SDK v0.3.198.
+func warnCanUseToolPermissionConflicts(opts *Options) {
+	if opts.CanUseTool == nil {
+		return
+	}
+	if len(opts.AllowedTools) > 0 {
+		fmt.Fprintln(os.Stderr,
+			"Warning: CanUseTool is configured alongside AllowedTools. "+
+				"Tools matched by AllowedTools are auto-approved without invoking CanUseTool.")
+	}
+	if opts.PermissionMode == PermissionModeBypassPermissions {
+		fmt.Fprintln(os.Stderr,
+			"Warning: CanUseTool is configured alongside PermissionMode "+
+				"PermissionModeBypassPermissions. Tool calls will bypass CanUseTool entirely.")
+	}
 }

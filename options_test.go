@@ -1,9 +1,103 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"os"
+	"strings"
 	"testing"
 )
+
+// captureStderr redirects os.Stderr for the duration of fn and returns
+// whatever was written to it.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	orig := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	os.Stderr = w
+	defer func() { os.Stderr = orig }()
+
+	fn()
+
+	_ = w.Close()
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("failed to read captured stderr: %v", err)
+	}
+	return string(out)
+}
+
+func TestWarnCanUseToolPermissionConflicts_NoCanUseTool(t *testing.T) {
+	out := captureStderr(t, func() {
+		warnCanUseToolPermissionConflicts(&Options{
+			AllowedTools:   []string{"Bash"},
+			PermissionMode: PermissionModeBypassPermissions,
+		})
+	})
+	if out != "" {
+		t.Errorf("expected no warning without CanUseTool, got %q", out)
+	}
+}
+
+func TestWarnCanUseToolPermissionConflicts_NoConflict(t *testing.T) {
+	out := captureStderr(t, func() {
+		warnCanUseToolPermissionConflicts(&Options{
+			CanUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+				return nil, nil
+			},
+		})
+	})
+	if out != "" {
+		t.Errorf("expected no warning for CanUseTool alone, got %q", out)
+	}
+}
+
+func TestWarnCanUseToolPermissionConflicts_AllowedTools(t *testing.T) {
+	out := captureStderr(t, func() {
+		warnCanUseToolPermissionConflicts(&Options{
+			CanUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+				return nil, nil
+			},
+			AllowedTools: []string{"Bash"},
+		})
+	})
+	if !strings.Contains(out, "AllowedTools") {
+		t.Errorf("expected warning mentioning AllowedTools, got %q", out)
+	}
+}
+
+func TestWarnCanUseToolPermissionConflicts_BypassPermissions(t *testing.T) {
+	out := captureStderr(t, func() {
+		warnCanUseToolPermissionConflicts(&Options{
+			CanUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+				return nil, nil
+			},
+			PermissionMode: PermissionModeBypassPermissions,
+		})
+	})
+	if !strings.Contains(out, "PermissionModeBypassPermissions") {
+		t.Errorf("expected warning mentioning PermissionModeBypassPermissions, got %q", out)
+	}
+}
+
+func TestWarnCanUseToolPermissionConflicts_Both(t *testing.T) {
+	out := captureStderr(t, func() {
+		warnCanUseToolPermissionConflicts(&Options{
+			CanUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+				return nil, nil
+			},
+			AllowedTools:   []string{"Bash"},
+			PermissionMode: PermissionModeBypassPermissions,
+		})
+	})
+	if !strings.Contains(out, "AllowedTools") || !strings.Contains(out, "PermissionModeBypassPermissions") {
+		t.Errorf("expected warning mentioning both AllowedTools and PermissionModeBypassPermissions, got %q", out)
+	}
+}
 
 func TestAgentDefinition_JSONMarshal(t *testing.T) {
 	def := AgentDefinition{
