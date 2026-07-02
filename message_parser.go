@@ -42,6 +42,7 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		ParentToolUseID: stringField(data, "parent_tool_use_id"),
 		UUID:            stringField(data, "uuid"),
 		Timestamp:       stringField(data, "timestamp"),
+		IsMeta:          boolField(data, "isMeta"),
 	}
 
 	if tr, ok := data["tool_use_result"].(map[string]any); ok {

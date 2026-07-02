@@ -142,6 +142,10 @@ type UserMessage struct {
 	ParentToolUseID string         `json:"parent_tool_use_id,omitempty"`
 	ToolUseResult   map[string]any `json:"tool_use_result,omitempty"`
 	Timestamp       string         `json:"timestamp,omitempty"`
+	// IsMeta indicates this message is metadata rather than visible
+	// conversation content (e.g. a synthetic message generated internally by
+	// the SDK or CLI). Port of TypeScript SDK v0.3.198.
+	IsMeta bool `json:"isMeta,omitempty"`
 }
 
 func (UserMessage) messageMarker() {}
