@@ -19,6 +19,8 @@ type McpStdioServerConfig struct {
 	Env     map[string]string `json:"env,omitempty"`
 	// AlwaysLoad, when true, requires this server to connect before the first query is executed. By default servers connect in the background.
 	AlwaysLoad bool `json:"alwaysLoad,omitempty"`
+	// RequestTimeoutMs overrides the default request timeout for this server, in milliseconds. Port of TypeScript SDK v0.3.198.
+	RequestTimeoutMs int `json:"requestTimeoutMs,omitempty"`
 }
 
 func (McpStdioServerConfig) mcpServerConfigMarker() {}
@@ -44,6 +46,8 @@ type McpSSEServerConfig struct {
 	PermissionPolicy map[string]string `json:"permissionPolicy,omitempty"`
 	// AlwaysLoad, when true, requires this server to connect before the first query is executed. By default servers connect in the background.
 	AlwaysLoad bool `json:"alwaysLoad,omitempty"`
+	// RequestTimeoutMs overrides the default request timeout for this server, in milliseconds. Port of TypeScript SDK v0.3.198.
+	RequestTimeoutMs int `json:"requestTimeoutMs,omitempty"`
 }
 
 func (McpSSEServerConfig) mcpServerConfigMarker() {}
@@ -69,6 +73,8 @@ type McpHTTPServerConfig struct {
 	PermissionPolicy map[string]string `json:"permissionPolicy,omitempty"`
 	// AlwaysLoad, when true, requires this server to connect before the first query is executed. By default servers connect in the background.
 	AlwaysLoad bool `json:"alwaysLoad,omitempty"`
+	// RequestTimeoutMs overrides the default request timeout for this server, in milliseconds. Port of TypeScript SDK v0.3.198.
+	RequestTimeoutMs int `json:"requestTimeoutMs,omitempty"`
 }
 
 func (McpHTTPServerConfig) mcpServerConfigMarker() {}
