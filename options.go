@@ -259,20 +259,35 @@ type SandboxCredentialFileEntry struct {
 	Mode string `json:"mode"`
 }
 
-// SandboxCredentialEnvVarEntry declares a single environment variable to unset
-// inside sandboxed commands. Mode is always "deny".
+// SandboxCredentialEnvVarEntry declares a single environment variable to protect
+// inside sandboxed commands. Mode "deny" unsets the variable for sandboxed
+// commands. Mode "mask" shows sandboxed commands a sentinel value instead,
+// and the host proxy swaps sentinel for the real value on egress to
+// InjectHosts. InjectHosts is only meaningful when Mode is "mask"; it is
+// accepted but ignored for "deny". If InjectHosts is unset, the credential
+// is injected at every host reachable via the sandbox's allowed network
+// domains. Port of TypeScript SDK v0.3.199.
 type SandboxCredentialEnvVarEntry struct {
-	Name string `json:"name"`
-	Mode string `json:"mode"`
+	Name        string   `json:"name"`
+	Mode        string   `json:"mode"`
+	InjectHosts []string `json:"injectHosts,omitempty"`
 }
 
 // SandboxCredentialsConfig declares credential sources to protect in sandboxed commands.
-// Files listed in Files are denied for reads; variables in EnvVars are unset.
-// Only explicitly listed entries are restricted — there is no built-in deny list.
-// Mode is deny-only. Port of TypeScript SDK v0.3.187.
+// Files listed in Files are denied for reads (Mode is always "deny" for file
+// entries). Variables in EnvVars are unset ("deny") or masked with a
+// sentinel value ("mask"); see SandboxCredentialEnvVarEntry. Only explicitly
+// listed entries are restricted — there is no built-in deny list.
 type SandboxCredentialsConfig struct {
 	Files   []SandboxCredentialFileEntry   `json:"files,omitempty"`
 	EnvVars []SandboxCredentialEnvVarEntry `json:"envVars,omitempty"`
+	// AllowPlaintextInject allows sentinel-to-real substitution on the
+	// plain-HTTP proxy path for "mask" mode entries. Defaults to false:
+	// without TLS termination the upstream identity is unverified and the
+	// credential travels in cleartext. Set only for trusted-network test
+	// fixtures. Only honored from user, managed/policy, or CLI settings —
+	// project settings are ignored. Port of TypeScript SDK v0.3.199.
+	AllowPlaintextInject *bool `json:"allowPlaintextInject,omitempty"`
 }
 
 // SandboxSettings controls bash command sandboxing.
