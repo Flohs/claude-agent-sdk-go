@@ -160,3 +160,73 @@ func TestAgentDefinition_JSONMarshal_OmitEmpty(t *testing.T) {
 		}
 	}
 }
+
+func TestSandboxCredentialsConfig_JSONMarshal_MaskMode(t *testing.T) {
+	allowPlaintext := true
+	cfg := SandboxCredentialsConfig{
+		Files: []SandboxCredentialFileEntry{
+			{Path: "~/.aws/credentials", Mode: "deny"},
+		},
+		EnvVars: []SandboxCredentialEnvVarEntry{
+			{Name: "GITHUB_TOKEN", Mode: "mask", InjectHosts: []string{"api.github.com"}},
+			{Name: "SECRET_KEY", Mode: "deny"},
+		},
+		AllowPlaintextInject: &allowPlaintext,
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if result["allowPlaintextInject"] != true {
+		t.Errorf("expected allowPlaintextInject true, got %v", result["allowPlaintextInject"])
+	}
+
+	envVars, ok := result["envVars"].([]any)
+	if !ok || len(envVars) != 2 {
+		t.Fatalf("expected 2 envVars, got %v", result["envVars"])
+	}
+
+	masked, ok := envVars[0].(map[string]any)
+	if !ok || masked["mode"] != "mask" {
+		t.Fatalf("expected first envVar mode 'mask', got %v", envVars[0])
+	}
+	hosts, ok := masked["injectHosts"].([]any)
+	if !ok || len(hosts) != 1 || hosts[0] != "api.github.com" {
+		t.Errorf("expected injectHosts [api.github.com], got %v", masked["injectHosts"])
+	}
+
+	denied, ok := envVars[1].(map[string]any)
+	if !ok || denied["mode"] != "deny" {
+		t.Fatalf("expected second envVar mode 'deny', got %v", envVars[1])
+	}
+	if _, ok := denied["injectHosts"]; ok {
+		t.Errorf("expected injectHosts to be omitted for deny mode entry, got %v", denied["injectHosts"])
+	}
+}
+
+func TestSandboxCredentialsConfig_JSONMarshal_OmitEmpty(t *testing.T) {
+	cfg := SandboxCredentialsConfig{}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	for _, key := range []string{"files", "envVars", "allowPlaintextInject"} {
+		if _, ok := result[key]; ok {
+			t.Errorf("expected %q to be omitted when empty, but it was present", key)
+		}
+	}
+}
