@@ -797,3 +797,67 @@ func TestReadMessages_ResultForwardedBeforeFirstResultSignal(t *testing.T) {
 
 	_ = q.close()
 }
+
+func TestHandleCanUseTool_PopulatesRequestID(t *testing.T) {
+	mt := newMockTransport()
+	var gotRequestID string
+	q := newQuery(queryConfig{
+		transport: mt,
+		canUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+			gotRequestID = permCtx.RequestID
+			return PermissionResultAllow{}, nil
+		},
+	})
+
+	q.handleControlRequest(map[string]any{
+		"request_id": "req-123",
+		"request": map[string]any{
+			"subtype":     "can_use_tool",
+			"tool_name":   "Bash",
+			"tool_use_id": "tu-1",
+			"input":       map[string]any{},
+		},
+	})
+
+	if gotRequestID != "req-123" {
+		t.Fatalf("expected RequestID %q, got %q", "req-123", gotRequestID)
+	}
+
+	written := mt.written
+	if len(written) != 1 {
+		t.Fatalf("expected exactly one control_response write, got %d", len(written))
+	}
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(written[0]), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	inner, _ := resp["response"].(map[string]any)
+	if inner["subtype"] != "success" {
+		t.Fatalf("expected success response, got %v", resp)
+	}
+}
+
+func TestHandleCanUseTool_NilResultSuppressesControlResponse(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{
+		transport: mt,
+		canUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+			// Simulate a consumer that already answered out-of-band.
+			return nil, nil
+		},
+	})
+
+	q.handleControlRequest(map[string]any{
+		"request_id": "req-456",
+		"request": map[string]any{
+			"subtype":     "can_use_tool",
+			"tool_name":   "Bash",
+			"tool_use_id": "tu-2",
+			"input":       map[string]any{},
+		},
+	})
+
+	if len(mt.written) != 0 {
+		t.Fatalf("expected no control_response to be written, got %v", mt.written)
+	}
+}
