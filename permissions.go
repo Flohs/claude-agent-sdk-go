@@ -124,6 +124,11 @@ type ToolPermissionContext struct {
 	Suggestions []PermissionUpdate
 	// ToolUseID is the ID of the tool use that triggered this permission request.
 	ToolUseID string
+	// RequestID is the control protocol request ID for this permission
+	// request. A consumer answering out-of-band (e.g. a signed HTTP POST
+	// instead of a CanUseToolFunc return value) must echo this value in its
+	// own control_response for the CLI to match it. See CanUseToolFunc.
+	RequestID string
 	// AgentID is the ID of the sub-agent requesting permission, if applicable.
 	AgentID string
 	// DecisionReason is the CLI's suggested reason for this permission decision,
@@ -181,4 +186,11 @@ func parsePermissionUpdate(m map[string]any) PermissionUpdate {
 //
 // ToolPermissionContext.ToolUseID is always non-empty when delivered via
 // CanUseTool; the omitempty tag exists for JSON marshaling compatibility only.
+//
+// Returning a nil PermissionResult with a nil error suppresses the SDK's
+// automatic control_response for this request. Use this ONLY after already
+// sending a control_response out-of-band (e.g. a signed HTTP POST echoing
+// ToolPermissionContext.RequestID) — permission prompts have no park
+// deadline, so an accidental nil/nil return leaves the tool call blocked
+// indefinitely with no response ever sent. Port of TypeScript SDK v0.3.199.
 type CanUseToolFunc func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error)

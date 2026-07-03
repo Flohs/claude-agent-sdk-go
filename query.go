@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -482,7 +483,7 @@ func (q *query) handleControlRequest(msg map[string]any) {
 		var err error
 		switch subtype {
 		case "can_use_tool":
-			responseData, err = q.handleCanUseTool(request)
+			responseData, err = q.handleCanUseTool(request, requestID)
 		case "hook_callback":
 			responseData, err = q.handleHookCallback(request)
 		case "mcp_message":
@@ -496,6 +497,11 @@ func (q *query) handleControlRequest(msg map[string]any) {
 	var response map[string]any
 	select {
 	case result := <-resultCh:
+		if errors.Is(result.err, errSuppressControlResponse) {
+			// The consumer already answered this can_use_tool request
+			// out-of-band; do not write a competing control_response.
+			return
+		}
 		if result.err != nil {
 			response = map[string]any{
 				"type": "control_response",
@@ -533,7 +539,12 @@ func (q *query) handleControlRequest(msg map[string]any) {
 	_ = q.transport.Write(string(data) + "\n")
 }
 
-func (q *query) handleCanUseTool(request map[string]any) (map[string]any, error) {
+// errSuppressControlResponse signals that CanUseToolFunc already answered
+// this can_use_tool request out-of-band, so handleControlRequest must skip
+// writing its own control_response.
+var errSuppressControlResponse = errors.New("claudeagent: control response suppressed by consumer")
+
+func (q *query) handleCanUseTool(request map[string]any, requestID string) (map[string]any, error) {
 	if q.canUseTool == nil {
 		return nil, fmt.Errorf("canUseTool callback is not provided")
 	}
@@ -544,6 +555,7 @@ func (q *query) handleCanUseTool(request map[string]any) (map[string]any, error)
 
 	permCtx := ToolPermissionContext{
 		ToolUseID:      stringField(request, "tool_use_id"),
+		RequestID:      requestID,
 		AgentID:        stringField(request, "agent_id"),
 		DecisionReason: stringField(request, "decision_reason"),
 		BlockedPath:    stringField(request, "blocked_path"),
@@ -563,6 +575,9 @@ func (q *query) handleCanUseTool(request map[string]any) (map[string]any, error)
 	result, err := q.canUseTool(q.ctx, toolName, input, permCtx)
 	if err != nil {
 		return nil, err
+	}
+	if result == nil {
+		return nil, errSuppressControlResponse
 	}
 
 	switch r := result.(type) {
