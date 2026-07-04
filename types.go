@@ -272,6 +272,9 @@ type TaskProgressMessage struct {
 	SubagentType string `json:"subagent_type,omitempty"`
 	// TaskDescription is a human-readable description of the task.
 	TaskDescription string `json:"task_description,omitempty"`
+	// Blocked indicates the agent was blocked by the auto-mode safety
+	// classifier. Port of TypeScript SDK v0.3.199.
+	Blocked bool `json:"blocked,omitempty"`
 }
 
 // TaskNotificationMessage is emitted when a task completes, fails, or is stopped.

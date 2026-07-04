@@ -204,6 +204,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Summary:         stringField(data, "summary"),
 			SubagentType:    stringField(data, "subagent_type"),
 			TaskDescription: stringField(data, "task_description"),
+			Blocked:         boolField(data, "blocked"),
 		}, nil
 
 	case "mirror_error":
