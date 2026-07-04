@@ -445,6 +445,28 @@ func TestParseMessage_TaskProgress_SummaryAbsent(t *testing.T) {
 	if progress.Summary != "" {
 		t.Errorf("Summary = %q, want empty when absent", progress.Summary)
 	}
+	if progress.Blocked {
+		t.Errorf("Blocked = true, want false when absent")
+	}
+}
+
+func TestParseMessage_TaskProgress_Blocked(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "task_progress",
+		"task_id":    "t1",
+		"uuid":       "u1",
+		"session_id": "s1",
+		"blocked":    true,
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	progress := msg.(*TaskProgressMessage)
+	if !progress.Blocked {
+		t.Errorf("Blocked = false, want true")
+	}
 }
 
 func TestParseMessage_ResultMessage(t *testing.T) {
