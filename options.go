@@ -36,6 +36,8 @@ const (
 	PermissionModeBypassPermissions PermissionMode = "bypassPermissions"
 	PermissionModeDontAsk           PermissionMode = "dontAsk"
 	PermissionModeAuto              PermissionMode = "auto"
+	// PermissionModeManual is an accepted alias for PermissionModeDefault.
+	PermissionModeManual PermissionMode = "manual"
 )
 
 // SdkBeta represents beta feature flags.
