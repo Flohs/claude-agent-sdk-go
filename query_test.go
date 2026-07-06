@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -859,5 +860,67 @@ func TestHandleCanUseTool_NilResultSuppressesControlResponse(t *testing.T) {
 
 	if len(mt.written) != 0 {
 		t.Fatalf("expected no control_response to be written, got %v", mt.written)
+	}
+}
+
+// TestHandleControlRequest_DuplicateInFlightRequestIsIgnored guards against a
+// regression where a control_request redelivered while the original is still
+// being handled (e.g. a redelivered pending_permission_requests entry, or a
+// transport-level redelivery) would invoke the permission callback a second
+// time and write a second control_response for the same request_id. Port of
+// TypeScript SDK v0.3.196.
+func TestHandleControlRequest_DuplicateInFlightRequestIsIgnored(t *testing.T) {
+	mt := newMockTransport()
+	var callCount int32
+	callbackEntered := make(chan struct{})
+	releaseCallback := make(chan struct{})
+	q := newQuery(queryConfig{
+		transport: mt,
+		canUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+			atomic.AddInt32(&callCount, 1)
+			close(callbackEntered)
+			<-releaseCallback
+			return PermissionResultAllow{}, nil
+		},
+	})
+
+	msg := map[string]any{
+		"request_id": "req-dup-1",
+		"request": map[string]any{
+			"subtype":     "can_use_tool",
+			"tool_name":   "Bash",
+			"tool_use_id": "tu-dup-1",
+			"input":       map[string]any{},
+		},
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		q.handleControlRequest(msg)
+	}()
+
+	select {
+	case <-callbackEntered:
+	case <-time.After(time.Second):
+		t.Fatal("callback was never invoked")
+	}
+
+	// Redeliver the same request_id while the first call is still in flight.
+	// This must return immediately without invoking the callback again.
+	q.handleControlRequest(msg)
+
+	close(releaseCallback)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("first handleControlRequest call never returned")
+	}
+
+	if got := atomic.LoadInt32(&callCount); got != 1 {
+		t.Fatalf("expected canUseTool to be invoked exactly once, got %d", got)
+	}
+	if len(mt.written) != 1 {
+		t.Fatalf("expected exactly one control_response write, got %d: %v", len(mt.written), mt.written)
 	}
 }
