@@ -110,8 +110,12 @@ func GetSubagentMessages(sessionID, agentID string, opts GetSubagentMessagesOpti
 		return nil, err
 	}
 
+	toolUseID, parentAgentID := readSubagentMetaSidecar(agentFile)
+
 	entries := parseTranscriptEntries(string(data))
-	return entriesToSessionMessages(entries, opts.IncludeSystemMessages, opts.Limit, opts.Offset), nil
+	messages := entriesToSessionMessages(entries, opts.IncludeSystemMessages, opts.Limit, opts.Offset)
+	applySubagentLineage(messages, toolUseID, parentAgentID)
+	return messages, nil
 }
 
 // resolveSubagentsDir returns the on-disk path of the `subagents/` folder
@@ -1228,6 +1232,44 @@ func toSessionMessage(entry transcriptEntry) SessionMessage {
 	}
 }
 
+// readSubagentMetaSidecar reads the ".meta.json" file sibling to a
+// disk-based subagent transcript ("agent-<id>.jsonl" -> "agent-<id>.meta.json")
+// and extracts its "toolUseId"/"parentAgentId" fields. Returns empty strings
+// when the sidecar is absent, unreadable, or malformed — the sidecar is an
+// optional enrichment, never required to read a subagent's transcript.
+func readSubagentMetaSidecar(agentFile string) (toolUseID, parentAgentID string) {
+	metaFile := strings.TrimSuffix(agentFile, ".jsonl") + ".meta.json"
+	data, err := os.ReadFile(metaFile)
+	if err != nil {
+		return "", ""
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return "", ""
+	}
+	toolUseID, _ = meta["toolUseId"].(string)
+	parentAgentID, _ = meta["parentAgentId"].(string)
+	return toolUseID, parentAgentID
+}
+
+// applySubagentLineage stamps toolUseID and parentAgentID (sourced from a
+// subagent's metadata sidecar) onto every message in messages, mirroring
+// how the sidecar describes the subagent transcript as a whole rather than
+// any single message within it. A no-op for either field left empty.
+func applySubagentLineage(messages []SessionMessage, toolUseID, parentAgentID string) {
+	if toolUseID == "" && parentAgentID == "" {
+		return
+	}
+	for i := range messages {
+		if toolUseID != "" {
+			messages[i].ParentToolUseID = toolUseID
+		}
+		if parentAgentID != "" {
+			messages[i].ParentAgentID = parentAgentID
+		}
+	}
+}
+
 // extractTagFromTranscript scans transcript head and tail for the last {"type":"tag"} entry
 // and returns the tag value. Returns nil if no tag entry is found.
 func extractTagFromTranscript(head, tail string) *string {
@@ -1968,14 +2010,18 @@ func GetSubagentMessagesFromStore(ctx context.Context, store SessionStore, sessi
 		return nil, nil
 	}
 
-	// Drop synthetic agent_metadata entries — they describe the
-	// .meta.json sidecar, not transcript lines.
+	// Split off synthetic agent_metadata entries — they describe the
+	// .meta.json sidecar, not transcript lines. Last one wins, matching
+	// the write-side semantics in materializeSubkeys.
 	transcript := make([]SessionStoreEntry, 0, len(entries))
+	var toolUseID, parentAgentID string
 	for _, e := range entries {
 		if e == nil {
 			continue
 		}
 		if t, _ := e["type"].(string); t == "agent_metadata" {
+			toolUseID, _ = e["toolUseId"].(string)
+			parentAgentID, _ = e["parentAgentId"].(string)
 			continue
 		}
 		transcript = append(transcript, e)
@@ -1985,7 +2031,9 @@ func GetSubagentMessagesFromStore(ctx context.Context, store SessionStore, sessi
 	}
 
 	filtered := filterTranscriptEntries(transcript)
-	return entriesToSessionMessages(filtered, opts.IncludeSystemMessages, opts.Limit, opts.Offset), nil
+	messages := entriesToSessionMessages(filtered, opts.IncludeSystemMessages, opts.Limit, opts.Offset)
+	applySubagentLineage(messages, toolUseID, parentAgentID)
+	return messages, nil
 }
 
 // ---------------------------------------------------------------------------

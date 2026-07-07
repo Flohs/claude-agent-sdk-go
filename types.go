@@ -841,12 +841,23 @@ type ServerCapabilities struct {
 }
 
 // SessionMessage represents a user or assistant message from a session transcript.
+//
+// For subagent transcripts (returned by [GetSubagentMessages] and
+// [GetSubagentMessagesFromStore]), ParentToolUseID and ParentAgentID are
+// populated from the subagent's metadata sidecar (the on-disk ".meta.json"
+// file, or the synthetic "agent_metadata" entry in a [SessionStore]) and
+// applied uniformly to every message in that subagent's transcript:
+// ParentToolUseID identifies the tool call that spawned the subagent, and
+// ParentAgentID identifies its immediate parent agent, which lets callers
+// reconstruct depth-2+ agent trees when a subagent itself spawned further
+// nested subagents. Both are empty for main-session messages.
 type SessionMessage struct {
 	Type            string `json:"type"` // "user" or "assistant"
 	UUID            string `json:"uuid"`
 	SessionID       string `json:"session_id"`
 	Message         any    `json:"message"`
 	ParentToolUseID string `json:"parent_tool_use_id,omitempty"`
+	ParentAgentID   string `json:"parent_agent_id,omitempty"`
 }
 
 // SessionKey identifies a single transcript stream in a [SessionStore].

@@ -1090,6 +1090,80 @@ func TestListSubagents_AndGetSubagentMessages(t *testing.T) {
 	})
 }
 
+func TestGetSubagentMessages_MetaSidecar(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/subagent-meta")
+
+	parentContent := makeUserLine("u1", "", "parent") + "\n"
+	writeSessionFile(t, projDir, testUUID1, parentContent)
+
+	subagentsDir := filepath.Join(projDir, testUUID1, "subagents")
+	if err := os.MkdirAll(subagentsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	agentFile := filepath.Join(subagentsDir, "agent-abc.jsonl")
+	agentContent := strings.Join([]string{
+		makeUserLine("au1", "", "sub Q"),
+		makeAssistantLine("aa1", "au1", "sub A"),
+	}, "\n") + "\n"
+	if err := os.WriteFile(agentFile, []byte(agentContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	metaFile := filepath.Join(subagentsDir, "agent-abc.meta.json")
+	metaContent := `{"toolUseId":"tu-abc","parentAgentId":"agent-parent"}`
+	if err := os.WriteFile(metaFile, []byte(metaContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	msgs, err := GetSubagentMessages(testUUID1, "abc", GetSubagentMessagesOptions{
+		Directory: "/test/subagent-meta",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(msgs))
+	}
+	for _, m := range msgs {
+		if m.ParentToolUseID != "tu-abc" {
+			t.Errorf("ParentToolUseID = %q, want tu-abc", m.ParentToolUseID)
+		}
+		if m.ParentAgentID != "agent-parent" {
+			t.Errorf("ParentAgentID = %q, want agent-parent", m.ParentAgentID)
+		}
+	}
+}
+
+func TestGetSubagentMessages_NoMetaSidecarLeavesLineageEmpty(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/subagent-no-meta")
+
+	parentContent := makeUserLine("u1", "", "parent") + "\n"
+	writeSessionFile(t, projDir, testUUID1, parentContent)
+
+	subagentsDir := filepath.Join(projDir, testUUID1, "subagents")
+	if err := os.MkdirAll(subagentsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	agentFile := filepath.Join(subagentsDir, "agent-abc.jsonl")
+	if err := os.WriteFile(agentFile, []byte(makeUserLine("au1", "", "sub Q")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	msgs, err := GetSubagentMessages(testUUID1, "abc", GetSubagentMessagesOptions{
+		Directory: "/test/subagent-no-meta",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0].ParentToolUseID != "" || msgs[0].ParentAgentID != "" {
+		t.Errorf("expected empty lineage without sidecar, got %+v", msgs[0])
+	}
+}
+
 func TestGetSessionMessages_IncludeSystemMessages(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/system")
 
@@ -3219,7 +3293,8 @@ func TestGetSubagentMessagesFromStore_HappyPath(t *testing.T) {
 	entries := []SessionStoreEntry{
 		{"type": "user", "uuid": "su1", "sessionId": testUUID1, "message": map[string]any{"content": "sub Q"}},
 		{"type": "assistant", "uuid": "sa1", "parentUuid": "su1", "sessionId": testUUID1, "message": map[string]any{"content": "sub A"}},
-		// Synthetic agent_metadata entry — must be dropped.
+		// Synthetic agent_metadata entry — dropped from the transcript but
+		// its toolUseId/parentAgentId are stamped onto every message.
 		{"type": "agent_metadata", "agent": "abc"},
 	}
 	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-abc"}, entries); err != nil {
@@ -3235,6 +3310,44 @@ func TestGetSubagentMessagesFromStore_HappyPath(t *testing.T) {
 	}
 	if got[0].UUID != "su1" || got[1].UUID != "sa1" {
 		t.Errorf("unexpected UUID order: %q, %q", got[0].UUID, got[1].UUID)
+	}
+	for _, m := range got {
+		if m.ParentToolUseID != "" || m.ParentAgentID != "" {
+			t.Errorf("expected empty lineage when metadata lacks toolUseId/parentAgentId, got %+v", m)
+		}
+	}
+}
+
+func TestGetSubagentMessagesFromStore_AppliesLineageFromMetadata_LastWins(t *testing.T) {
+	store := NewInMemorySessionStore()
+	dir := "/test/sub-lineage"
+	projectKey := ProjectKeyForDirectory(dir)
+
+	entries := []SessionStoreEntry{
+		{"type": "user", "uuid": "su1", "sessionId": testUUID1, "message": map[string]any{"content": "sub Q"}},
+		{"type": "assistant", "uuid": "sa1", "parentUuid": "su1", "sessionId": testUUID1, "message": map[string]any{"content": "sub A"}},
+		{"type": "agent_metadata", "toolUseId": "tu-stale", "parentAgentId": "agent-stale"},
+		// Last agent_metadata entry wins, matching materializeSubkeys' write-side semantics.
+		{"type": "agent_metadata", "toolUseId": "tu-fresh", "parentAgentId": "agent-fresh"},
+	}
+	if err := store.Append(context.Background(), SessionKey{ProjectKey: projectKey, SessionID: testUUID1, Subpath: "subagents/agent-abc"}, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := GetSubagentMessagesFromStore(context.Background(), store, testUUID1, "abc", GetSubagentMessagesOptions{Directory: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(got))
+	}
+	for _, m := range got {
+		if m.ParentToolUseID != "tu-fresh" {
+			t.Errorf("ParentToolUseID = %q, want tu-fresh", m.ParentToolUseID)
+		}
+		if m.ParentAgentID != "agent-fresh" {
+			t.Errorf("ParentAgentID = %q, want agent-fresh", m.ParentAgentID)
+		}
 	}
 }
 
