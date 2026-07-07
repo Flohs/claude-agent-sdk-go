@@ -16,19 +16,27 @@ import (
 
 // query handles the bidirectional control protocol on top of Transport.
 type query struct {
-	transport     Transport
-	canUseTool    CanUseToolFunc
-	hooks         map[string][]hookMatcherInternal
-	mcpRouter     *sdkMcpRouter
-	agents        map[string]map[string]any
+	transport  Transport
+	canUseTool CanUseToolFunc
+	hooks      map[string][]hookMatcherInternal
+	mcpRouter  *sdkMcpRouter
+	agents     map[string]map[string]any
 
 	// Control protocol state
-	pendingMu       sync.Mutex
-	pendingEvents   map[string]chan struct{}
-	pendingResults  map[string]any // map[string](map[string]any | error)
-	hookCallbacks   map[string]HookCallback
-	nextCallbackID  int
-	requestCounter  int
+	pendingMu      sync.Mutex
+	pendingEvents  map[string]chan struct{}
+	pendingResults map[string]any // map[string](map[string]any | error)
+	hookCallbacks  map[string]HookCallback
+	nextCallbackID int
+	requestCounter int
+
+	// inFlightMu guards inFlightControlRequests, the set of inbound
+	// control_request request_ids currently being handled. Guards against
+	// duplicate delivery (e.g. a redelivered pending_permission_requests
+	// entry, or a transport-level redelivery) invoking a permission/hook
+	// callback twice for the same request. Port of TypeScript SDK v0.3.196.
+	inFlightMu              sync.Mutex
+	inFlightControlRequests map[string]struct{}
 
 	// Message channel
 	messageCh chan map[string]any
@@ -62,15 +70,15 @@ type query struct {
 	flushTimeout   time.Duration
 	stderrCallback func(string)
 
-	ctx       context.Context
-	cancelFn  context.CancelFunc
-	wg        sync.WaitGroup
+	ctx      context.Context
+	cancelFn context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 type hookMatcherInternal struct {
-	matcher  string
-	hooks    []HookCallback
-	timeout  *float64
+	matcher string
+	hooks   []HookCallback
+	timeout *float64
 }
 
 type queryConfig struct {
@@ -120,21 +128,22 @@ func newQuery(cfg queryConfig) *query {
 	}
 
 	q := &query{
-		transport:              cfg.transport,
-		canUseTool:             cfg.canUseTool,
-		hookCallbacks:          make(map[string]HookCallback),
-		pendingEvents:          make(map[string]chan struct{}),
-		pendingResults:         make(map[string]any),
-		messageCh:              make(chan map[string]any, 100),
-		initTimeout:            initTimeout,
-		firstResultCh:          make(chan struct{}),
-		mainResultCh:           make(chan struct{}),
-		streamCloseTimeout:     streamCloseTimeoutMs / 1000.0,
-		excludeDynamicSections: cfg.excludeDynamicSections,
-		flushTimeout:           flushTimeout,
-		stderrCallback:         cfg.stderr,
-		ctx:                    ctx,
-		cancelFn:               cancel,
+		transport:               cfg.transport,
+		canUseTool:              cfg.canUseTool,
+		hookCallbacks:           make(map[string]HookCallback),
+		pendingEvents:           make(map[string]chan struct{}),
+		pendingResults:          make(map[string]any),
+		inFlightControlRequests: make(map[string]struct{}),
+		messageCh:               make(chan map[string]any, 100),
+		initTimeout:             initTimeout,
+		firstResultCh:           make(chan struct{}),
+		mainResultCh:            make(chan struct{}),
+		streamCloseTimeout:      streamCloseTimeoutMs / 1000.0,
+		excludeDynamicSections:  cfg.excludeDynamicSections,
+		flushTimeout:            flushTimeout,
+		stderrCallback:          cfg.stderr,
+		ctx:                     ctx,
+		cancelFn:                cancel,
 	}
 
 	if cfg.sessionStore != nil {
@@ -471,6 +480,29 @@ func (q *query) handleControlRequest(msg map[string]any) {
 	requestID, _ := msg["request_id"].(string)
 	request, _ := msg["request"].(map[string]any)
 	subtype, _ := request["subtype"].(string)
+
+	// Guard against duplicate delivery of the same in-flight request_id (e.g.
+	// a redelivered pending_permission_requests entry, or a transport-level
+	// redelivery), which would otherwise invoke the callback twice and write
+	// two control_responses for the same ID. An empty request_id is never
+	// deduped: the synthetic pending_permission_requests dispatch does not
+	// currently set one, and treating every empty ID as the same key would
+	// incorrectly drop unrelated redelivered requests. Port of TypeScript SDK
+	// v0.3.196.
+	if requestID != "" {
+		q.inFlightMu.Lock()
+		if _, dup := q.inFlightControlRequests[requestID]; dup {
+			q.inFlightMu.Unlock()
+			return
+		}
+		q.inFlightControlRequests[requestID] = struct{}{}
+		q.inFlightMu.Unlock()
+		defer func() {
+			q.inFlightMu.Lock()
+			delete(q.inFlightControlRequests, requestID)
+			q.inFlightMu.Unlock()
+		}()
+	}
 
 	type callbackResult struct {
 		resp map[string]any
