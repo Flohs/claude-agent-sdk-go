@@ -204,7 +204,7 @@ func interruptExample(ctx context.Context) {
 		// Interrupt after receiving a few messages
 		if msgCount >= 2 {
 			fmt.Println("\n  [Sending interrupt...]")
-			if err := client.Interrupt(ctx); err != nil {
+			if _, err := client.Interrupt(ctx); err != nil {
 				fmt.Println("  Interrupt error:", err)
 			}
 		}
