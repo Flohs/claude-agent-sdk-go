@@ -238,6 +238,28 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 		}
 		return msg, nil
 
+	case "background_tasks_changed":
+		msg := &BackgroundTasksChangedMessage{
+			SystemMessage: base,
+			SessionID:     stringField(data, "session_id"),
+			UUID:          stringField(data, "uuid"),
+		}
+		if rawTasks, ok := data["tasks"].([]any); ok {
+			msg.Tasks = make([]BackgroundTaskInfo, 0, len(rawTasks))
+			for _, rawTask := range rawTasks {
+				taskMap, ok := rawTask.(map[string]any)
+				if !ok {
+					continue
+				}
+				msg.Tasks = append(msg.Tasks, BackgroundTaskInfo{
+					TaskID:      stringField(taskMap, "task_id"),
+					TaskType:    stringField(taskMap, "task_type"),
+					Description: stringField(taskMap, "description"),
+				})
+			}
+		}
+		return msg, nil
+
 	case "task_notification":
 		var usage *TaskUsage
 		if u := data["usage"]; u != nil {

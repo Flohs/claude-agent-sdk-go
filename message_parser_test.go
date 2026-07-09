@@ -779,6 +779,82 @@ func TestParseMessage_MirrorErrorMessage_NullKey(t *testing.T) {
 	}
 }
 
+func TestParseMessage_BackgroundTasksChangedMessage(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "background_tasks_changed",
+		"uuid":       "btc-uuid-1",
+		"session_id": "sess-1",
+		"tasks": []any{
+			map[string]any{
+				"task_id":     "task-1",
+				"task_type":   "agent",
+				"description": "Refactor the parser",
+			},
+			map[string]any{
+				"task_id":     "task-2",
+				"task_type":   "workflow",
+				"description": "Run the test suite",
+			},
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	btc, ok := msg.(*BackgroundTasksChangedMessage)
+	if !ok {
+		t.Fatalf("expected *BackgroundTasksChangedMessage, got %T", msg)
+	}
+	if btc.UUID != "btc-uuid-1" {
+		t.Errorf("UUID = %q", btc.UUID)
+	}
+	if btc.SessionID != "sess-1" {
+		t.Errorf("SessionID = %q", btc.SessionID)
+	}
+	if len(btc.Tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(btc.Tasks))
+	}
+	want := []BackgroundTaskInfo{
+		{TaskID: "task-1", TaskType: "agent", Description: "Refactor the parser"},
+		{TaskID: "task-2", TaskType: "workflow", Description: "Run the test suite"},
+	}
+	for i, w := range want {
+		if btc.Tasks[i] != w {
+			t.Errorf("Tasks[%d] = %+v, want %+v", i, btc.Tasks[i], w)
+		}
+	}
+	if btc.Subtype != "background_tasks_changed" {
+		t.Errorf("Subtype = %q", btc.Subtype)
+	}
+}
+
+func TestParseMessage_BackgroundTasksChangedMessage_EmptyTasks(t *testing.T) {
+	// An empty tasks list is the "no more background work" signal and must
+	// round-trip as an empty (not nil) slice being acceptable either way —
+	// the important thing is no error and no leftover tasks.
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "background_tasks_changed",
+		"uuid":       "btc-uuid-2",
+		"session_id": "sess-1",
+		"tasks":      []any{},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	btc, ok := msg.(*BackgroundTasksChangedMessage)
+	if !ok {
+		t.Fatalf("expected *BackgroundTasksChangedMessage, got %T", msg)
+	}
+	if len(btc.Tasks) != 0 {
+		t.Errorf("expected 0 tasks, got %d", len(btc.Tasks))
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Coverage for [Unreleased] message-parser additions (#204):
 // AssistantMessage.RequestID, ResultMessage.Origin / RequestID /

@@ -342,6 +342,37 @@ type TaskUpdatedMessage struct {
 	UUID string `json:"uuid,omitempty"`
 }
 
+// BackgroundTaskInfo describes one live background task in a
+// [BackgroundTasksChangedMessage] payload.
+// Port of TypeScript SDK v0.3.203.
+type BackgroundTaskInfo struct {
+	TaskID      string `json:"task_id"`
+	TaskType    string `json:"task_type"`
+	Description string `json:"description"`
+}
+
+// BackgroundTasksChangedMessage is emitted as a system/background_tasks_changed
+// event whenever background-task membership changes: a start, a completion, a
+// kill, or a foreground agent being backgrounded. Unlike the
+// [TaskStartedMessage]/[TaskNotificationMessage] edge bookends, this is a level
+// signal — Tasks is the full set of live background tasks after the change, so
+// consumers tracking "is background work running" should replace their tracked
+// set with Tasks on every message rather than pairing edges, ensuring a missed
+// bookend cannot wedge a stale indicator. The level is per-process: nothing is
+// emitted at startup, so consumers must reset to the empty set whenever the
+// session's CLI process (re)starts and let the next message repopulate it.
+// Port of TypeScript SDK v0.3.203.
+type BackgroundTasksChangedMessage struct {
+	SystemMessage
+	// Tasks is every live background task after the change. REPLACE
+	// semantics: swap your tracked set for this payload.
+	Tasks []BackgroundTaskInfo `json:"tasks"`
+	// UUID uniquely identifies this event.
+	UUID string `json:"uuid,omitempty"`
+	// SessionID is the session this event belongs to.
+	SessionID string `json:"session_id,omitempty"`
+}
+
 // TaskStatus represents the lifecycle state of a task managed by the Task tools.
 type TaskStatus string
 
