@@ -837,7 +837,7 @@ func (q *query) receiveMessages() <-chan map[string]any {
 	return out
 }
 
-func (q *query) interrupt(ctx context.Context) error {
+func (q *query) interrupt(ctx context.Context) (*InterruptReceipt, error) {
 	// Run sendControlRequest in a goroutine so we can select on ctx.Done()
 	// for both deadline expiry and explicit cancellation. The underlying
 	// request still runs to completion (best-effort signal to the subprocess),
@@ -853,9 +853,20 @@ func (q *query) interrupt(ctx context.Context) error {
 	}()
 	select {
 	case r := <-ch:
-		return r.err
+		if r.err != nil {
+			return nil, r.err
+		}
+		receipt := &InterruptReceipt{}
+		if stillQueued, ok := r.resp["still_queued"].([]any); ok {
+			for _, v := range stillQueued {
+				if s, ok := v.(string); ok {
+					receipt.StillQueued = append(receipt.StillQueued, s)
+				}
+			}
+		}
+		return receipt, nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 }
 

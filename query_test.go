@@ -924,3 +924,116 @@ func TestHandleControlRequest_DuplicateInFlightRequestIsIgnored(t *testing.T) {
 		t.Fatalf("expected exactly one control_response write, got %d: %v", len(mt.written), mt.written)
 	}
 }
+
+// interruptRespondTransport auto-responds to control requests like
+// autoRespondTransport, but replies to "interrupt" requests with a
+// configurable response body so tests can simulate both the
+// interrupt_receipt_v1 payload and older CLIs that omit it.
+type interruptRespondTransport struct {
+	mockTransport
+	interruptResponse map[string]any
+}
+
+func newInterruptRespondTransport(interruptResponse map[string]any) *interruptRespondTransport {
+	return &interruptRespondTransport{
+		mockTransport:     mockTransport{messages: make(chan map[string]any, 100)},
+		interruptResponse: interruptResponse,
+	}
+}
+
+func (a *interruptRespondTransport) Write(data string) error {
+	a.mu.Lock()
+	a.written = append(a.written, data)
+	a.mu.Unlock()
+
+	var msg map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(data)), &msg); err == nil {
+		if msg["type"] == "control_request" {
+			reqID, _ := msg["request_id"].(string)
+			response := map[string]any{}
+			if req, ok := msg["request"].(map[string]any); ok && req["subtype"] == "interrupt" {
+				response = a.interruptResponse
+			}
+			go func() {
+				a.messages <- map[string]any{
+					"type": "control_response",
+					"response": map[string]any{
+						"subtype":    "success",
+						"request_id": reqID,
+						"response":   response,
+					},
+				}
+			}()
+		}
+	}
+	return nil
+}
+
+func (a *interruptRespondTransport) ReadMessages(ctx context.Context) <-chan map[string]any {
+	out := make(chan map[string]any, 100)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case msg, ok := <-a.messages:
+				if !ok {
+					return
+				}
+				out <- msg
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out
+}
+
+// TestInterrupt_PopulatesStillQueued verifies that query.interrupt surfaces
+// the still_queued uuids from a CLI advertising interrupt_receipt_v1. Port
+// of TypeScript SDK v0.3.205.
+func TestInterrupt_PopulatesStillQueued(t *testing.T) {
+	mt := newInterruptRespondTransport(map[string]any{
+		"still_queued": []any{"uuid-1", "uuid-2"},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	receipt, err := q.interrupt(context.Background())
+	if err != nil {
+		t.Fatalf("interrupt failed: %v", err)
+	}
+	if receipt == nil {
+		t.Fatal("expected non-nil receipt")
+	}
+	want := []string{"uuid-1", "uuid-2"}
+	if len(receipt.StillQueued) != len(want) {
+		t.Fatalf("StillQueued = %v, want %v", receipt.StillQueued, want)
+	}
+	for i, s := range want {
+		if receipt.StillQueued[i] != s {
+			t.Fatalf("StillQueued[%d] = %q, want %q", i, receipt.StillQueued[i], s)
+		}
+	}
+}
+
+// TestInterrupt_OlderCLIOmitsStillQueued verifies that an empty success
+// response (older CLIs without interrupt_receipt_v1) yields a non-nil
+// receipt with a nil StillQueued, rather than an error.
+func TestInterrupt_OlderCLIOmitsStillQueued(t *testing.T) {
+	mt := newInterruptRespondTransport(map[string]any{})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	receipt, err := q.interrupt(context.Background())
+	if err != nil {
+		t.Fatalf("interrupt failed: %v", err)
+	}
+	if receipt == nil {
+		t.Fatal("expected non-nil receipt")
+	}
+	if receipt.StillQueued != nil {
+		t.Fatalf("StillQueued = %v, want nil", receipt.StillQueued)
+	}
+}

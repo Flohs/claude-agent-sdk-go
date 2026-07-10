@@ -311,9 +311,14 @@ func (c *Client) ReceiveResponse(ctx context.Context) <-chan Message {
 // Interrupt sends an interrupt signal to the current operation.
 // The ctx parameter is respected: if the context is cancelled or its deadline
 // expires, the interrupt request is abandoned.
-func (c *Client) Interrupt(ctx context.Context) error {
+//
+// On CLIs advertising the "interrupt_receipt_v1" protocol capability (see
+// [ServerCapabilities.Capabilities]), the returned [InterruptReceipt] lists
+// uuids of async user messages that survive the interrupt. Older CLIs return
+// a zero-value receipt with a nil StillQueued.
+func (c *Client) Interrupt(ctx context.Context) (*InterruptReceipt, error) {
 	if c.q == nil {
-		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
 	return c.q.interrupt(ctx)
 }

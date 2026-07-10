@@ -850,6 +850,25 @@ type ReadStateEntry struct {
 	Mtime int64  `json:"mtime"`
 }
 
+// InterruptReceipt is the result of [Client.Interrupt] on CLIs advertising
+// the "interrupt_receipt_v1" protocol capability (see
+// [ServerCapabilities.Capabilities]); older CLIs return a zero-value receipt
+// with a nil StillQueued. Port of TypeScript SDK v0.3.205.
+type InterruptReceipt struct {
+	// StillQueued lists uuids of async user messages that survive this
+	// interrupt: commands still in the queue, plus any batch already
+	// dequeued for the imminent turn but not yet reachable by the abort.
+	// These WILL run unless cancelled first via a mechanism outside this
+	// SDK's current surface. Coverage caveats: only uuid-stamped messages
+	// appear (a message enqueued without a uuid still runs but is never
+	// listed, so an empty slice does not mean "nothing will run"); only
+	// main-thread messages are listed; the list may include
+	// internally-enqueued uuids the caller never sent (cron triggers,
+	// auto-resume continuations) — treat unknown uuids as informational
+	// rather than an error.
+	StillQueued []string
+}
+
 // ServerCapabilities describes model-level capabilities reported by the CLI
 // during session initialization. These fields allow callers to dynamically
 // check which effort levels and thinking modes the currently active model
