@@ -888,6 +888,14 @@ type ServerCapabilities struct {
 	// MemoryPaths is the list of memory file paths loaded at session initialization.
 	// Empty when no memory files are configured.
 	MemoryPaths []string `json:"memoryPaths,omitempty"`
+	// Capabilities lists protocol capabilities the CLI supports, letting
+	// callers feature-detect instead of version-sniffing. This is an open
+	// set: ignore unknown values and check only for the specific values you
+	// use. Known values include "interrupt_receipt_v1" (the interrupt
+	// control response's success payload carries a still_queued list of
+	// uuids). Empty on CLIs that predate this field. Port of TypeScript SDK
+	// v0.3.205.
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // SessionMessage represents a user or assistant message from a session transcript.

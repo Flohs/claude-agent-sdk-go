@@ -559,6 +559,13 @@ func (c *Client) GetServerCapabilities() *ServerCapabilities {
 			}
 		}
 	}
+	if values, ok := c.q.initializationResult["capabilities"].([]any); ok {
+		for _, v := range values {
+			if s, ok := v.(string); ok {
+				caps.Capabilities = append(caps.Capabilities, s)
+			}
+		}
+	}
 	return caps
 }
 
