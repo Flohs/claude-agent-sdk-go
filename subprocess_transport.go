@@ -342,6 +342,17 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 			}
 		}
 
+		if err := scanner.Err(); err != nil {
+			select {
+			case ch <- map[string]any{
+				"type":  "error",
+				"error": fmt.Sprintf("Failed to read CLI output: %v", err),
+			}:
+			case <-ctx.Done():
+				return
+			}
+		}
+
 		// Wait for process to finish and check exit code
 		if t.cmd != nil {
 			cmd := t.cmd

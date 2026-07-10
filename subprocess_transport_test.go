@@ -1,6 +1,8 @@
 package claude
 
 import (
+	"context"
+	"io"
 	"strings"
 	"testing"
 )
@@ -835,5 +837,37 @@ func TestHandleStderr_PanicInCallbackDoesNotAbortLoop(t *testing.T) {
 	if len(delivered) != totalLines {
 		t.Errorf("expected %d lines delivered, got %d — panic on line %d aborted the loop",
 			totalLines, len(delivered), panicOnLine)
+	}
+}
+
+// TestReadMessages_SurfacesScannerErrTooLong is a regression test: previously
+// a line exceeding maxBufSize caused bufio.Scanner to stop with
+// bufio.ErrTooLong, and ReadMessages silently ended the channel with no
+// indication anything went wrong. It must now surface a "type": "error"
+// message so callers see the failure instead of a silent truncated stream.
+func TestReadMessages_SurfacesScannerErrTooLong(t *testing.T) {
+	oversized := strings.Repeat("a", 200)
+	line := `{"type":"assistant","` + oversized + `":"x"}` + "\n"
+
+	transport := &SubprocessTransport{
+		stdout:     io.NopCloser(strings.NewReader(line)),
+		maxBufSize: 64, // smaller than the line above, forces ErrTooLong
+	}
+
+	ch := transport.ReadMessages(context.Background())
+
+	var sawError bool
+	for msg := range ch {
+		if msg["type"] == "error" {
+			sawError = true
+			errStr, _ := msg["error"].(string)
+			if errStr == "" {
+				t.Error("expected non-empty error message for oversized line")
+			}
+		}
+	}
+
+	if !sawError {
+		t.Error("expected a \"type\": \"error\" message when a line exceeds maxBufSize, got none")
 	}
 }
