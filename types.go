@@ -342,6 +342,39 @@ type TaskUpdatedMessage struct {
 	UUID string `json:"uuid,omitempty"`
 }
 
+// CommandLifecycleState is the lifecycle state of a queued command reported
+// by a [CommandLifecycleMessage].
+// Port of TypeScript SDK v0.3.206.
+type CommandLifecycleState string
+
+const (
+	CommandLifecycleStateQueued    CommandLifecycleState = "queued"
+	CommandLifecycleStateStarted   CommandLifecycleState = "started"
+	CommandLifecycleStateCompleted CommandLifecycleState = "completed"
+	CommandLifecycleStateCancelled CommandLifecycleState = "cancelled"
+	CommandLifecycleStateDiscarded CommandLifecycleState = "discarded"
+)
+
+// CommandLifecycleMessage is emitted as a system/command_lifecycle event
+// reporting the lifecycle state of a previously-queued command. CommandUUID
+// identifies the queued message this event pertains to. A Cancelled state
+// may result from an explicit cancel or from the turn that would have
+// consumed the command dying (e.g. a ResultMessage with TerminalReason
+// "tool_deferred_unavailable", "turn_setup_failed", "api_error",
+// "malformed_tool_use_exhausted", "budget_exhausted", or
+// "structured_output_retry_exhausted") — such turns previously reported
+// "completed" for commands they consumed.
+// Port of TypeScript SDK v0.3.204-v0.3.206.
+type CommandLifecycleMessage struct {
+	SystemMessage
+	// CommandUUID is the uuid of the queued command this event reports on.
+	CommandUUID string `json:"uuid"`
+	// State is the lifecycle state of the command.
+	State CommandLifecycleState `json:"state"`
+	// SessionID is the session this event belongs to.
+	SessionID string `json:"session_id,omitempty"`
+}
+
 // BackgroundTaskInfo describes one live background task in a
 // [BackgroundTasksChangedMessage] payload.
 // Port of TypeScript SDK v0.3.203.

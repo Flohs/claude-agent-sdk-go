@@ -855,6 +855,72 @@ func TestParseMessage_BackgroundTasksChangedMessage_EmptyTasks(t *testing.T) {
 	}
 }
 
+func TestParseMessage_CommandLifecycleMessage(t *testing.T) {
+	states := []CommandLifecycleState{
+		CommandLifecycleStateQueued,
+		CommandLifecycleStateStarted,
+		CommandLifecycleStateCompleted,
+		CommandLifecycleStateCancelled,
+		CommandLifecycleStateDiscarded,
+	}
+	for _, state := range states {
+		t.Run(string(state), func(t *testing.T) {
+			data := map[string]any{
+				"type":       "system",
+				"subtype":    "command_lifecycle",
+				"uuid":       "cmd-uuid-1",
+				"session_id": "sess-1",
+				"state":      string(state),
+			}
+
+			msg, err := ParseMessage(data)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			cl, ok := msg.(*CommandLifecycleMessage)
+			if !ok {
+				t.Fatalf("expected *CommandLifecycleMessage, got %T", msg)
+			}
+			if cl.CommandUUID != "cmd-uuid-1" {
+				t.Errorf("CommandUUID = %q", cl.CommandUUID)
+			}
+			if cl.SessionID != "sess-1" {
+				t.Errorf("SessionID = %q", cl.SessionID)
+			}
+			if cl.State != state {
+				t.Errorf("State = %q, want %q", cl.State, state)
+			}
+			// Must still satisfy the Message interface via the embedded
+			// SystemMessage, matching every other typed system subtype.
+			var _ Message = cl
+		})
+	}
+}
+
+func TestParseMessage_CommandLifecycleMessage_MinimalPayload(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "command_lifecycle",
+		"uuid":    "cmd-uuid-2",
+		"state":   "queued",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cl, ok := msg.(*CommandLifecycleMessage)
+	if !ok {
+		t.Fatalf("expected *CommandLifecycleMessage, got %T", msg)
+	}
+	if cl.SessionID != "" {
+		t.Errorf("expected empty SessionID, got %q", cl.SessionID)
+	}
+	if cl.State != CommandLifecycleStateQueued {
+		t.Errorf("State = %q", cl.State)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Coverage for [Unreleased] message-parser additions (#204):
 // AssistantMessage.RequestID, ResultMessage.Origin / RequestID /

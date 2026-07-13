@@ -238,6 +238,14 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 		}
 		return msg, nil
 
+	case "command_lifecycle":
+		return &CommandLifecycleMessage{
+			SystemMessage: base,
+			CommandUUID:   stringField(data, "uuid"),
+			State:         CommandLifecycleState(stringField(data, "state")),
+			SessionID:     stringField(data, "session_id"),
+		}, nil
+
 	case "background_tasks_changed":
 		msg := &BackgroundTasksChangedMessage{
 			SystemMessage: base,
