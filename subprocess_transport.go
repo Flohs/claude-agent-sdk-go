@@ -532,6 +532,16 @@ func (t *SubprocessTransport) callStderr(line string) {
 	t.options.Stderr(line)
 }
 
+// appendFlagValue appends a "--flag value" pair to cmd, binding dash-leading
+// values with equals-form argv ("--flag=value") so the CLI's arg parser
+// cannot mistake the value for a flag of its own (e.g. resume: "--version").
+func appendFlagValue(cmd []string, flag, value string) []string {
+	if strings.HasPrefix(value, "-") {
+		return append(cmd, "--"+flag+"="+value)
+	}
+	return append(cmd, "--"+flag, value)
+}
+
 func (t *SubprocessTransport) buildCommand() []string {
 	cmd := []string{t.cliPath, "--output-format", "stream-json", "--verbose"}
 
@@ -651,7 +661,7 @@ func (t *SubprocessTransport) buildCommand() []string {
 	}
 
 	if opts.Resume != "" {
-		cmd = append(cmd, "--resume", opts.Resume)
+		cmd = appendFlagValue(cmd, "resume", opts.Resume)
 	}
 
 	if opts.SessionID != "" {
@@ -766,7 +776,7 @@ func (t *SubprocessTransport) buildCommand() []string {
 		if value == "" {
 			cmd = append(cmd, "--"+flag)
 		} else {
-			cmd = append(cmd, "--"+flag, value)
+			cmd = appendFlagValue(cmd, flag, value)
 		}
 	}
 

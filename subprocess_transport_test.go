@@ -178,6 +178,32 @@ func TestBuildCommand_ExtraArgs(t *testing.T) {
 	assertContainsFlag(t, cmd, "--replay-user-messages")
 }
 
+func TestBuildCommand_ExtraArgsFlagLikeValue(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			ExtraArgs: map[string]string{
+				"resume": "--version",
+			},
+		},
+	}
+	cmd := transport.buildCommand()
+	assertContainsFlag(t, cmd, "--resume=--version")
+	assertNotContainsFlag(t, cmd, "--version")
+}
+
+func TestBuildCommand_ResumeFlagLikeValue(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			Resume: "--version",
+		},
+	}
+	cmd := transport.buildCommand()
+	assertContainsFlag(t, cmd, "--resume=--version")
+	assertNotContainsFlag(t, cmd, "--version")
+}
+
 func TestConnectEnv_IncludePartialMessages(t *testing.T) {
 	t.Run("does not set CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING even when true", func(t *testing.T) {
 		env := buildTestEnv(&Options{IncludePartialMessages: true})
