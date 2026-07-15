@@ -1037,3 +1037,105 @@ func TestInterrupt_OlderCLIOmitsStillQueued(t *testing.T) {
 		t.Fatalf("StillQueued = %v, want nil", receipt.StillQueued)
 	}
 }
+
+// TestHandleHookCallback_TimesOutHungCallback verifies that a hook callback
+// which never returns is bounded by its configured per-callback timeout
+// instead of wedging the control request forever.
+func TestHandleHookCallback_TimesOutHungCallback(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+
+	observedCancel := make(chan struct{})
+	q.hookCallbacks["hook_0"] = func(ctx context.Context, input HookInput, toolUseID string, hookCtx HookContext) (HookJSONOutput, error) {
+		<-ctx.Done()
+		close(observedCancel)
+		return nil, ctx.Err()
+	}
+	q.hookCallbackTimeouts["hook_0"] = 20 * time.Millisecond
+
+	_, err := q.handleHookCallback(map[string]any{
+		"callback_id": "hook_0",
+		"input":       map[string]any{},
+		"tool_use_id": "tu-1",
+	})
+	if err == nil {
+		t.Fatal("expected a timeout error, got nil")
+	}
+	if !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("expected timeout error message, got: %v", err)
+	}
+
+	select {
+	case <-observedCancel:
+	case <-time.After(time.Second):
+		t.Fatal("callback goroutine never observed its context being cancelled")
+	}
+}
+
+// TestHandleHookCallback_DefaultTimeoutWhenUnset verifies that a callback ID
+// with no recorded timeout (e.g. registered without going through
+// initialize()) still gets the documented 60s default rather than blocking
+// forever, by using a fast-returning callback and asserting success.
+func TestHandleHookCallback_DefaultTimeoutWhenUnset(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+
+	q.hookCallbacks["hook_0"] = func(ctx context.Context, input HookInput, toolUseID string, hookCtx HookContext) (HookJSONOutput, error) {
+		return HookJSONOutput{"decision": "approve"}, nil
+	}
+	// Intentionally not populating q.hookCallbackTimeouts["hook_0"].
+
+	resp, err := q.handleHookCallback(map[string]any{
+		"callback_id": "hook_0",
+		"input":       map[string]any{},
+		"tool_use_id": "tu-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp["decision"] != "approve" {
+		t.Fatalf("expected decision=approve, got: %v", resp)
+	}
+}
+
+// TestHandleHookCallback_SessionCancellationPropagates verifies that when the
+// query's own context is cancelled (not just the per-callback timeout), the
+// returned error reflects context cancellation rather than a misleading
+// "timed out" message.
+func TestHandleHookCallback_SessionCancellationPropagates(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+
+	started := make(chan struct{})
+	q.hookCallbacks["hook_0"] = func(ctx context.Context, input HookInput, toolUseID string, hookCtx HookContext) (HookJSONOutput, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	q.hookCallbackTimeouts["hook_0"] = time.Minute
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := q.handleHookCallback(map[string]any{
+			"callback_id": "hook_0",
+			"input":       map[string]any{},
+			"tool_use_id": "tu-1",
+		})
+		done <- err
+	}()
+
+	<-started
+	q.cancelFn()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected an error from session cancellation")
+		}
+		if strings.Contains(err.Error(), "timed out") {
+			t.Fatalf("expected session-cancellation error, got timeout error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("handleHookCallback never returned after session cancellation")
+	}
+}
