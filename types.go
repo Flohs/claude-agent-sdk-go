@@ -465,6 +465,17 @@ type NotebookEditResult struct {
 	OldSource string `json:"old_source,omitempty"`
 }
 
+// BashToolOutput is the result returned by the Bash tool.
+// Accessible from [PostToolUseHookInput].ToolResponse when ToolName is "Bash"
+// (decode the map[string]any with json.Marshal/Unmarshal, as with [NotebookEditResult]).
+// Port of TypeScript SDK v0.3.210.
+type BashToolOutput struct {
+	// TimedOutAfterMs is set when the command was auto-backgrounded after
+	// exceeding its timeout, giving the elapsed time in milliseconds at the
+	// point of backgrounding. Nil when the command completed normally.
+	TimedOutAfterMs *int `json:"timedOutAfterMs,omitempty"`
+}
+
 // TaskCreateInput is the input schema for the TaskCreate tool.
 type TaskCreateInput struct {
 	Subject     string         `json:"subject"`
