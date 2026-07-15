@@ -27,8 +27,13 @@ type query struct {
 	pendingEvents  map[string]chan struct{}
 	pendingResults map[string]any // map[string](map[string]any | error)
 	hookCallbacks  map[string]HookCallback
-	nextCallbackID int
-	requestCounter int
+	// hookCallbackTimeouts holds the resolved per-callback timeout (mirroring
+	// the value forwarded to the CLI at registration), keyed by the same
+	// callback ID used in hookCallbacks. Enforced client-side so a hook
+	// callback that never returns can't wedge its control request forever.
+	hookCallbackTimeouts map[string]time.Duration
+	nextCallbackID       int
+	requestCounter       int
 
 	// inFlightMu guards inFlightControlRequests, the set of inbound
 	// control_request request_ids currently being handled. Guards against
@@ -131,6 +136,7 @@ func newQuery(cfg queryConfig) *query {
 		transport:               cfg.transport,
 		canUseTool:              cfg.canUseTool,
 		hookCallbacks:           make(map[string]HookCallback),
+		hookCallbackTimeouts:    make(map[string]time.Duration),
 		pendingEvents:           make(map[string]chan struct{}),
 		pendingResults:          make(map[string]any),
 		inFlightControlRequests: make(map[string]struct{}),
@@ -646,6 +652,11 @@ func (q *query) handleCanUseTool(request map[string]any, requestID string) (map[
 	}
 }
 
+// defaultHookCallbackTimeout is the fallback per-callback hook timeout when a
+// [HookMatcher] does not set Timeout, matching the documented default on
+// [HookMatcher.Timeout].
+const defaultHookCallbackTimeout = 60 * time.Second
+
 func (q *query) handleHookCallback(request map[string]any) (map[string]any, error) {
 	callbackID, _ := request["callback_id"].(string)
 	callback, ok := q.hookCallbacks[callbackID]
@@ -653,16 +664,41 @@ func (q *query) handleHookCallback(request map[string]any) (map[string]any, erro
 		return nil, fmt.Errorf("no hook callback found for ID: %s", callbackID)
 	}
 
+	timeout := defaultHookCallbackTimeout
+	if t, ok := q.hookCallbackTimeouts[callbackID]; ok {
+		timeout = t
+	}
+
 	input, _ := request["input"].(map[string]any)
 	toolUseID, _ := request["tool_use_id"].(string)
 
-	output, err := callback(q.ctx, HookInput(input), toolUseID, HookContext{})
-	if err != nil {
-		return nil, err
-	}
+	ctx, cancel := context.WithTimeout(q.ctx, timeout)
+	defer cancel()
 
-	// Convert Go-safe field names if needed
-	return map[string]any(output), nil
+	type callbackResult struct {
+		output HookJSONOutput
+		err    error
+	}
+	resultCh := make(chan callbackResult, 1)
+	go func() {
+		output, err := callback(ctx, HookInput(input), toolUseID, HookContext{})
+		resultCh <- callbackResult{output, err}
+	}()
+
+	select {
+	case result := <-resultCh:
+		if result.err != nil {
+			return nil, result.err
+		}
+		// Convert Go-safe field names if needed
+		return map[string]any(result.output), nil
+	case <-ctx.Done():
+		if q.ctx.Err() != nil {
+			// The query itself was cancelled, not just this callback's timeout.
+			return nil, q.ctx.Err()
+		}
+		return nil, fmt.Errorf("hook callback timed out after %s", timeout)
+	}
 }
 
 func (q *query) handleMcpMessage(request map[string]any) (map[string]any, error) {
@@ -686,10 +722,15 @@ func (q *query) initialize() (map[string]any, error) {
 			matcherConfigs := make([]map[string]any, 0, len(matchers))
 			for _, m := range matchers {
 				callbackIDs := make([]string, 0, len(m.hooks))
+				timeout := defaultHookCallbackTimeout
+				if m.timeout != nil {
+					timeout = time.Duration(*m.timeout * float64(time.Second))
+				}
 				for _, cb := range m.hooks {
 					id := fmt.Sprintf("hook_%d", q.nextCallbackID)
 					q.nextCallbackID++
 					q.hookCallbacks[id] = cb
+					q.hookCallbackTimeouts[id] = timeout
 					callbackIDs = append(callbackIDs, id)
 				}
 				mc := map[string]any{
