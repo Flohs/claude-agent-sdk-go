@@ -832,6 +832,57 @@ type RateLimitEvent struct {
 
 func (RateLimitEvent) messageMarker() {}
 
+// The following prefix buckets classify a rate-limit-related message string
+// (e.g. surfaced in a ResultMessage or system message) by matching its
+// leading text with strings.HasPrefix, without hand-mirroring the literal
+// strings at each call site. They are plain []string, not arrays, so callers
+// must treat them as read-only: Go has no way to enforce immutability on a
+// slice. Port of TypeScript SDK v0.3.211 (published as @alpha exports;
+// values confirmed from the npm package's bundled sdk.d.ts, since the
+// TypeScript SDK's GitHub repository does not expose its .ts source).
+var (
+	// OrgPolicyLimitPrefixes matches messages indicating the org has
+	// disabled this service via policy.
+	OrgPolicyLimitPrefixes = []string{
+		"This service is disabled for your org",
+	}
+
+	// UsageLimitErrorPrefixes matches messages indicating usage credits or
+	// allocation have been exhausted or disabled, blocking further use.
+	UsageLimitErrorPrefixes = []string{
+		"You've hit your",
+		"You've reached your",
+		"You're out of usage credits",
+		"Your org is out of usage · add funds to continue",
+		"Your org is out of usage · contact your admin",
+		"Your seat type doesn't include usage credits",
+		"Your seat type doesn't include usage",
+		"Your usage allocation has been disabled by your admin",
+		"Your group's usage limit is set to $0",
+		"Fable 5 requires usage credits",
+		"You're out of extra usage",
+		"Your seat type doesn't include extra usage",
+	}
+
+	// UsageTransitionPrefixes matches messages announcing a switch onto
+	// usage credits or a usage allocation after a prior limit condition.
+	UsageTransitionPrefixes = []string{
+		"You're now using usage credits",
+		"You're now using your usage allocation",
+		"Now using your usage allocation",
+		"Now using usage credits",
+		"You're now using extra usage",
+		"Now using extra usage",
+	}
+
+	// UsageWarningPrefixes matches messages warning that usage is
+	// approaching a limit, short of an outright rejection.
+	UsageWarningPrefixes = []string{
+		"You've used",
+		"You're close to",
+	}
+)
+
 // ContextUsage contains context window utilization broken down by category.
 type ContextUsage struct {
 	TotalTokens     int            `json:"total_tokens"`
