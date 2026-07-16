@@ -665,7 +665,7 @@ func (t *SubprocessTransport) buildCommand() []string {
 	}
 
 	if opts.SessionID != "" {
-		cmd = append(cmd, "--session-id", opts.SessionID)
+		cmd = appendFlagValue(cmd, "session-id", opts.SessionID)
 	}
 
 	if opts.Title != "" {
