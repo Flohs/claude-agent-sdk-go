@@ -106,7 +106,7 @@ const (
 	ServerToolSearchBM25              ServerToolName = "tool_search_tool_bm25"
 	// ServerToolReadMcpResource is the server tool name for reading a single MCP
 	// resource by URI. Port of TypeScript SDK v0.3.186.
-	ServerToolReadMcpResource    ServerToolName = "read_mcp_resource"
+	ServerToolReadMcpResource ServerToolName = "read_mcp_resource"
 	// ServerToolReadMcpResourceDir is the server tool name for listing MCP
 	// resource directory contents by URI. A dedicated tool as of TypeScript SDK
 	// v0.3.186; previously a fallback inside ReadMcpResourceTool.
@@ -243,14 +243,14 @@ const (
 // TaskStartedMessage is emitted when a task starts.
 type TaskStartedMessage struct {
 	SystemMessage
-	TaskID          string `json:"task_id"`
-	Description     string `json:"description"`
-	UUID            string `json:"uuid"`
-	SessionID       string `json:"session_id"`
-	ToolUseID       string `json:"tool_use_id,omitempty"`
-	TaskType        string `json:"task_type,omitempty"`
+	TaskID      string `json:"task_id"`
+	Description string `json:"description"`
+	UUID        string `json:"uuid"`
+	SessionID   string `json:"session_id"`
+	ToolUseID   string `json:"tool_use_id,omitempty"`
+	TaskType    string `json:"task_type,omitempty"`
 	// SubagentType identifies the type of subagent that started this task.
-	SubagentType    string `json:"subagent_type,omitempty"`
+	SubagentType string `json:"subagent_type,omitempty"`
 	// TaskDescription is a human-readable description of the task.
 	TaskDescription string `json:"task_description,omitempty"`
 }
@@ -550,6 +550,120 @@ type TaskListOutput struct {
 	} `json:"tasks"`
 }
 
+// AgentOutputStatus discriminates the shape of the structured result payload
+// for the subagent-spawning "Agent" tool, which appears on the wire as
+// "Task" (distinct from the task-management TaskCreate/TaskGet/TaskUpdate/
+// TaskList family above). Port of TypeScript SDK v0.2.75/v0.3.207.
+type AgentOutputStatus string
+
+const (
+	// AgentOutputStatusCompleted indicates the subagent finished and
+	// [UserMessage.ToolUseResult] decodes as [AgentToolCompletedOutput].
+	AgentOutputStatusCompleted AgentOutputStatus = "completed"
+	// AgentOutputStatusAsyncLaunched indicates the subagent was launched in
+	// the background and [UserMessage.ToolUseResult] decodes as
+	// [AgentToolAsyncLaunchedOutput].
+	AgentOutputStatusAsyncLaunched AgentOutputStatus = "async_launched"
+	// AgentOutputStatusRemoteLaunched indicates the subagent was launched as
+	// a remote cloud session and [UserMessage.ToolUseResult] decodes as
+	// [AgentToolRemoteLaunchedOutput].
+	AgentOutputStatusRemoteLaunched AgentOutputStatus = "remote_launched"
+)
+
+// AgentContentBlock is a text block within
+// [AgentToolCompletedOutput].Content.
+type AgentContentBlock struct {
+	Type      string `json:"type"` // "text"
+	Text      string `json:"text"`
+	Citations []any  `json:"citations,omitempty"`
+}
+
+// AgentToolUsage mirrors the token-usage object embedded in
+// [AgentToolCompletedOutput].
+type AgentToolUsage struct {
+	InputTokens              int  `json:"input_tokens"`
+	OutputTokens             int  `json:"output_tokens"`
+	CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     *int `json:"cache_read_input_tokens"`
+	ServerToolUse            *struct {
+		WebSearchRequests int `json:"web_search_requests"`
+		WebFetchRequests  int `json:"web_fetch_requests"`
+	} `json:"server_tool_use"`
+	ServiceTier   *string `json:"service_tier"`
+	CacheCreation *struct {
+		Ephemeral1hInputTokens int `json:"ephemeral_1h_input_tokens"`
+		Ephemeral5mInputTokens int `json:"ephemeral_5m_input_tokens"`
+	} `json:"cache_creation"`
+	InferenceGeo *string `json:"inference_geo,omitempty"`
+	Speed        *string `json:"speed,omitempty"`
+}
+
+// AgentToolStats mirrors the optional per-run tool-usage counters embedded
+// in [AgentToolCompletedOutput].
+type AgentToolStats struct {
+	ReadCount      int  `json:"readCount"`
+	SearchCount    int  `json:"searchCount"`
+	BashCount      int  `json:"bashCount"`
+	EditFileCount  int  `json:"editFileCount"`
+	LinesAdded     int  `json:"linesAdded"`
+	LinesRemoved   int  `json:"linesRemoved"`
+	OtherToolCount int  `json:"otherToolCount"`
+	FrameCount     *int `json:"frameCount,omitempty"`
+}
+
+// AgentToolCompletedOutput is the structured result payload for a completed
+// Agent/Task tool call: the subagent's final report, without the
+// model-directed agentId/usage trailer the tool_result text carries, plus
+// run totals. Accessible from [UserMessage.ToolUseResult] when the preceding
+// [ToolUseBlock].Name is "Task" and Status is [AgentOutputStatusCompleted]
+// (decode the map[string]any with json.Marshal/Unmarshal, as with
+// [NotebookEditResult]). Render from this instead of parsing the tool_result
+// text. Port of TypeScript SDK v0.3.207.
+type AgentToolCompletedOutput struct {
+	Status            AgentOutputStatus   `json:"status"` // always "completed"
+	AgentID           string              `json:"agentId"`
+	AgentType         string              `json:"agentType,omitempty"`
+	Content           []AgentContentBlock `json:"content"`
+	ResolvedModel     string              `json:"resolvedModel,omitempty"`
+	TotalToolUseCount int                 `json:"totalToolUseCount"`
+	TotalDurationMs   int                 `json:"totalDurationMs"`
+	TotalTokens       int                 `json:"totalTokens"`
+	Usage             AgentToolUsage      `json:"usage"`
+	ToolStats         *AgentToolStats     `json:"toolStats,omitempty"`
+	Prompt            string              `json:"prompt"`
+	WorktreePath      string              `json:"worktreePath,omitempty"`
+	WorktreeBranch    string              `json:"worktreeBranch,omitempty"`
+}
+
+// AgentToolAsyncLaunchedOutput is the structured result payload for an
+// Agent/Task tool call that launched a background subagent. Accessible from
+// [UserMessage.ToolUseResult] when the preceding [ToolUseBlock].Name is
+// "Task" and Status is [AgentOutputStatusAsyncLaunched]. Port of TypeScript
+// SDK v0.3.207.
+type AgentToolAsyncLaunchedOutput struct {
+	Status            AgentOutputStatus `json:"status"` // always "async_launched"
+	AgentID           string            `json:"agentId"`
+	Description       string            `json:"description"`
+	ResolvedModel     string            `json:"resolvedModel,omitempty"`
+	Prompt            string            `json:"prompt"`
+	OutputFile        string            `json:"outputFile"`
+	CanReadOutputFile bool              `json:"canReadOutputFile,omitempty"`
+}
+
+// AgentToolRemoteLaunchedOutput is the structured result payload for an
+// Agent/Task tool call that launched a remote cloud session. Accessible from
+// [UserMessage.ToolUseResult] when the preceding [ToolUseBlock].Name is
+// "Task" and Status is [AgentOutputStatusRemoteLaunched]. Port of
+// TypeScript SDK v0.3.207.
+type AgentToolRemoteLaunchedOutput struct {
+	Status      AgentOutputStatus `json:"status"` // always "remote_launched"
+	TaskID      string            `json:"taskId"`
+	SessionURL  string            `json:"sessionUrl"`
+	Description string            `json:"description"`
+	Prompt      string            `json:"prompt"`
+	OutputFile  string            `json:"outputFile"`
+}
+
 // MirrorErrorMessage is an SDK-synthesized system message emitted when the
 // transcript mirror batcher exhausts its retry budget for a pending
 // [SessionStore.Append]. It never originates from the CLI — the SDK injects
@@ -810,16 +924,16 @@ const (
 
 // RateLimitInfo contains detailed rate limit information.
 type RateLimitInfo struct {
-	Status                       RateLimitStatus `json:"status"`
-	ResetsAt                     *string         `json:"resets_at,omitempty"`
-	RateLimitType                *string         `json:"rate_limit_type,omitempty"`
-	Utilization                  *float64        `json:"utilization,omitempty"`
-	OverageStatus                *string         `json:"overage_status,omitempty"`
-	OverageResetsAt              *string         `json:"overage_resets_at,omitempty"`
-	OverageDisabledReason        *string         `json:"overage_disabled_reason,omitempty"`
-	ErrorCode                    *string         `json:"error_code,omitempty"`
-	CanUserPurchaseCredits       *bool           `json:"can_user_purchase_credits,omitempty"`
-	HasChargeableSavedPaymentMethod *bool        `json:"has_chargeable_saved_payment_method,omitempty"`
+	Status                          RateLimitStatus `json:"status"`
+	ResetsAt                        *string         `json:"resets_at,omitempty"`
+	RateLimitType                   *string         `json:"rate_limit_type,omitempty"`
+	Utilization                     *float64        `json:"utilization,omitempty"`
+	OverageStatus                   *string         `json:"overage_status,omitempty"`
+	OverageResetsAt                 *string         `json:"overage_resets_at,omitempty"`
+	OverageDisabledReason           *string         `json:"overage_disabled_reason,omitempty"`
+	ErrorCode                       *string         `json:"error_code,omitempty"`
+	CanUserPurchaseCredits          *bool           `json:"can_user_purchase_credits,omitempty"`
+	HasChargeableSavedPaymentMethod *bool           `json:"has_chargeable_saved_payment_method,omitempty"`
 }
 
 // RateLimitEvent represents a rate limit status change from the CLI.
