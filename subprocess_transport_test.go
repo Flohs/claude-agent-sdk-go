@@ -204,6 +204,18 @@ func TestBuildCommand_ResumeFlagLikeValue(t *testing.T) {
 	assertNotContainsFlag(t, cmd, "--version")
 }
 
+func TestBuildCommand_SessionIDFlagLikeValue(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			SessionID: "--version",
+		},
+	}
+	cmd := transport.buildCommand()
+	assertContainsFlag(t, cmd, "--session-id=--version")
+	assertNotContainsFlag(t, cmd, "--version")
+}
+
 func TestConnectEnv_IncludePartialMessages(t *testing.T) {
 	t.Run("does not set CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING even when true", func(t *testing.T) {
 		env := buildTestEnv(&Options{IncludePartialMessages: true})
