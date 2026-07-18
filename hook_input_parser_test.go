@@ -848,6 +848,24 @@ func TestParseHookInput_SessionStart(t *testing.T) {
 	if m.SessionID != "sess-1" {
 		t.Errorf("SessionID: got %q, want 'sess-1'", m.SessionID)
 	}
+	if m.Source != "" {
+		t.Errorf("Source: got %q, want empty when absent", m.Source)
+	}
+}
+
+func TestParseHookInput_SessionStart_Fork(t *testing.T) {
+	input := merge(base("SessionStart"), HookInput{"source": "fork"})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*SessionStartHookInput)
+	if !ok {
+		t.Fatalf("expected *SessionStartHookInput, got %T", result)
+	}
+	if m.Source != SessionStartSourceFork {
+		t.Errorf("Source: got %q, want %q", m.Source, SessionStartSourceFork)
+	}
 }
 
 func TestParseHookInput_SessionEnd(t *testing.T) {

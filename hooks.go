@@ -346,11 +346,30 @@ func (o MessageDisplayHookOutput) ToHookJSONOutput() HookJSONOutput {
 	return out
 }
 
+// SessionStartSource identifies how a session was started, for
+// [SessionStartHookInput.Source]. Port of TypeScript SDK v0.3.152 (values)
+// and v0.3.214 (SessionStartSourceFork).
+type SessionStartSource string
+
+const (
+	SessionStartSourceStartup SessionStartSource = "startup"
+	SessionStartSourceResume  SessionStartSource = "resume"
+	SessionStartSourceClear   SessionStartSource = "clear"
+	SessionStartSourceCompact SessionStartSource = "compact"
+	// SessionStartSourceFork indicates the session began as a fork of another
+	// session. Previously reported as SessionStartSourceResume. Port of
+	// TypeScript SDK v0.3.214.
+	SessionStartSourceFork SessionStartSource = "fork"
+)
+
 // SessionStartHookInput is the typed input for SessionStart hook events.
 // Fires at session initialization before the first user turn.
 // Port of TypeScript SDK v0.3.152.
 type SessionStartHookInput struct {
 	BaseHookInput
+	// Source identifies how the session was started (startup, resume, clear,
+	// compact, or fork). Empty when not provided by the CLI.
+	Source SessionStartSource `json:"source,omitempty"`
 }
 
 func (*SessionStartHookInput) hookInputMarker() {}
