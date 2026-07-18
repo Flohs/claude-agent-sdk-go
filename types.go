@@ -625,19 +625,23 @@ type AgentToolStats struct {
 // [NotebookEditResult]). Render from this instead of parsing the tool_result
 // text. Port of TypeScript SDK v0.3.207.
 type AgentToolCompletedOutput struct {
-	Status            AgentOutputStatus   `json:"status"` // always "completed"
-	AgentID           string              `json:"agentId"`
-	AgentType         string              `json:"agentType,omitempty"`
-	Content           []AgentContentBlock `json:"content"`
-	ResolvedModel     string              `json:"resolvedModel,omitempty"`
-	TotalToolUseCount int                 `json:"totalToolUseCount"`
-	TotalDurationMs   int                 `json:"totalDurationMs"`
-	TotalTokens       int                 `json:"totalTokens"`
-	Usage             AgentToolUsage      `json:"usage"`
-	ToolStats         *AgentToolStats     `json:"toolStats,omitempty"`
-	Prompt            string              `json:"prompt"`
-	WorktreePath      string              `json:"worktreePath,omitempty"`
-	WorktreeBranch    string              `json:"worktreeBranch,omitempty"`
+	Status        AgentOutputStatus   `json:"status"` // always "completed"
+	AgentID       string              `json:"agentId"`
+	AgentType     string              `json:"agentType,omitempty"`
+	Content       []AgentContentBlock `json:"content"`
+	ResolvedModel string              `json:"resolvedModel,omitempty"`
+	// ModelsUsed lists, in order, the distinct models used by this subagent
+	// run. A length greater than 1 indicates a mid-run model swap. Port of
+	// TypeScript SDK v0.3.212.
+	ModelsUsed        []string        `json:"modelsUsed,omitempty"`
+	TotalToolUseCount int             `json:"totalToolUseCount"`
+	TotalDurationMs   int             `json:"totalDurationMs"`
+	TotalTokens       int             `json:"totalTokens"`
+	Usage             AgentToolUsage  `json:"usage"`
+	ToolStats         *AgentToolStats `json:"toolStats,omitempty"`
+	Prompt            string          `json:"prompt"`
+	WorktreePath      string          `json:"worktreePath,omitempty"`
+	WorktreeBranch    string          `json:"worktreeBranch,omitempty"`
 }
 
 // AgentToolAsyncLaunchedOutput is the structured result payload for an
@@ -646,13 +650,17 @@ type AgentToolCompletedOutput struct {
 // "Task" and Status is [AgentOutputStatusAsyncLaunched]. Port of TypeScript
 // SDK v0.3.207.
 type AgentToolAsyncLaunchedOutput struct {
-	Status            AgentOutputStatus `json:"status"` // always "async_launched"
-	AgentID           string            `json:"agentId"`
-	Description       string            `json:"description"`
-	ResolvedModel     string            `json:"resolvedModel,omitempty"`
-	Prompt            string            `json:"prompt"`
-	OutputFile        string            `json:"outputFile"`
-	CanReadOutputFile bool              `json:"canReadOutputFile,omitempty"`
+	Status        AgentOutputStatus `json:"status"` // always "async_launched"
+	AgentID       string            `json:"agentId"`
+	Description   string            `json:"description"`
+	ResolvedModel string            `json:"resolvedModel,omitempty"`
+	// ModelsUsed lists, in order, the distinct models used before this
+	// subagent was backgrounded. A length greater than 1 indicates a mid-run
+	// model swap. Port of TypeScript SDK v0.3.212.
+	ModelsUsed        []string `json:"modelsUsed,omitempty"`
+	Prompt            string   `json:"prompt"`
+	OutputFile        string   `json:"outputFile"`
+	CanReadOutputFile bool     `json:"canReadOutputFile,omitempty"`
 }
 
 // AgentToolRemoteLaunchedOutput is the structured result payload for an

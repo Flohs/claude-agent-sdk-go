@@ -26,6 +26,7 @@ func TestAgentToolCompletedOutput_DecodesFromToolUseResult(t *testing.T) {
 			"agentId":           "agent-123",
 			"agentType":         "general-purpose",
 			"resolvedModel":     "claude-sonnet-5",
+			"modelsUsed":        []any{"claude-haiku-4-5", "claude-sonnet-5"},
 			"totalToolUseCount": float64(4),
 			"totalDurationMs":   float64(1500),
 			"totalTokens":       float64(2048),
@@ -66,6 +67,10 @@ func TestAgentToolCompletedOutput_DecodesFromToolUseResult(t *testing.T) {
 	if out.ToolStats == nil || out.ToolStats.ReadCount != 3 || out.ToolStats.BashCount != 1 {
 		t.Errorf("ToolStats = %+v, want readCount=3 bashCount=1", out.ToolStats)
 	}
+	wantModelsUsed := []string{"claude-haiku-4-5", "claude-sonnet-5"}
+	if len(out.ModelsUsed) != len(wantModelsUsed) || out.ModelsUsed[0] != wantModelsUsed[0] || out.ModelsUsed[1] != wantModelsUsed[1] {
+		t.Errorf("ModelsUsed = %v, want %v", out.ModelsUsed, wantModelsUsed)
+	}
 }
 
 func TestAgentToolAsyncLaunchedOutput_DecodesFromToolUseResult(t *testing.T) {
@@ -74,6 +79,8 @@ func TestAgentToolAsyncLaunchedOutput_DecodesFromToolUseResult(t *testing.T) {
 		"isAsync":           true,
 		"agentId":           "agent-456",
 		"description":       "long running task",
+		"resolvedModel":     "claude-sonnet-5",
+		"modelsUsed":        []any{"claude-sonnet-5"},
 		"prompt":            "do the thing",
 		"outputFile":        "/tmp/agent-456.out",
 		"canReadOutputFile": true,
@@ -93,6 +100,9 @@ func TestAgentToolAsyncLaunchedOutput_DecodesFromToolUseResult(t *testing.T) {
 	}
 	if !out.CanReadOutputFile {
 		t.Errorf("CanReadOutputFile = false, want true")
+	}
+	if len(out.ModelsUsed) != 1 || out.ModelsUsed[0] != "claude-sonnet-5" {
+		t.Errorf("ModelsUsed = %v, want [claude-sonnet-5]", out.ModelsUsed)
 	}
 }
 
