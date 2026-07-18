@@ -195,6 +195,11 @@ type AssistantMessage struct {
 	// StopReason is why the model stopped generating (e.g. "end_turn",
 	// "tool_use", "max_tokens"). Empty when not provided.
 	StopReason string `json:"stop_reason,omitempty"`
+	// Aborted is true when this message was truncated by an interrupt/abort
+	// before the stream completed: StopReason was never received and Content
+	// may end mid-word. False on normally completed messages. Port of
+	// TypeScript SDK v0.3.214.
+	Aborted bool `json:"aborted,omitempty"`
 	// StopDetails contains structured metadata when StopReason is "refusal" or
 	// another stop condition that carries additional context. Nil when not
 	// provided by the CLI.

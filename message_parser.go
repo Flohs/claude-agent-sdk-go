@@ -127,6 +127,7 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		SessionID:       stringField(data, "session_id"),
 		UUID:            stringField(data, "uuid"),
 		StopReason:      stringField(message, "stop_reason"),
+		Aborted:         boolField(message, "aborted"),
 		RequestID:       stringField(data, "request_id"),
 		Timestamp:       stringField(data, "timestamp"),
 	}
