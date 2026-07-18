@@ -142,6 +142,29 @@ type ToolPermissionContext struct {
 	DisplayName string
 	// Description is additional descriptive context for this permission request.
 	Description string
+	// SuppressAlwaysAllowRule is true when the dialog must not offer a
+	// persistent "don't ask again" affordance for this ask: accepting it
+	// would write a whole-tool allow rule broader than the ask's own verb.
+	// Port of TypeScript SDK v0.3.214.
+	SuppressAlwaysAllowRule bool
+	// MatchedAskRule is set when a user-configured ask rule (permissions.ask)
+	// forced this prompt while the ask still carries the tool's own
+	// DecisionReason. Nil when no ask rule matched. Port of TypeScript SDK
+	// v0.3.214.
+	MatchedAskRule *MatchedAskRule
+}
+
+// MatchedAskRule describes the user-configured permission ask rule that
+// forced a permission prompt. See [ToolPermissionContext.MatchedAskRule].
+// Port of TypeScript SDK v0.3.214.
+type MatchedAskRule struct {
+	// Source identifies where the ask rule was configured (e.g. a settings
+	// file path).
+	Source string
+	// ToolName is the tool name the matched rule applies to.
+	ToolName string
+	// RuleContent is the matched rule's pattern, if any.
+	RuleContent string
 }
 
 // parsePermissionUpdate converts a raw map from the CLI protocol into a

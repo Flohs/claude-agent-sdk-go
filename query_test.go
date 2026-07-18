@@ -838,6 +838,50 @@ func TestHandleCanUseTool_PopulatesRequestID(t *testing.T) {
 	}
 }
 
+func TestHandleCanUseTool_PopulatesMatchedAskRuleAndSuppressAlwaysAllowRule(t *testing.T) {
+	mt := newMockTransport()
+	var gotCtx ToolPermissionContext
+	q := newQuery(queryConfig{
+		transport: mt,
+		canUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+			gotCtx = permCtx
+			return PermissionResultAllow{}, nil
+		},
+	})
+
+	q.handleControlRequest(map[string]any{
+		"request_id": "req-789",
+		"request": map[string]any{
+			"subtype":                    "can_use_tool",
+			"tool_name":                  "Bash",
+			"tool_use_id":                "tu-3",
+			"input":                      map[string]any{},
+			"suppress_always_allow_rule": true,
+			"matched_ask_rule": map[string]any{
+				"source":       "/home/user/.claude/settings.json",
+				"tool_name":    "Bash",
+				"rule_content": "Bash(rm:*)",
+			},
+		},
+	})
+
+	if !gotCtx.SuppressAlwaysAllowRule {
+		t.Error("expected SuppressAlwaysAllowRule to be true")
+	}
+	if gotCtx.MatchedAskRule == nil {
+		t.Fatal("expected MatchedAskRule to be non-nil")
+	}
+	if gotCtx.MatchedAskRule.Source != "/home/user/.claude/settings.json" {
+		t.Errorf("MatchedAskRule.Source = %q, want %q", gotCtx.MatchedAskRule.Source, "/home/user/.claude/settings.json")
+	}
+	if gotCtx.MatchedAskRule.ToolName != "Bash" {
+		t.Errorf("MatchedAskRule.ToolName = %q, want %q", gotCtx.MatchedAskRule.ToolName, "Bash")
+	}
+	if gotCtx.MatchedAskRule.RuleContent != "Bash(rm:*)" {
+		t.Errorf("MatchedAskRule.RuleContent = %q, want %q", gotCtx.MatchedAskRule.RuleContent, "Bash(rm:*)")
+	}
+}
+
 func TestHandleCanUseTool_NilResultSuppressesControlResponse(t *testing.T) {
 	mt := newMockTransport()
 	q := newQuery(queryConfig{
