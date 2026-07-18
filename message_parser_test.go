@@ -1493,6 +1493,51 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 	}
 }
 
+func TestParseAssistantMessage_Aborted(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{},
+			"aborted": true,
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	am, ok := msg.(*AssistantMessage)
+	if !ok {
+		t.Fatalf("expected AssistantMessage, got %T", msg)
+	}
+	if !am.Aborted {
+		t.Error("expected Aborted to be true")
+	}
+	if am.StopReason != "" {
+		t.Errorf("expected empty StopReason for aborted message, got %q", am.StopReason)
+	}
+}
+
+func TestParseAssistantMessage_NotAborted(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content":     []any{},
+			"stop_reason": "end_turn",
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	am, ok := msg.(*AssistantMessage)
+	if !ok {
+		t.Fatalf("expected AssistantMessage, got %T", msg)
+	}
+	if am.Aborted {
+		t.Error("expected Aborted to be false for a normally completed message")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tests for HookEventMessage (hook_started / hook_response) — issue #328
 // Port of Python SDK PR anthropics/claude-agent-sdk-python#917.
