@@ -140,6 +140,7 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 	case HookEventSessionStart:
 		return &SessionStartHookInput{
 			BaseHookInput: base,
+			Source:        SessionStartSource(stringField(input, "source")),
 		}, nil
 
 	case HookEventSessionEnd:
