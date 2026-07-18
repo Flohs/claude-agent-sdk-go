@@ -592,14 +592,15 @@ func (q *query) handleCanUseTool(request map[string]any, requestID string) (map[
 	originalInput := input
 
 	permCtx := ToolPermissionContext{
-		ToolUseID:      stringField(request, "tool_use_id"),
-		RequestID:      requestID,
-		AgentID:        stringField(request, "agent_id"),
-		DecisionReason: stringField(request, "decision_reason"),
-		BlockedPath:    stringField(request, "blocked_path"),
-		Title:          stringField(request, "title"),
-		DisplayName:    stringField(request, "display_name"),
-		Description:    stringField(request, "description"),
+		ToolUseID:               stringField(request, "tool_use_id"),
+		RequestID:               requestID,
+		AgentID:                 stringField(request, "agent_id"),
+		DecisionReason:          stringField(request, "decision_reason"),
+		BlockedPath:             stringField(request, "blocked_path"),
+		Title:                   stringField(request, "title"),
+		DisplayName:             stringField(request, "display_name"),
+		Description:             stringField(request, "description"),
+		SuppressAlwaysAllowRule: boolField(request, "suppress_always_allow_rule"),
 	}
 	if suggestions, ok := request["permission_suggestions"].([]any); ok {
 		permCtx.Suggestions = make([]PermissionUpdate, 0, len(suggestions))
@@ -607,6 +608,13 @@ func (q *query) handleCanUseTool(request map[string]any, requestID string) (map[
 			if sm, ok := s.(map[string]any); ok {
 				permCtx.Suggestions = append(permCtx.Suggestions, parsePermissionUpdate(sm))
 			}
+		}
+	}
+	if rule, ok := request["matched_ask_rule"].(map[string]any); ok {
+		permCtx.MatchedAskRule = &MatchedAskRule{
+			Source:      stringField(rule, "source"),
+			ToolName:    stringField(rule, "tool_name"),
+			RuleContent: stringField(rule, "rule_content"),
 		}
 	}
 
