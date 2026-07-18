@@ -470,6 +470,66 @@ type NotebookEditResult struct {
 	OldSource string `json:"old_source,omitempty"`
 }
 
+// SendFeedbackInput is the typed input for the SendFeedback tool.
+// Accessible from [PreToolUseHookInput].ToolInput when ToolName is "SendFeedback".
+// Port of TypeScript SDK v0.3.214.
+type SendFeedbackInput struct {
+	// Type classifies the feedback: "bug", "idea", or "missing_capability".
+	Type string `json:"type"`
+	// Title is a short, specific one-line summary of the issue.
+	Title string `json:"title"`
+	// Details is a factual, reproducible report: what was attempted, what
+	// happened, exact error text if short, repro steps.
+	Details string `json:"details"`
+	// Area is an optional short tag naming the part of Claude Code this is
+	// about (e.g. "hooks config", "/help", "file editing").
+	Area string `json:"area,omitempty"`
+}
+
+// SendFeedbackOutput is the result returned by the SendFeedback tool.
+// Accessible from [PostToolUseHookInput].ToolResponse when ToolName is
+// "SendFeedback" (decode the map[string]any with json.Marshal/Unmarshal, as
+// with [NotebookEditResult]). Port of TypeScript SDK v0.3.214.
+type SendFeedbackOutput struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+// SkillProposal describes a single proposed new or improved skill, part of
+// [ProposeSkillsInput.Proposals]. Port of TypeScript SDK v0.3.214.
+type SkillProposal struct {
+	// Name is the kebab-case skill slug.
+	Name string `json:"name"`
+	// Kind is "new" or "improvement".
+	Kind string `json:"kind"`
+	// Target is the existing skill name to amend. Required when Kind is
+	// "improvement"; empty for "new".
+	Target string `json:"target,omitempty"`
+	// Description is the one-line summary shown on the review card.
+	Description string `json:"description"`
+	// Evidence lists memory file paths where this procedure was observed.
+	Evidence []string `json:"evidence,omitempty"`
+	// SkillMd is the complete SKILL.md draft (frontmatter + body).
+	SkillMd string `json:"skillMd"`
+}
+
+// ProposeSkillsInput is the typed input for the ProposeSkills tool.
+// Accessible from [PreToolUseHookInput].ToolInput when ToolName is
+// "ProposeSkills". Upstream models Proposals as a 1-3 item tuple union; a Go
+// slice is sufficient. Port of TypeScript SDK v0.3.214.
+type ProposeSkillsInput struct {
+	Proposals []SkillProposal `json:"proposals"`
+}
+
+// ProposeSkillsOutput is the result returned by the ProposeSkills tool.
+// Accessible from [PostToolUseHookInput].ToolResponse when ToolName is
+// "ProposeSkills" (decode the map[string]any with json.Marshal/Unmarshal, as
+// with [NotebookEditResult]). Port of TypeScript SDK v0.3.214.
+type ProposeSkillsOutput struct {
+	// ProposalCount is the number of proposals shown on the review card.
+	ProposalCount int `json:"proposalCount"`
+}
+
 // BashToolOutput is the result returned by the Bash tool.
 // Accessible from [PostToolUseHookInput].ToolResponse when ToolName is "Bash"
 // (decode the map[string]any with json.Marshal/Unmarshal, as with [NotebookEditResult]).
