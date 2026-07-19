@@ -3,8 +3,11 @@ package claude
 import (
 	"context"
 	"io"
+	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBuildCommand_BasicFlags(t *testing.T) {
@@ -938,5 +941,88 @@ func TestNewSubprocessTransport_AcceptsValidPermissionMode(t *testing.T) {
 	}
 	if transport == nil {
 		t.Fatal("expected non-nil transport")
+	}
+}
+
+// TestReadMessages_CtxCancelDuringScanUnregistersChild is a regression test
+// for issue #520: cancelling the ctx passed to ReadMessages while its
+// bufio.Scanner-based read loop was still running caused the goroutine to
+// return early from inside the loop, bypassing the cleanup that normally
+// runs after the loop ends naturally (unregisterChild + t.runCleanup()). That
+// left the *exec.Cmd permanently registered in the package-level
+// activeChildren registry, leaking one entry per cancelled ReadMessages call
+// that wasn't also followed by an explicit Close().
+//
+// This spawns a real short-lived subprocess that continuously emits NDJSON
+// lines, confirms the scan loop is actively running (by receiving a message),
+// cancels the context mid-stream, and asserts the cmd is promptly removed
+// from activeChildren once the ReadMessages goroutine exits.
+func TestReadMessages_CtxCancelDuringScanUnregistersChild(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX shell subprocess; not supported on windows")
+	}
+
+	cmd := exec.Command("sh", "-c", `while true; do printf '{"type":"assistant"}\n'; sleep 0.02; done`)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatalf("StdoutPipe: %v", err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	registerChild(cmd)
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	})
+
+	if !activeChildrenContains(cmd) {
+		t.Fatal("expected cmd to be registered in activeChildren before the test begins")
+	}
+
+	transport := &SubprocessTransport{
+		cmd:        cmd,
+		stdout:     stdout,
+		maxBufSize: defaultMaxBufferSize,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch := transport.ReadMessages(ctx)
+
+	// Wait for at least one message so we know the scan loop is genuinely
+	// live (blocked in scanner.Scan()/select) before cancelling, rather than
+	// racing an already-finished goroutine.
+	select {
+	case _, ok := <-ch:
+		if !ok {
+			t.Fatal("channel closed before any message was received")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for first message from ReadMessages")
+	}
+
+	cancel()
+
+	// Drain until the channel closes. close(ch) happens after the
+	// ReadMessages goroutine's deferred cleanup (unregisterChild + runCleanup)
+	// has already run, so once this returns the registry check below is not
+	// racing the cleanup itself.
+	drained := make(chan struct{})
+	go func() {
+		for range ch {
+		}
+		close(drained)
+	}()
+
+	select {
+	case <-drained:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for ReadMessages goroutine to exit after ctx cancellation")
+	}
+
+	if activeChildrenContains(cmd) {
+		t.Error("expected cmd to be unregistered from activeChildren after ctx cancellation, but it is still registered (leak)")
 	}
 }
