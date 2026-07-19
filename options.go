@@ -3,6 +3,7 @@ package claude
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Model string constants for use with Options.Model.
@@ -39,6 +40,44 @@ const (
 	// PermissionModeManual is an accepted alias for PermissionModeDefault.
 	PermissionModeManual PermissionMode = "manual"
 )
+
+// validPermissionModes enumerates every value validatePermissionMode accepts,
+// used both for the membership check and to render the error message's list
+// of valid values.
+var validPermissionModes = []PermissionMode{
+	PermissionModeDefault,
+	PermissionModeAcceptEdits,
+	PermissionModePlan,
+	PermissionModeBypassPermissions,
+	PermissionModeDontAsk,
+	PermissionModeAuto,
+	PermissionModeManual,
+}
+
+// validatePermissionMode rejects a PermissionMode value that is neither the
+// empty string (unset — the CLI's own default applies) nor one of the known
+// PermissionMode* constants. Callers should validate before forwarding the
+// mode to the CLI subprocess (as a --permission-mode flag) or a live
+// set_permission_mode control request, so a typo surfaces as an immediate,
+// actionable Go error instead of an opaque CLI failure.
+func validatePermissionMode(mode PermissionMode) error {
+	if mode == "" {
+		return nil
+	}
+	for _, valid := range validPermissionModes {
+		if mode == valid {
+			return nil
+		}
+	}
+	valid := make([]string, len(validPermissionModes))
+	for i, v := range validPermissionModes {
+		valid[i] = string(v)
+	}
+	return &SDKError{Message: fmt.Sprintf(
+		"invalid PermissionMode %q: must be one of %s",
+		string(mode), strings.Join(valid, ", "),
+	)}
+}
 
 // SdkBeta represents beta feature flags.
 type SdkBeta string
