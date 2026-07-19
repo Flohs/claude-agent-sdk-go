@@ -45,6 +45,7 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		UUID:            stringField(data, "uuid"),
 		Timestamp:       stringField(data, "timestamp"),
 		IsMeta:          boolField(data, "isMeta"),
+		Origin:          parseMessageOrigin(data),
 	}
 
 	if tr, ok := data["tool_use_result"].(map[string]any); ok {
@@ -391,7 +392,7 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		SessionID:      stringField(data, "session_id"),
 		StopReason:     stringField(data, "stop_reason"),
 		TerminalReason: stringField(data, "terminal_reason"),
-		Origin:         stringField(data, "origin"),
+		Origin:         parseMessageOrigin(data),
 		RequestID:      stringField(data, "request_id"),
 		Result:         stringField(data, "result"),
 		Timestamp:      stringField(data, "timestamp"),
@@ -585,6 +586,24 @@ func parseBase64Source(blockMap map[string]any) Base64Source {
 		Type:      stringField(source, "type"),
 		MediaType: stringField(source, "media_type"),
 		Data:      stringField(source, "data"),
+	}
+}
+
+// parseMessageOrigin extracts the "origin" field shared by result and user
+// messages. Returns nil when the key is absent or not a JSON object.
+func parseMessageOrigin(data map[string]any) *MessageOrigin {
+	origin, ok := data["origin"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return &MessageOrigin{
+		Kind:         MessageOriginKind(stringField(origin, "kind")),
+		Server:       stringField(origin, "server"),
+		From:         stringField(origin, "from"),
+		Name:         stringField(origin, "name"),
+		SenderTaskID: stringField(origin, "senderTaskId"),
+		Body:         stringField(origin, "body"),
+		Subkind:      stringField(origin, "subkind"),
 	}
 }
 

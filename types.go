@@ -146,6 +146,11 @@ type UserMessage struct {
 	// conversation content (e.g. a synthetic message generated internally by
 	// the SDK or CLI). Port of TypeScript SDK v0.3.198.
 	IsMeta bool `json:"isMeta,omitempty"`
+	// Origin identifies what triggered this message (e.g. a direct human
+	// prompt vs. a peer relay or task-notification replay). Nil when the CLI
+	// omits the field. Port of TypeScript SDK bundled sdk.d.ts
+	// (SDKMessageOrigin).
+	Origin *MessageOrigin `json:"origin,omitempty"`
 }
 
 func (UserMessage) messageMarker() {}
@@ -922,6 +927,63 @@ type DeferredToolUse struct {
 	ToolInput map[string]any `json:"tool_input"`
 }
 
+// MessageOriginKind identifies what triggered a message, distinguishing
+// direct human input from background agents, scheduled tasks, and other
+// non-interactive senders.
+// Port of TypeScript SDK bundled sdk.d.ts (SDKMessageOrigin).
+type MessageOriginKind string
+
+const (
+	// MessageOriginKindHuman is a message sent directly by the human user.
+	MessageOriginKindHuman MessageOriginKind = "human"
+	// MessageOriginKindChannel is a message delivered via a named channel
+	// (e.g. Slack). Server carries the channel server name.
+	MessageOriginKindChannel MessageOriginKind = "channel"
+	// MessageOriginKindPeer is a message relayed from another agent peer.
+	// From, Name, SenderTaskID, and Body may be populated.
+	MessageOriginKindPeer MessageOriginKind = "peer"
+	// MessageOriginKindTaskNotification is a message delivered as the result
+	// of a completed task. Subkind is "scheduled-trigger" when the delivery
+	// is the fired prompt of a scheduled task/routine.
+	MessageOriginKindTaskNotification MessageOriginKind = "task-notification"
+	// MessageOriginKindCoordinator is a message sent by the coordinator.
+	MessageOriginKindCoordinator MessageOriginKind = "coordinator"
+	// MessageOriginKindObserver is a message sent by an observer agent.
+	// From and SenderTaskID are populated.
+	MessageOriginKindObserver MessageOriginKind = "observer"
+	// MessageOriginKindAutoContinuation is a message the CLI generated to
+	// automatically continue a turn.
+	MessageOriginKindAutoContinuation MessageOriginKind = "auto-continuation"
+	// MessageOriginKindObserverActivity is a message reporting observer
+	// activity.
+	MessageOriginKindObserverActivity MessageOriginKind = "observer-activity"
+)
+
+// MessageOrigin identifies what triggered a message (e.g. distinguishing a
+// direct human prompt from a background task notification or a peer relay).
+// Which fields are populated depends on Kind; see each field's doc comment.
+// Port of TypeScript SDK bundled sdk.d.ts (SDKMessageOrigin).
+type MessageOrigin struct {
+	Kind MessageOriginKind `json:"kind"`
+	// Server is the channel server name. Populated for MessageOriginKindChannel.
+	Server string `json:"server,omitempty"`
+	// From identifies the sending peer or observer. Populated for
+	// MessageOriginKindPeer and MessageOriginKindObserver.
+	From string `json:"from,omitempty"`
+	// Name is the sender's display name. Populated for MessageOriginKindPeer.
+	Name string `json:"name,omitempty"`
+	// SenderTaskID is the sending peer's or observer's task ID. Populated for
+	// MessageOriginKindPeer (optional) and MessageOriginKindObserver
+	// (required).
+	SenderTaskID string `json:"senderTaskId,omitempty"`
+	// Body is the raw relayed message body. Populated for
+	// MessageOriginKindPeer.
+	Body string `json:"body,omitempty"`
+	// Subkind further classifies MessageOriginKindTaskNotification.
+	// Currently only "scheduled-trigger" is emitted by the CLI.
+	Subkind string `json:"subkind,omitempty"`
+}
+
 // ResultMessage contains cost and usage information for a completed query.
 type ResultMessage struct {
 	Subtype       string `json:"subtype"`
@@ -945,7 +1007,9 @@ type ResultMessage struct {
 	APIErrorStatus *int `json:"api_error_status,omitempty"`
 	// Origin forwards the triggering message's origin so consumers can
 	// distinguish user-prompted results from task-notification followups.
-	Origin string `json:"origin,omitempty"`
+	// Nil when the CLI omits the field (the common case for main-session
+	// results).
+	Origin *MessageOrigin `json:"origin,omitempty"`
 	// RequestID is the API request identifier for the final API call.
 	RequestID        string         `json:"request_id,omitempty"`
 	TotalCostUSD     *float64       `json:"total_cost_usd,omitempty"`
