@@ -30,6 +30,8 @@ func ParseMessage(data map[string]any) (Message, error) {
 		return parseStreamEvent(data)
 	case "rate_limit_event":
 		return parseRateLimitEvent(data)
+	case "tool_progress":
+		return parseToolProgressMessage(data)
 
 	default:
 		// Forward-compatible: skip unrecognized message types
@@ -482,6 +484,41 @@ func parseRateLimitInfo(m map[string]any) RateLimitInfo {
 		info.HasChargeableSavedPaymentMethod = &v
 	}
 	return info
+}
+
+func parseToolProgressMessage(data map[string]any) (*ToolProgressMessage, error) {
+	msg := &ToolProgressMessage{
+		ToolUseID:       stringField(data, "tool_use_id"),
+		ToolName:        stringField(data, "tool_name"),
+		ParentToolUseID: optionalStringField(data, "parent_tool_use_id"),
+		TaskID:          stringField(data, "task_id"),
+		UUID:            stringField(data, "uuid"),
+		SessionID:       stringField(data, "session_id"),
+		Heartbeat:       boolField(data, "heartbeat"),
+		SubagentType:    stringField(data, "subagent_type"),
+	}
+
+	if v, ok := data["elapsed_time_seconds"].(float64); ok {
+		msg.ElapsedTimeSeconds = v
+	}
+
+	if sr, ok := data["subagent_retry"].(map[string]any); ok {
+		retry := &SubagentRetryInfo{
+			AgentID:       stringField(sr, "agent_id"),
+			Attempt:       intField(sr, "attempt"),
+			MaxRetries:    intField(sr, "max_retries"),
+			RetryDelayMs:  intField(sr, "retry_delay_ms"),
+			ErrorCategory: stringField(sr, "error_category"),
+		}
+		if v, ok := sr["error_status"]; ok {
+			if status := intFromAny(v); status != 0 {
+				retry.ErrorStatus = &status
+			}
+		}
+		msg.SubagentRetry = retry
+	}
+
+	return msg, nil
 }
 
 func parseContentBlocks(raw []any) ([]ContentBlock, error) {
