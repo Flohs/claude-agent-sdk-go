@@ -136,6 +136,10 @@ func NewSubprocessTransport(opts *Options) (*SubprocessTransport, error) {
 		opts = &Options{}
 	}
 
+	if err := validatePermissionMode(opts.PermissionMode); err != nil {
+		return nil, err
+	}
+
 	t := &SubprocessTransport{
 		options:    opts,
 		cwd:       opts.Cwd,

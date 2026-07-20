@@ -230,3 +230,39 @@ func TestSandboxCredentialsConfig_JSONMarshal_OmitEmpty(t *testing.T) {
 		}
 	}
 }
+
+// TestValidatePermissionMode_ValidValues verifies that every known
+// PermissionMode constant (including the "manual" alias) and the empty
+// string (unset — CLI default applies) are accepted.
+func TestValidatePermissionMode_ValidValues(t *testing.T) {
+	valid := []PermissionMode{
+		"",
+		PermissionModeDefault,
+		PermissionModeAcceptEdits,
+		PermissionModePlan,
+		PermissionModeBypassPermissions,
+		PermissionModeDontAsk,
+		PermissionModeAuto,
+		PermissionModeManual,
+	}
+	for _, mode := range valid {
+		if err := validatePermissionMode(mode); err != nil {
+			t.Errorf("validatePermissionMode(%q) = %v, want nil", mode, err)
+		}
+	}
+}
+
+// TestValidatePermissionMode_InvalidValue verifies that a typo'd
+// PermissionMode is rejected with an error naming the bad value.
+func TestValidatePermissionMode_InvalidValue(t *testing.T) {
+	err := validatePermissionMode(PermissionMode("acceptEdit"))
+	if err == nil {
+		t.Fatal("expected error for invalid PermissionMode, got nil")
+	}
+	if !strings.Contains(err.Error(), "acceptEdit") {
+		t.Errorf("error message = %q, want it to contain %q", err.Error(), "acceptEdit")
+	}
+	if _, ok := err.(*SDKError); !ok {
+		t.Errorf("expected error to be a *SDKError, got %T", err)
+	}
+}

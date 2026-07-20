@@ -1,6 +1,10 @@
 package claude
 
-import "testing"
+import (
+	"context"
+	"strings"
+	"testing"
+)
 
 // TestGetServerCapabilities_PopulatesCapabilities verifies that the open-set
 // "capabilities" field from the CLI's initialization result is surfaced on
@@ -48,5 +52,28 @@ func TestGetServerCapabilities_OlderCLIOmitsCapabilities(t *testing.T) {
 	}
 	if caps.Capabilities != nil {
 		t.Fatalf("Capabilities = %v, want nil", caps.Capabilities)
+	}
+}
+
+// TestSetPermissionMode_RejectsInvalidModeWithoutSendingRequest verifies
+// that Client.SetPermissionMode validates the mode before dispatching a
+// set_permission_mode control request, so a typo never reaches the CLI.
+func TestSetPermissionMode_RejectsInvalidModeWithoutSendingRequest(t *testing.T) {
+	mt := newMockTransport()
+	c := &Client{q: newQuery(queryConfig{transport: mt})}
+
+	err := c.SetPermissionMode(context.Background(), "acceptEdit")
+	if err == nil {
+		t.Fatal("expected error for invalid PermissionMode, got nil")
+	}
+	if !strings.Contains(err.Error(), "acceptEdit") {
+		t.Errorf("error message = %q, want it to contain %q", err.Error(), "acceptEdit")
+	}
+
+	mt.mu.Lock()
+	written := len(mt.written)
+	mt.mu.Unlock()
+	if written != 0 {
+		t.Errorf("expected no control request to be written, got %d write(s): %v", written, mt.written)
 	}
 }

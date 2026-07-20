@@ -328,6 +328,9 @@ func (c *Client) SetPermissionMode(ctx context.Context, mode string) error {
 	if c.q == nil {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
+	if err := validatePermissionMode(PermissionMode(mode)); err != nil {
+		return err
+	}
 	return c.q.setPermissionMode(mode)
 }
 

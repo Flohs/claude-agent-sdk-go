@@ -909,3 +909,34 @@ func TestReadMessages_SurfacesScannerErrTooLong(t *testing.T) {
 		t.Error("expected a \"type\": \"error\" message when a line exceeds maxBufSize, got none")
 	}
 }
+
+// TestNewSubprocessTransport_RejectsInvalidPermissionMode verifies that a
+// typo'd Options.PermissionMode is rejected before the CLI is even located,
+// so a bad value never reaches the subprocess launch path.
+func TestNewSubprocessTransport_RejectsInvalidPermissionMode(t *testing.T) {
+	_, err := NewSubprocessTransport(&Options{
+		CLIPath:        "/usr/local/bin/claude",
+		PermissionMode: PermissionMode("acceptEdit"),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid PermissionMode, got nil")
+	}
+	if !strings.Contains(err.Error(), "acceptEdit") {
+		t.Errorf("error message = %q, want it to contain %q", err.Error(), "acceptEdit")
+	}
+}
+
+// TestNewSubprocessTransport_AcceptsValidPermissionMode verifies that a
+// known PermissionMode value does not trip the new validation.
+func TestNewSubprocessTransport_AcceptsValidPermissionMode(t *testing.T) {
+	transport, err := NewSubprocessTransport(&Options{
+		CLIPath:        "/usr/local/bin/claude",
+		PermissionMode: PermissionModeAcceptEdits,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if transport == nil {
+		t.Fatal("expected non-nil transport")
+	}
+}
