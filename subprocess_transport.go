@@ -44,6 +44,20 @@ func unregisterChild(cmd *exec.Cmd) {
 	activeChildrenMu.Unlock()
 }
 
+// activeChildrenContains reports whether cmd is currently registered in
+// activeChildren. Test-only accessor for exercising the registry directly
+// (activeChildren itself is package-private and unexported).
+func activeChildrenContains(cmd *exec.Cmd) bool {
+	activeChildrenMu.Lock()
+	defer activeChildrenMu.Unlock()
+	for _, c := range activeChildren {
+		if c == cmd {
+			return true
+		}
+	}
+	return false
+}
+
 func killActiveChildren() {
 	activeChildrenMu.Lock()
 	cmds := make([]*exec.Cmd, len(activeChildren))
@@ -127,6 +141,7 @@ type SubprocessTransport struct {
 	maxBufSize   int
 	mu           sync.Mutex
 	stdinClosed  bool
+	cleanupMu    sync.Mutex
 	cleanupFuncs []func()
 }
 
@@ -298,6 +313,26 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 	go func() {
 		defer close(ch)
 
+		// Capture cmd now so unregistration is unaffected by Close() concurrently
+		// nilling out t.cmd. Whatever path exits this goroutine — natural scanner
+		// EOF, scanner.Err(), or the early return via ctx.Done() inside the scan
+		// loop below — must unregister the child from activeChildren and run the
+		// transport's registered cleanup funcs exactly once. Previously that
+		// cleanup only ran after the scan loop ended naturally, so cancelling ctx
+		// while the loop was still running leaked the *exec.Cmd entry in
+		// activeChildren and skipped t.runCleanup() entirely. unregisterChild and
+		// runCleanup are both safe to call more than once (e.g. if this defer
+		// races with a concurrent Close()), so it is safe to run them here
+		// unconditionally even on the normal-exit path where cmd.Wait() below
+		// also completes first.
+		cmd := t.cmd
+		defer func() {
+			if cmd != nil {
+				unregisterChild(cmd)
+			}
+			t.runCleanup()
+		}()
+
 		if t.stdout == nil {
 			return
 		}
@@ -358,8 +393,7 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 		}
 
 		// Wait for process to finish and check exit code
-		if t.cmd != nil {
-			cmd := t.cmd
+		if cmd != nil {
 			if err := cmd.Wait(); err != nil {
 				if exitErr, ok := err.(*exec.ExitError); ok {
 					code := exitErr.ExitCode()
@@ -378,9 +412,7 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 					}
 				}
 			}
-			unregisterChild(cmd)
 		}
-		t.runCleanup()
 	}()
 
 	return ch
@@ -431,9 +463,15 @@ func (t *SubprocessTransport) Close() error {
 
 // runCleanup executes and clears all registered cleanup functions.
 // Must be called without holding t.mu (cleanup functions may need to acquire it).
+// Safe to call more than once (e.g. when both the ReadMessages goroutine's exit
+// path and a concurrent Close() call race to clean up the same transport): the
+// cleanupMu-guarded swap ensures only the first caller sees a non-empty fns
+// slice, so a second call is a harmless no-op.
 func (t *SubprocessTransport) runCleanup() {
+	t.cleanupMu.Lock()
 	fns := t.cleanupFuncs
 	t.cleanupFuncs = nil
+	t.cleanupMu.Unlock()
 	for _, fn := range fns {
 		fn()
 	}
