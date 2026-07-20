@@ -1110,15 +1110,91 @@ func TestParseMessage_ResultMessage_Origin(t *testing.T) {
 		"subtype":    "success",
 		"is_error":   false,
 		"session_id": "s",
-		"origin":     "task_notification",
+		"origin": map[string]any{
+			"kind":    "task-notification",
+			"subkind": "scheduled-trigger",
+		},
 	}
 	msg, err := ParseMessage(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	r := msg.(*ResultMessage)
-	if r.Origin != "task_notification" {
-		t.Errorf("Origin = %q, want task_notification", r.Origin)
+	if r.Origin == nil {
+		t.Fatal("Origin = nil, want non-nil")
+	}
+	if r.Origin.Kind != MessageOriginKindTaskNotification {
+		t.Errorf("Origin.Kind = %q, want %q", r.Origin.Kind, MessageOriginKindTaskNotification)
+	}
+	if r.Origin.Subkind != "scheduled-trigger" {
+		t.Errorf("Origin.Subkind = %q, want scheduled-trigger", r.Origin.Subkind)
+	}
+}
+
+func TestParseMessage_ResultMessage_Origin_Channel(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+		"origin": map[string]any{
+			"kind":   "channel",
+			"server": "slack-workspace-1",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.Origin == nil {
+		t.Fatal("Origin = nil, want non-nil")
+	}
+	if r.Origin.Kind != MessageOriginKindChannel {
+		t.Errorf("Origin.Kind = %q, want %q", r.Origin.Kind, MessageOriginKindChannel)
+	}
+	if r.Origin.Server != "slack-workspace-1" {
+		t.Errorf("Origin.Server = %q, want slack-workspace-1", r.Origin.Server)
+	}
+}
+
+func TestParseMessage_ResultMessage_Origin_Absent(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.Origin != nil {
+		t.Errorf("Origin = %+v, want nil", r.Origin)
+	}
+}
+
+func TestParseMessage_UserMessage_Origin_Human(t *testing.T) {
+	data := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"content": "hi",
+		},
+		"origin": map[string]any{
+			"kind": "human",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	u := msg.(*UserMessage)
+	if u.Origin == nil {
+		t.Fatal("Origin = nil, want non-nil")
+	}
+	if u.Origin.Kind != MessageOriginKindHuman {
+		t.Errorf("Origin.Kind = %q, want %q", u.Origin.Kind, MessageOriginKindHuman)
 	}
 }
 

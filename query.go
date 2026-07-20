@@ -412,10 +412,10 @@ func (q *query) readMessages() {
 		// hooks) is already accessible to consumers.
 		if msgType == "result" {
 			q.firstResultOnce.Do(func() { close(q.firstResultCh) })
-			// Close mainResultCh only for the main-session result (empty origin).
-			// Background-agent results carry a non-empty origin and must not
-			// trigger stdin close, as the main turn is still running.
-			if origin, _ := msg["origin"].(string); origin == "" {
+			// Close mainResultCh only for the main-session result (no origin).
+			// Background-agent results carry a structured origin object and
+			// must not trigger stdin close, as the main turn is still running.
+			if parseMessageOrigin(msg) == nil {
 				q.mainResultOnce.Do(func() { close(q.mainResultCh) })
 			}
 		}

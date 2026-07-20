@@ -292,10 +292,10 @@ func (c *Client) ReceiveResponse(ctx context.Context) <-chan Message {
 					return
 				}
 				if r, ok := parsed.(*ResultMessage); ok {
-					// Only stop on the main-session result (empty Origin).
-					// Background-agent results (non-empty Origin) are forwarded
+					// Only stop on the main-session result (nil Origin).
+					// Background-agent results (non-nil Origin) are forwarded
 					// but must not end the response stream.
-					if r.Origin == "" {
+					if r.Origin == nil {
 						return
 					}
 				}
