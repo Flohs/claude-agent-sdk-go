@@ -472,15 +472,15 @@ func TestParseMessage_TaskProgress_Blocked(t *testing.T) {
 func TestParseMessage_ResultMessage(t *testing.T) {
 	cost := 0.05
 	data := map[string]any{
-		"type":           "result",
-		"subtype":        "success",
-		"duration_ms":    float64(1000),
+		"type":            "result",
+		"subtype":         "success",
+		"duration_ms":     float64(1000),
 		"duration_api_ms": float64(800),
-		"is_error":       false,
-		"num_turns":      float64(3),
-		"session_id":     "sess-1",
-		"total_cost_usd": cost,
-		"result":         "done",
+		"is_error":        false,
+		"num_turns":       float64(3),
+		"session_id":      "sess-1",
+		"total_cost_usd":  cost,
+		"result":          "done",
 	}
 
 	msg, err := ParseMessage(data)
@@ -686,6 +686,162 @@ func TestParseMessage_RateLimitEvent_ImplementsMessage(t *testing.T) {
 		// expected
 	default:
 		t.Errorf("expected *RateLimitEvent in type switch, got %T", m)
+	}
+}
+
+func TestParseMessage_ToolProgress(t *testing.T) {
+	errorStatus := 503
+	data := map[string]any{
+		"type":                 "tool_progress",
+		"tool_use_id":          "toolu_1",
+		"tool_name":            "Task",
+		"parent_tool_use_id":   "toolu_parent",
+		"elapsed_time_seconds": 12.5,
+		"task_id":              "task-1",
+		"uuid":                 "tp-uuid-1",
+		"session_id":           "sess-tp-1",
+		"heartbeat":            true,
+		"subagent_type":        "general-purpose",
+		"subagent_retry": map[string]any{
+			"agent_id":       "agent-1",
+			"attempt":        2,
+			"max_retries":    5,
+			"retry_delay_ms": 1000,
+			"error_status":   float64(errorStatus),
+			"error_category": "overloaded",
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tp, ok := msg.(*ToolProgressMessage)
+	if !ok {
+		t.Fatalf("expected *ToolProgressMessage, got %T", msg)
+	}
+	if tp.ToolUseID != "toolu_1" {
+		t.Errorf("expected ToolUseID 'toolu_1', got %s", tp.ToolUseID)
+	}
+	if tp.ToolName != "Task" {
+		t.Errorf("expected ToolName 'Task', got %s", tp.ToolName)
+	}
+	if tp.ParentToolUseID == nil || *tp.ParentToolUseID != "toolu_parent" {
+		t.Errorf("expected ParentToolUseID 'toolu_parent', got %v", tp.ParentToolUseID)
+	}
+	if tp.ElapsedTimeSeconds != 12.5 {
+		t.Errorf("expected ElapsedTimeSeconds 12.5, got %v", tp.ElapsedTimeSeconds)
+	}
+	if tp.TaskID != "task-1" {
+		t.Errorf("expected TaskID 'task-1', got %s", tp.TaskID)
+	}
+	if tp.UUID != "tp-uuid-1" {
+		t.Errorf("expected UUID 'tp-uuid-1', got %s", tp.UUID)
+	}
+	if tp.SessionID != "sess-tp-1" {
+		t.Errorf("expected SessionID 'sess-tp-1', got %s", tp.SessionID)
+	}
+	if !tp.Heartbeat {
+		t.Error("expected Heartbeat true")
+	}
+	if tp.SubagentType != "general-purpose" {
+		t.Errorf("expected SubagentType 'general-purpose', got %s", tp.SubagentType)
+	}
+	if tp.SubagentRetry == nil {
+		t.Fatal("expected non-nil SubagentRetry")
+	}
+	if tp.SubagentRetry.AgentID != "agent-1" {
+		t.Errorf("expected AgentID 'agent-1', got %s", tp.SubagentRetry.AgentID)
+	}
+	if tp.SubagentRetry.Attempt != 2 {
+		t.Errorf("expected Attempt 2, got %d", tp.SubagentRetry.Attempt)
+	}
+	if tp.SubagentRetry.MaxRetries != 5 {
+		t.Errorf("expected MaxRetries 5, got %d", tp.SubagentRetry.MaxRetries)
+	}
+	if tp.SubagentRetry.RetryDelayMs != 1000 {
+		t.Errorf("expected RetryDelayMs 1000, got %d", tp.SubagentRetry.RetryDelayMs)
+	}
+	if tp.SubagentRetry.ErrorStatus == nil || *tp.SubagentRetry.ErrorStatus != errorStatus {
+		t.Errorf("expected ErrorStatus %d, got %v", errorStatus, tp.SubagentRetry.ErrorStatus)
+	}
+	if tp.SubagentRetry.ErrorCategory != "overloaded" {
+		t.Errorf("expected ErrorCategory 'overloaded', got %s", tp.SubagentRetry.ErrorCategory)
+	}
+}
+
+func TestParseMessage_ToolProgress_Minimal(t *testing.T) {
+	data := map[string]any{
+		"type":                 "tool_progress",
+		"tool_use_id":          "toolu_2",
+		"tool_name":            "Bash",
+		"parent_tool_use_id":   nil,
+		"elapsed_time_seconds": 0.5,
+		"uuid":                 "tp-uuid-2",
+		"session_id":           "sess-tp-2",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tp, ok := msg.(*ToolProgressMessage)
+	if !ok {
+		t.Fatalf("expected *ToolProgressMessage, got %T", msg)
+	}
+	if tp.ToolUseID != "toolu_2" {
+		t.Errorf("expected ToolUseID 'toolu_2', got %s", tp.ToolUseID)
+	}
+	if tp.ToolName != "Bash" {
+		t.Errorf("expected ToolName 'Bash', got %s", tp.ToolName)
+	}
+	if tp.ParentToolUseID != nil {
+		t.Errorf("expected nil ParentToolUseID, got %v", *tp.ParentToolUseID)
+	}
+	if tp.ElapsedTimeSeconds != 0.5 {
+		t.Errorf("expected ElapsedTimeSeconds 0.5, got %v", tp.ElapsedTimeSeconds)
+	}
+	if tp.TaskID != "" {
+		t.Errorf("expected empty TaskID, got %s", tp.TaskID)
+	}
+	if tp.Heartbeat {
+		t.Error("expected Heartbeat false")
+	}
+	if tp.SubagentType != "" {
+		t.Errorf("expected empty SubagentType, got %s", tp.SubagentType)
+	}
+	if tp.SubagentRetry != nil {
+		t.Errorf("expected nil SubagentRetry, got %v", tp.SubagentRetry)
+	}
+}
+
+func TestParseMessage_ToolProgress_ImplementsMessage(t *testing.T) {
+	data := map[string]any{
+		"type":                 "tool_progress",
+		"tool_use_id":          "toolu_3",
+		"tool_name":            "Read",
+		"elapsed_time_seconds": 1.0,
+		"uuid":                 "tp-uuid-3",
+		"session_id":           "sess-tp-3",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := Message(msg)
+	if m == nil {
+		t.Fatal("expected non-nil Message")
+	}
+
+	switch m.(type) {
+	case *ToolProgressMessage:
+		// expected
+	default:
+		t.Errorf("expected *ToolProgressMessage in type switch, got %T", m)
 	}
 }
 
@@ -1469,8 +1625,8 @@ func TestParseAssistantMessage_StopDetails(t *testing.T) {
 	raw := map[string]any{
 		"type": "assistant",
 		"message": map[string]any{
-			"content":     []any{},
-			"stop_reason": "refusal",
+			"content":      []any{},
+			"stop_reason":  "refusal",
 			"stop_details": map[string]any{"type": "refusal", "reason": "policy"},
 		},
 	}

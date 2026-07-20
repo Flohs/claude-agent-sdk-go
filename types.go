@@ -1019,6 +1019,51 @@ type RateLimitEvent struct {
 
 func (RateLimitEvent) messageMarker() {}
 
+// SubagentRetryInfo carries retry-attempt bookkeeping for a subagent that is
+// being retried after a failure. Populated on ToolProgressMessage.SubagentRetry
+// when the CLI is currently retrying a subagent launch.
+type SubagentRetryInfo struct {
+	AgentID      string `json:"agent_id"`
+	Attempt      int    `json:"attempt"`
+	MaxRetries   int    `json:"max_retries"`
+	RetryDelayMs int    `json:"retry_delay_ms"`
+	// ErrorStatus is the HTTP status code from the failing attempt, when
+	// available. Nil when not provided by the CLI.
+	ErrorStatus   *int   `json:"error_status"`
+	ErrorCategory string `json:"error_category"`
+}
+
+// ToolProgressMessage is a top-level "tool_progress" message emitted while a
+// tool call (including subagent-spawning Task/Agent calls) is in progress.
+// Unlike TaskProgressMessage (a "system"/"task_progress" subtype), this is
+// its own top-level message type and does not embed SystemMessage.
+// Port of TypeScript SDK bundled sdk-tools.d.ts (SDKToolProgressMessage).
+type ToolProgressMessage struct {
+	ToolUseID string `json:"tool_use_id"`
+	ToolName  string `json:"tool_name"`
+	// ParentToolUseID is the tool-use ID of the enclosing tool call, or nil
+	// when this tool call is not nested inside another.
+	ParentToolUseID    *string `json:"parent_tool_use_id"`
+	ElapsedTimeSeconds float64 `json:"elapsed_time_seconds"`
+	// TaskID identifies the task this progress report belongs to, when the
+	// tool call is running as part of a task. Empty when not provided.
+	TaskID    string `json:"task_id,omitempty"`
+	UUID      string `json:"uuid"`
+	SessionID string `json:"session_id"`
+	// Heartbeat indicates this progress report is a periodic keep-alive
+	// rather than a report tied to actual tool progress.
+	Heartbeat bool `json:"heartbeat,omitempty"`
+	// SubagentType identifies the type of subagent this progress report
+	// belongs to, when the tool call is a subagent-spawning call. Empty when
+	// not applicable.
+	SubagentType string `json:"subagent_type,omitempty"`
+	// SubagentRetry is populated when the CLI is currently retrying a
+	// subagent launch after a failure. Nil when no retry is in progress.
+	SubagentRetry *SubagentRetryInfo `json:"subagent_retry,omitempty"`
+}
+
+func (ToolProgressMessage) messageMarker() {}
+
 // The following prefix buckets classify a rate-limit-related message string
 // (e.g. surfaced in a ResultMessage or system message) by matching its
 // leading text with strings.HasPrefix, without hand-mirroring the literal
