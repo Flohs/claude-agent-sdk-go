@@ -1144,12 +1144,25 @@ func (q *query) stopTask(taskID string) error {
 	return err
 }
 
-func (q *query) rewindFiles(userMessageID string) error {
-	_, err := q.sendControlRequest(map[string]any{
+func (q *query) rewindFiles(userMessageID string) (*RewindFilesResult, error) {
+	resp, err := q.sendControlRequest(map[string]any{
 		"subtype":         "rewind_files",
 		"user_message_id": userMessageID,
 	}, 60*time.Second)
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var result RewindFilesResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 func (q *query) rewindConversation(userMessageID string) error {

@@ -1288,6 +1288,33 @@ type InterruptReceipt struct {
 	StillQueued []string
 }
 
+// RewindFilesResult is the result of a [Client.RewindFiles] operation.
+// Port of TypeScript SDK v0.3.216.
+type RewindFilesResult struct {
+	// CanRewind reports whether the rewind was (or, for a dry run, would be)
+	// possible.
+	CanRewind bool `json:"canRewind"`
+	// Error contains a human-readable explanation when CanRewind is false.
+	Error string `json:"error,omitempty"`
+	// FilesChanged lists the tracked file paths that were restored or deleted.
+	FilesChanged []string `json:"filesChanged,omitempty"`
+	// Insertions is the number of lines inserted across all changed files.
+	Insertions int `json:"insertions,omitempty"`
+	// Deletions is the number of lines deleted across all changed files.
+	Deletions int `json:"deletions,omitempty"`
+	// SkippedLinks counts tracked files that were NOT restored or deleted
+	// because a symlink, hard link, or other non-regular file was detected at
+	// the tracked path, its parent directory no longer resolves to where it
+	// pointed when the checkpoint was taken, or its backup could not be
+	// safely read. Only populated by a real (non-dry-run) rewind — on a dry
+	// run response the field is never set and the preview counts do not
+	// reflect link-safety refusals. Absent or 0 on a real rewind means no
+	// link-safety refusals occurred; other per-file failures (for example a
+	// missing backup file) are logged and reported in telemetry but are not
+	// counted here.
+	SkippedLinks int `json:"skippedLinks,omitempty"`
+}
+
 // ServerCapabilities describes model-level capabilities reported by the CLI
 // during session initialization. These fields allow callers to dynamically
 // check which effort levels and thinking modes the currently active model

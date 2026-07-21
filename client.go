@@ -484,9 +484,9 @@ func (c *Client) StopTask(ctx context.Context, taskID string) error {
 
 // RewindFiles rewinds tracked files to their state at a specific user message.
 // Requires EnableFileCheckpointing to be set in Options.
-func (c *Client) RewindFiles(ctx context.Context, userMessageID string) error {
+func (c *Client) RewindFiles(ctx context.Context, userMessageID string) (*RewindFilesResult, error) {
 	if c.q == nil {
-		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
 	return c.q.rewindFiles(userMessageID)
 }
