@@ -83,6 +83,60 @@ func TestParseMessage_UserMessage_IsMeta(t *testing.T) {
 	}
 }
 
+func TestParseMessage_UserMessage_ToolResultMeta(t *testing.T) {
+	data := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"content": "denied",
+		},
+		"tool_result_meta": map[string]any{
+			"non_execution_kind": "denied",
+			"user_feedback":      "not now, please ask again later",
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	user, ok := msg.(*UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+	if user.ToolResultMeta == nil {
+		t.Fatal("ToolResultMeta = nil, want non-nil")
+	}
+	if user.ToolResultMeta.NonExecutionKind != "denied" {
+		t.Errorf("ToolResultMeta.NonExecutionKind = %q, want %q", user.ToolResultMeta.NonExecutionKind, "denied")
+	}
+	if user.ToolResultMeta.UserFeedback != "not now, please ask again later" {
+		t.Errorf("ToolResultMeta.UserFeedback = %q, want %q", user.ToolResultMeta.UserFeedback, "not now, please ask again later")
+	}
+}
+
+func TestParseMessage_UserMessage_ToolResultMeta_Absent(t *testing.T) {
+	data := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"content": "hello world",
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	user, ok := msg.(*UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+	if user.ToolResultMeta != nil {
+		t.Errorf("ToolResultMeta = %+v, want nil", user.ToolResultMeta)
+	}
+}
+
 func TestParseMessage_AssistantMessage(t *testing.T) {
 	data := map[string]any{
 		"type": "assistant",
