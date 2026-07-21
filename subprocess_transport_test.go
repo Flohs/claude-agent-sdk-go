@@ -1026,3 +1026,200 @@ func TestReadMessages_CtxCancelDuringScanUnregistersChild(t *testing.T) {
 		t.Error("expected cmd to be unregistered from activeChildren after ctx cancellation, but it is still registered (leak)")
 	}
 }
+
+// --- Windows batch-script / cmd.exe metacharacter refusal (issue #527) ---
+//
+// isWindowsBatchScript and containsWindowsCmdMetacharacters are deliberately
+// pure string logic with no runtime.GOOS dependency, so they are exercised
+// directly here and run on every CI host regardless of OS. The OS gate
+// itself (rejectWindowsBatchCLIForGOOS / rejectWindowsCmdMetacharactersForGOOS)
+// takes the OS name as a parameter rather than reading runtime.GOOS
+// internally, specifically so the gating behavior — refuse on "windows",
+// no-op on everything else — can also be verified from a non-Windows CI
+// host by passing both a real and a fake goos value.
+
+func TestIsWindowsBatchScript(t *testing.T) {
+	positive := []string{
+		`C:\tools\claude.cmd`,
+		`C:\tools\claude.bat`,
+		`C:\tools\claude.CMD`,        // case-insensitive
+		`C:\tools\claude.cmd.`,       // trailing dot
+		`C:\tools\claude.CMD `,       // trailing space
+		`C:\tools\claude.cmd:stream`, // NTFS alternate data stream on the base file
+		`C:\tools\claude:evil.cmd`,   // NTFS alternate data stream naming a .cmd
+		`C:\tools\.cmd`,              // bare extension
+		`:claude.cmd`,                // leading colon
+		`C:claude.cmd`,               // drive-relative path
+		`C:\tools\claude.cmd\.`,      // trailing "." component after the batch file
+		`C:\tools\claude.cmd\..`,     // trailing ".." component after the batch file
+		`claude.cmd`,
+		`claude.bat`,
+		`/mnt/c/tools/claude.cmd`, // forward slashes
+		`C:\\tools\\\\claude.cmd`, // repeated separators
+		`relative\path\claude.cmd`,
+	}
+	for _, p := range positive {
+		if !isWindowsBatchScript(p) {
+			t.Errorf("isWindowsBatchScript(%q) = false, want true", p)
+		}
+	}
+
+	negative := []string{
+		`C:\tools\claude.exe`,
+		`C:\tools\claude`,
+		`/usr/local/bin/claude`,
+		`claude`,
+		`claude.exe`,
+		`C:\tools\claude.com`,
+		``,
+		`C:\tools\notcmd`,
+		`C:\tools\claude.cmdx`, // suffix, not exact extension
+	}
+	for _, p := range negative {
+		if isWindowsBatchScript(p) {
+			t.Errorf("isWindowsBatchScript(%q) = true, want false", p)
+		}
+	}
+}
+
+func TestContainsWindowsCmdMetacharacters(t *testing.T) {
+	positive := []string{
+		"x&calc",
+		"x|whoami",
+		"x<in",
+		"x>out",
+		"x^y",
+		"x%PATH%y",
+		"x!VAR!y",
+		`x"y`,
+		"x\ny",
+		"x\ry",
+		"x\r\ny",
+	}
+	for _, v := range positive {
+		if !containsWindowsCmdMetacharacters(v) {
+			t.Errorf("containsWindowsCmdMetacharacters(%q) = false, want true", v)
+		}
+	}
+
+	negative := []string{
+		"",
+		"my-session-id",
+		"My project - daily notes (v2) #3",
+		"abc123-def456",
+		"a normal resume title",
+	}
+	for _, v := range negative {
+		if containsWindowsCmdMetacharacters(v) {
+			t.Errorf("containsWindowsCmdMetacharacters(%q) = true, want false", v)
+		}
+	}
+}
+
+func TestRejectWindowsBatchCLIForGOOS(t *testing.T) {
+	t.Run("refuses batch script on windows", func(t *testing.T) {
+		err := rejectWindowsBatchCLIForGOOS("windows", `C:\tools\claude.cmd`)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if _, ok := err.(*ConnectionError); !ok {
+			t.Fatalf("expected *ConnectionError, got %T: %v", err, err)
+		}
+		if !strings.Contains(err.Error(), "claude.cmd") {
+			t.Errorf("error message = %q, want it to mention the offending path", err.Error())
+		}
+		if !strings.Contains(err.Error(), "CVE-2024-27980") {
+			t.Errorf("error message = %q, want it to reference CVE-2024-27980", err.Error())
+		}
+	})
+
+	t.Run("allows native exe on windows", func(t *testing.T) {
+		if err := rejectWindowsBatchCLIForGOOS("windows", `C:\tools\claude.exe`); err != nil {
+			t.Fatalf("unexpected error for native exe: %v", err)
+		}
+	})
+
+	t.Run("no-op off windows even for a .cmd path", func(t *testing.T) {
+		for _, goos := range []string{"linux", "darwin", "freebsd", ""} {
+			if err := rejectWindowsBatchCLIForGOOS(goos, `/tmp/claude.cmd`); err != nil {
+				t.Errorf("goos=%q: unexpected error: %v", goos, err)
+			}
+		}
+	})
+
+	t.Run("matches the host's actual runtime.GOOS", func(t *testing.T) {
+		// This repo's CI runs on Linux, so this should always be a no-op here;
+		// it exists to document that production code calls the *ForGOOS
+		// helpers with runtime.GOOS, not a hardcoded value.
+		if err := rejectWindowsBatchCLIForGOOS(runtime.GOOS, `C:\tools\claude.cmd`); runtime.GOOS != "windows" && err != nil {
+			t.Errorf("unexpected error on non-windows host: %v", err)
+		}
+	})
+}
+
+func TestRejectWindowsCmdMetacharactersForGOOS(t *testing.T) {
+	t.Run("refuses metacharacters on windows", func(t *testing.T) {
+		err := rejectWindowsCmdMetacharactersForGOOS("windows", "Resume", "x&calc")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if _, ok := err.(*ConnectionError); !ok {
+			t.Fatalf("expected *ConnectionError, got %T: %v", err, err)
+		}
+		if !strings.Contains(err.Error(), "Resume") {
+			t.Errorf("error message = %q, want it to mention the option name", err.Error())
+		}
+	})
+
+	t.Run("allows plain values on windows", func(t *testing.T) {
+		if err := rejectWindowsCmdMetacharactersForGOOS("windows", "SessionID", "abc-123-def"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("no-op off windows even with metacharacters", func(t *testing.T) {
+		for _, goos := range []string{"linux", "darwin", "freebsd", ""} {
+			if err := rejectWindowsCmdMetacharactersForGOOS(goos, "Resume", "x&calc|y<z>w^v%u!\"\r\n"); err != nil {
+				t.Errorf("goos=%q: unexpected error: %v", goos, err)
+			}
+		}
+	})
+
+	t.Run("empty value is always fine", func(t *testing.T) {
+		if err := rejectWindowsCmdMetacharactersForGOOS("windows", "Resume", ""); err != nil {
+			t.Errorf("unexpected error for empty value: %v", err)
+		}
+	})
+}
+
+// TestConnect_NonWindowsHost_NoBatchOrMetacharacterRefusal is a light
+// integration check that on this CI host's actual runtime.GOOS (non-Windows),
+// Connect does not short-circuit with the Windows-only refusals even when
+// given inputs that would trip them on Windows. It still fails to connect
+// (there is no real CLI at the given path), but the error must not be the
+// batch-script/metacharacter ConnectionError — proving those checks are
+// inert here, matching "no behavior change on Linux or macOS" from #527.
+func TestConnect_NonWindowsHost_NoBatchOrMetacharacterRefusal(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("this test documents non-Windows behavior")
+	}
+
+	transport := &SubprocessTransport{
+		cliPath: "/nonexistent/path/claude.cmd",
+		options: &Options{
+			Resume: "x&calc",
+		},
+		maxBufSize: defaultMaxBufferSize,
+	}
+
+	err := transport.Connect(context.Background())
+	if err == nil {
+		t.Fatal("expected an error connecting to a nonexistent CLI path, got nil")
+	}
+	if strings.Contains(err.Error(), "CVE-2024-27980") {
+		t.Errorf("Connect refused as a batch script on a non-Windows host: %v", err)
+	}
+	if strings.Contains(err.Error(), "unsafe to pass on a Windows command line") {
+		t.Errorf("Connect refused cmd.exe metacharacters on a non-Windows host: %v", err)
+	}
+}

@@ -184,6 +184,23 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 		return nil
 	}
 
+	// Security: refuse to spawn a .bat/.cmd CLI on Windows, and reject
+	// cmd.exe metacharacters in Resume/SessionID. Both checks must run
+	// before any process is spawned with the resolved CLI path — this
+	// covers the version probe below as well as the main spawn further
+	// down. See rejectWindowsBatchCLIForGOOS / rejectWindowsCmdMetacharactersForGOOS
+	// for the CVE-2024-27980 ("BatBadBut") background; neither check does
+	// anything off Windows.
+	if err := rejectWindowsBatchCLIForGOOS(runtime.GOOS, t.cliPath); err != nil {
+		return err
+	}
+	if err := rejectWindowsCmdMetacharactersForGOOS(runtime.GOOS, "Resume", t.options.Resume); err != nil {
+		return err
+	}
+	if err := rejectWindowsCmdMetacharactersForGOOS(runtime.GOOS, "SessionID", t.options.SessionID); err != nil {
+		return err
+	}
+
 	if os.Getenv("CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK") == "" {
 		checkClaudeVersion(t.cliPath)
 	}
@@ -992,6 +1009,116 @@ func findCLI() (string, error) {
 					"  Options{CLIPath: \"/path/to/%s\"}", cliName),
 		}},
 	}
+}
+
+// windowsCmdMetacharacters is the set of characters that carry special
+// meaning to cmd.exe's command-line re-parser (CVE-2024-27980, the
+// "BatBadBut" vulnerability class). Values containing any of these, or a CR
+// or LF, are flagged by containsWindowsCmdMetacharacters.
+const windowsCmdMetacharacters = `&|<>^%!"`
+
+// isWindowsBatchScript reports whether cliPath names a .bat/.cmd batch
+// script under Win32 path-normalization rules. It is pure string logic with
+// no runtime.GOOS dependency so it can be unit-tested on any host; callers
+// gate its use to Windows (see rejectWindowsBatchCLIForGOOS).
+//
+// Windows has no shebang mechanism: CreateProcess runs batch scripts by
+// silently rewriting the spawn into a "cmd.exe /c" invocation, and cmd.exe
+// re-parses the whole command line at execution time. Quoting rules that
+// correctly protect a native executable's argv (e.g. our appendFlagValue
+// equals-form binding, from #495/#502) do not protect against cmd.exe
+// metacharacter expansion once that re-parse happens — %VAR% expands even
+// inside double quotes — so no reliable escaping for cmd.exe exists.
+// Refusing to spawn a batch script at all is the same remediation Node.js
+// and Rust shipped for this vulnerability class (CVE-2024-27980,
+// "BatBadBut").
+//
+// The normalization below classifies EVERY path component, not only the
+// final one, and handles the obfuscations that a naive filepath.Ext check
+// would miss:
+//   - trailing dots/spaces on a segment are stripped (Windows ignores them,
+//     so "claude.cmd." and "claude.CMD " both name claude.cmd)
+//   - both '/' and '\' are treated as path separators; repeated separators
+//     are tolerated since splitting simply yields extra empty components
+//   - each separator-delimited component is further split on ':' to catch
+//     NTFS alternate-data-stream specs ("claude.cmd:stream",
+//     "claude:evil.cmd") and drive-relative paths ("C:claude.cmd")
+//   - "." and ".." components, and a bare ".cmd" component, fall out of the
+//     same logic naturally: "." and ".." trim away to nothing and never
+//     match the suffix, while a bare ".cmd" component trims to itself and
+//     does match, so it is correctly flagged
+func isWindowsBatchScript(cliPath string) bool {
+	normalized := strings.ReplaceAll(cliPath, "\\", "/")
+	for _, component := range strings.Split(normalized, "/") {
+		for _, segment := range strings.Split(component, ":") {
+			trimmed := strings.ToLower(strings.TrimRight(segment, ". "))
+			if strings.HasSuffix(trimmed, ".bat") || strings.HasSuffix(trimmed, ".cmd") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// containsWindowsCmdMetacharacters reports whether value contains a
+// character that carries special meaning to cmd.exe (windowsCmdMetacharacters)
+// or a CR/LF. It is pure string logic so it can be unit-tested on any host;
+// callers gate its use to Windows.
+func containsWindowsCmdMetacharacters(value string) bool {
+	return strings.ContainsAny(value, windowsCmdMetacharacters+"\r\n")
+}
+
+// rejectWindowsBatchCLIForGOOS refuses to proceed if goos is "windows" and
+// cliPath names a .bat/.cmd batch script (per isWindowsBatchScript). goos is
+// threaded through as a parameter — rather than read internally via
+// runtime.GOOS — purely so this gating logic can be exercised directly by
+// tests on any host; Connect always calls it with runtime.GOOS, so the
+// refusal is only ever active on real Windows hosts and behavior on
+// Linux/macOS is unchanged.
+//
+// This must run before any process is spawned with cliPath, which is why
+// Connect calls it before both the version probe (checkClaudeVersion) and
+// the main CLI spawn, regardless of whether cliPath came from
+// Options.CLIPath or the findCLI() fallback.
+func rejectWindowsBatchCLIForGOOS(goos, cliPath string) error {
+	if goos != "windows" || !isWindowsBatchScript(cliPath) {
+		return nil
+	}
+	return &ConnectionError{SDKError: SDKError{Message: fmt.Sprintf(
+		"Refusing to execute batch script %q: Windows runs .bat/.cmd files via "+
+			"cmd.exe, which re-parses the entire command line and can execute "+
+			"commands injected through CLI arguments (CVE-2024-27980, the "+
+			"\"BatBadBut\" vulnerability class); no reliable escaping for cmd.exe "+
+			"exists. Use a native claude.exe instead: install Claude Code with the "+
+			"native Windows installer, point Options.CLIPath at a claude.exe, or "+
+			"use an SDK platform build that bundles claude.exe.",
+		cliPath,
+	)}}
+}
+
+// rejectWindowsCmdMetacharactersForGOOS refuses optionName's value if goos is
+// "windows" and the value contains a cmd.exe metacharacter or CR/LF (per
+// containsWindowsCmdMetacharacters). goos is threaded through as a parameter
+// for the same testability reason as rejectWindowsBatchCLIForGOOS.
+//
+// This is defense in depth: with batch-script spawning already refused
+// (rejectWindowsBatchCLIForGOOS), these characters are harmless to a native
+// claude.exe, whose argv is quoted correctly by exec.Cmd / appendFlagValue.
+// They are rejected anyway so that Resume/SessionID values — which
+// applications commonly take from external input — stay inert even if a
+// cmd.exe hop is ever reintroduced between the SDK and the CLI. No format is
+// imposed beyond this (Resume values may be arbitrary session titles, not
+// only UUIDs), and POSIX/Linux/macOS behavior is completely unchanged: the
+// goos guard means this never rejects anything off Windows.
+func rejectWindowsCmdMetacharactersForGOOS(goos, optionName, value string) error {
+	if goos != "windows" || !containsWindowsCmdMetacharacters(value) {
+		return nil
+	}
+	return &ConnectionError{SDKError: SDKError{Message: fmt.Sprintf(
+		"%s value %q contains characters that are unsafe to pass on a Windows "+
+			"command line (%s or CR/LF)",
+		optionName, value, windowsCmdMetacharacters,
+	)}}
 }
 
 var versionRegexp = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+)`)
