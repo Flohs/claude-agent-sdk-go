@@ -385,18 +385,19 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 
 func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 	msg := &ResultMessage{
-		Subtype:        stringField(data, "subtype"),
-		DurationMs:     intField(data, "duration_ms"),
-		DurationAPIMs:  intField(data, "duration_api_ms"),
-		IsError:        boolField(data, "is_error"),
-		NumTurns:       intField(data, "num_turns"),
-		SessionID:      stringField(data, "session_id"),
-		StopReason:     stringField(data, "stop_reason"),
-		TerminalReason: stringField(data, "terminal_reason"),
-		Origin:         parseMessageOrigin(data),
-		RequestID:      stringField(data, "request_id"),
-		Result:         stringField(data, "result"),
-		Timestamp:      stringField(data, "timestamp"),
+		Subtype:         stringField(data, "subtype"),
+		DurationMs:      intField(data, "duration_ms"),
+		DurationAPIMs:   intField(data, "duration_api_ms"),
+		IsError:         boolField(data, "is_error"),
+		NumTurns:        intField(data, "num_turns"),
+		SessionID:       stringField(data, "session_id"),
+		StopReason:      stringField(data, "stop_reason"),
+		TerminalReason:  stringField(data, "terminal_reason"),
+		Origin:          parseMessageOrigin(data),
+		RequestID:       stringField(data, "request_id"),
+		Result:          stringField(data, "result"),
+		Timestamp:       stringField(data, "timestamp"),
+		UserMessageUUID: stringField(data, "user_message_uuid"),
 	}
 
 	if errors, ok := data["errors"].([]any); ok {
@@ -410,6 +411,12 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 	if v, ok := data["api_error_status"]; ok {
 		if status := intFromAny(v); status != 0 {
 			msg.APIErrorStatus = &status
+		}
+	}
+
+	if v, ok := data["request_sent_wall_ms"]; ok {
+		if wallMs := int64FromAny(v); wallMs != 0 {
+			msg.RequestSentWallMs = &wallMs
 		}
 	}
 
@@ -650,6 +657,19 @@ func intFromAny(v any) int {
 		return n
 	case int64:
 		return int(n)
+	default:
+		return 0
+	}
+}
+
+func int64FromAny(v any) int64 {
+	switch n := v.(type) {
+	case float64:
+		return int64(n)
+	case int:
+		return int64(n)
+	case int64:
+		return n
 	default:
 		return 0
 	}

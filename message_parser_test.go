@@ -1359,6 +1359,55 @@ func TestParseMessage_ResultMessage_DeferredToolUse_Absent(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_UserMessageUUIDAndRequestSentWallMs(t *testing.T) {
+	// Success result carries the triggering user message uuid and the
+	// wall-clock send timestamp for cross-host request-latency correlation.
+	data := map[string]any{
+		"type":                 "result",
+		"subtype":              "success",
+		"is_error":             false,
+		"session_id":           "s",
+		"user_message_uuid":    "um_123",
+		"request_sent_wall_ms": float64(1700000000123),
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.UserMessageUUID != "um_123" {
+		t.Errorf("UserMessageUUID = %q, want %q", r.UserMessageUUID, "um_123")
+	}
+	if r.RequestSentWallMs == nil {
+		t.Fatal("RequestSentWallMs is nil")
+	}
+	if *r.RequestSentWallMs != 1700000000123 {
+		t.Errorf("*RequestSentWallMs = %d, want 1700000000123", *r.RequestSentWallMs)
+	}
+}
+
+func TestParseMessage_ResultMessage_UserMessageUUIDAndRequestSentWallMs_Absent(t *testing.T) {
+	// Non-success subtypes (and older CLIs) omit these fields; they stay
+	// zero-value.
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "error_max_turns",
+		"is_error":   true,
+		"session_id": "s",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.UserMessageUUID != "" {
+		t.Errorf("UserMessageUUID = %q, want empty when absent", r.UserMessageUUID)
+	}
+	if r.RequestSentWallMs != nil {
+		t.Errorf("RequestSentWallMs = %v, want nil when absent", *r.RequestSentWallMs)
+	}
+}
+
 func TestParseMessage_TaskStarted_SubagentTypeAndDescription(t *testing.T) {
 	data := map[string]any{
 		"type":             "system",
