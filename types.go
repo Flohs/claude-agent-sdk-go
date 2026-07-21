@@ -1043,6 +1043,14 @@ type ResultMessage struct {
 	// Timestamp is the ISO-8601 datetime when this message was recorded in the
 	// CLI transcript. Empty when not provided by the CLI.
 	Timestamp string `json:"timestamp,omitempty"`
+	// UserMessageUUID is the uuid of the user message that triggered this
+	// result, for cross-host request-latency correlation. Empty when not
+	// provided by the CLI (e.g. non-success subtypes).
+	UserMessageUUID string `json:"user_message_uuid,omitempty"`
+	// RequestSentWallMs is the wall-clock timestamp (ms) when the request was
+	// sent, for cross-host request-latency correlation. Nil when not
+	// provided by the CLI.
+	RequestSentWallMs *int64 `json:"request_sent_wall_ms,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
