@@ -46,6 +46,7 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		Timestamp:       stringField(data, "timestamp"),
 		IsMeta:          boolField(data, "isMeta"),
 		Origin:          parseMessageOrigin(data),
+		ToolResultMeta:  parseToolResultMeta(data),
 	}
 
 	if tr, ok := data["tool_use_result"].(map[string]any); ok {
@@ -604,6 +605,17 @@ func parseMessageOrigin(data map[string]any) *MessageOrigin {
 		SenderTaskID: stringField(origin, "senderTaskId"),
 		Body:         stringField(origin, "body"),
 		Subkind:      stringField(origin, "subkind"),
+	}
+}
+
+func parseToolResultMeta(data map[string]any) *ToolResultMeta {
+	meta, ok := data["tool_result_meta"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return &ToolResultMeta{
+		NonExecutionKind: stringField(meta, "non_execution_kind"),
+		UserFeedback:     stringField(meta, "user_feedback"),
 	}
 }
 

@@ -151,9 +151,29 @@ type UserMessage struct {
 	// omits the field. Port of TypeScript SDK bundled sdk.d.ts
 	// (SDKMessageOrigin).
 	Origin *MessageOrigin `json:"origin,omitempty"`
+	// ToolResultMeta carries classification metadata alongside a
+	// tool_use_result (e.g. distinguishing a denied, interrupted, or
+	// cancelled tool call). Nil when the CLI omits the field. Port of
+	// TypeScript SDK v0.3.216.
+	ToolResultMeta *ToolResultMeta `json:"tool_result_meta,omitempty"`
 }
 
 func (UserMessage) messageMarker() {}
+
+// ToolResultMeta carries classification metadata alongside a
+// tool_use_result, letting consumers distinguish denied, interrupted, or
+// cancelled tool calls without string-matching the result text.
+//
+// Field shape is not present in the TypeScript SDK's public sdk.d.ts as of
+// v0.3.216 (also checked sdk-tools.d.ts and bridge.d.ts, and the
+// claude-agent-sdk-python source tree — not found in either). It is modeled
+// directly from the upstream changelog's prose description only; field
+// types are our best-effort interpretation and may need adjustment once a
+// typed source becomes available.
+type ToolResultMeta struct {
+	NonExecutionKind string `json:"non_execution_kind,omitempty"`
+	UserFeedback     string `json:"user_feedback,omitempty"`
+}
 
 // AssistantMessageError represents possible error types on assistant messages.
 type AssistantMessageError string
