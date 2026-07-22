@@ -426,6 +426,12 @@ type Options struct {
 	//
 	// Note: unlike the TypeScript SDK (where options.env replaces the subprocess
 	// environment), the Go SDK merges Env on top of the inherited environment.
+	//
+	// The CLI also honors two subagent-limiting env vars (set here, not via a
+	// typed Options field, since the TS SDK exposes no corresponding schema
+	// change either): CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH (default 1) caps
+	// subagent nesting depth, and CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS (default
+	// 20) caps concurrently-running subagents.
 	Env map[string]string
 	// InheritEnv controls whether the CLI subprocess inherits the parent process
 	// environment. Defaults to true when nil. When set to false, the subprocess

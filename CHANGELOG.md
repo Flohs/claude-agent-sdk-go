@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Documented the CLI's two subagent-limiting environment variables, `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` (default 1) and `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` (default 20), near `Options.Env`. Reviewed TypeScript SDK v0.3.217: aside from these (CLI-behavior-only, no `.d.ts` schema change), the only other changes were a Remote Control bridge fix (`bridge.d.ts`) scoped to the claude.ai browser/companion-app bridge, which this single-subprocess-transport Go SDK doesn't implement, and new desktop-app `Settings` UI preference fields outside the Agent SDK's client/query surface. No functional Go SDK changes required. ([#536](https://github.com/Flohs/claude-agent-sdk-go/issues/536))
+
 ### Fixed
 
 - `examples/session_stores/s3`'s pinned `github.com/aws/aws-sdk-go-v2/service/s3` (`v1.79.5`) had its upstream git tag removed, which broke the module entirely (`go build`/`go mod tidy` failed with `unknown revision service/s3/v1.79.5`) and blocked Dependabot from opening its own security-update PR for a since-patched advisory affecting versions `< 1.97.3`. Bumped directly to `v1.97.3` (pulling in `aws-sdk-go-v2` core `v1.41.5` and other transitive requirements via `go mod tidy`), fixing both the build breakage and the underlying advisory.
