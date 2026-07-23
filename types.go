@@ -1031,11 +1031,15 @@ type ResultMessage struct {
 	// results).
 	Origin *MessageOrigin `json:"origin,omitempty"`
 	// RequestID is the API request identifier for the final API call.
-	RequestID        string         `json:"request_id,omitempty"`
-	TotalCostUSD     *float64       `json:"total_cost_usd,omitempty"`
-	Usage            map[string]any `json:"usage,omitempty"`
-	Result           string         `json:"result,omitempty"`
-	StructuredOutput any            `json:"structured_output,omitempty"`
+	RequestID    string         `json:"request_id,omitempty"`
+	TotalCostUSD *float64       `json:"total_cost_usd,omitempty"`
+	Usage        map[string]any `json:"usage,omitempty"`
+	// ModelUsage contains a per-model token usage and cost breakdown, keyed
+	// by the raw model string reported by the CLI. Nil when not provided.
+	// Port of TypeScript SDK v0.3.218 / Python SDK v0.2.126.
+	ModelUsage       map[string]ModelUsage `json:"model_usage,omitempty"`
+	Result           string                `json:"result,omitempty"`
+	StructuredOutput any                   `json:"structured_output,omitempty"`
 	// DeferredToolUse is populated when a PreToolUse hook returned
 	// {"decision": "defer"}, surfacing the pending tool call so the caller
 	// can prompt the user and resume. Nil when no deferral occurred.
@@ -1227,6 +1231,31 @@ type ModelScopedUsage struct {
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
 	// CacheReadInputTokens is the number of tokens read from the prompt cache.
 	CacheReadInputTokens int `json:"cache_read_input_tokens,omitempty"`
+}
+
+// ModelUsage holds the per-model token usage and cost breakdown reported on
+// ResultMessage.ModelUsage. Field names mirror the TypeScript SDK's
+// ModelUsage shape verbatim, since the CLI's raw modelUsage entries are
+// passed through as-is. Port of TypeScript SDK v0.3.218 / Python SDK
+// v0.2.126.
+type ModelUsage struct {
+	InputTokens              int     `json:"inputTokens"`
+	OutputTokens             int     `json:"outputTokens"`
+	CacheReadInputTokens     int     `json:"cacheReadInputTokens"`
+	CacheCreationInputTokens int     `json:"cacheCreationInputTokens"`
+	WebSearchRequests        int     `json:"webSearchRequests"`
+	CostUSD                  float64 `json:"costUSD"`
+	ContextWindow            int     `json:"contextWindow"`
+	MaxOutputTokens          int     `json:"maxOutputTokens"`
+	// CanonicalModel is the canonical model id used for the pricing lookup
+	// (e.g. "claude-opus-4-8"), which may differ from the raw model string
+	// this entry is keyed by (provider-specific ids, aliases). Empty when
+	// not provided by the CLI.
+	CanonicalModel string `json:"canonicalModel,omitempty"`
+	// Provider is the API provider that served this model ("firstParty",
+	// "bedrock", "vertex", "foundry", "anthropicAws", "anthropicGoogleCloud",
+	// "mantle", "gateway"). Empty when not provided by the CLI.
+	Provider string `json:"provider,omitempty"`
 }
 
 // UsageDataExperimental contains session cost, plan rate-limit, and local
