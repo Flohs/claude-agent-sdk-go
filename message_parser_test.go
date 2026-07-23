@@ -578,6 +578,47 @@ func TestParseMessage_ResultMessage_TerminalReason(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_ModelUsage(t *testing.T) {
+	data := map[string]any{
+		"type":            "result",
+		"subtype":         "success",
+		"duration_ms":     1000,
+		"duration_api_ms": 900,
+		"is_error":        false,
+		"num_turns":       1,
+		"session_id":      "s",
+		"modelUsage": map[string]any{
+			"claude-opus-4-8": map[string]any{
+				"inputTokens":              float64(100),
+				"outputTokens":             float64(50),
+				"cacheReadInputTokens":     float64(10),
+				"cacheCreationInputTokens": float64(5),
+				"webSearchRequests":        float64(2),
+				"costUSD":                  0.25,
+				"contextWindow":            float64(200000),
+				"maxOutputTokens":          float64(8192),
+				"canonicalModel":           "claude-opus-4-7",
+				"provider":                 "firstParty",
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := msg.(*ResultMessage)
+	u, ok := result.ModelUsage["claude-opus-4-8"]
+	if !ok {
+		t.Fatalf("expected model usage entry for claude-opus-4-8, got %v", result.ModelUsage)
+	}
+	if u.InputTokens != 100 || u.OutputTokens != 50 || u.CacheReadInputTokens != 10 ||
+		u.CacheCreationInputTokens != 5 || u.WebSearchRequests != 2 || u.CostUSD != 0.25 ||
+		u.ContextWindow != 200000 || u.MaxOutputTokens != 8192 ||
+		u.CanonicalModel != "claude-opus-4-7" || u.Provider != "firstParty" {
+		t.Errorf("unexpected ModelUsage entry: %+v", u)
+	}
+}
+
 func TestParseMessage_ResultMessage_StopReasonPresent(t *testing.T) {
 	data := map[string]any{
 		"type":        "result",
