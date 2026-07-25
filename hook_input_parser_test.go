@@ -39,6 +39,7 @@ var (
 	_ TypedHookInput = (*UserPromptExpansionHookInput)(nil)
 	_ TypedHookInput = (*SetupHookInput)(nil)
 	_ TypedHookInput = (*TaskCreatedHookInput)(nil)
+	_ TypedHookInput = (*DirectoryAddedHookInput)(nil)
 )
 
 // base returns a HookInput with common fields pre-filled.
@@ -1135,6 +1136,32 @@ func TestParseHookInput_FileChanged(t *testing.T) {
 	}
 	if m.ChangeType != "modified" {
 		t.Errorf("ChangeType: got %q", m.ChangeType)
+	}
+}
+
+func TestParseHookInput_DirectoryAdded(t *testing.T) {
+	input := HookInput{
+		"session_id":      "sess-da",
+		"transcript_path": "/tmp/sess-da.jsonl",
+		"cwd":             "/project",
+		"permission_mode": "default",
+		"hook_event_name": "DirectoryAdded",
+		"directory":       "/project/vendor",
+		"source":          "slash_command",
+	}
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*DirectoryAddedHookInput)
+	if !ok {
+		t.Fatalf("expected *DirectoryAddedHookInput, got %T", result)
+	}
+	if m.Directory != "/project/vendor" {
+		t.Errorf("Directory: got %q", m.Directory)
+	}
+	if m.Source != "slash_command" {
+		t.Errorf("Source: got %q", m.Source)
 	}
 }
 
