@@ -951,7 +951,7 @@ func (q *query) receiveMessages() <-chan map[string]any {
 	return out
 }
 
-func (q *query) interrupt(ctx context.Context) (*InterruptReceipt, error) {
+func (q *query) interrupt(ctx context.Context, cancelQueued bool) (*InterruptReceipt, error) {
 	// Run sendControlRequest in a goroutine so we can select on ctx.Done()
 	// for both deadline expiry and explicit cancellation. The underlying
 	// request still runs to completion (best-effort signal to the subprocess),
@@ -960,9 +960,13 @@ func (q *query) interrupt(ctx context.Context) (*InterruptReceipt, error) {
 		resp map[string]any
 		err  error
 	}
+	req := map[string]any{"subtype": "interrupt"}
+	if cancelQueued {
+		req["cancel_queued"] = true
+	}
 	ch := make(chan result, 1)
 	go func() {
-		resp, err := q.sendControlRequest(map[string]any{"subtype": "interrupt"}, 30*time.Second)
+		resp, err := q.sendControlRequest(req, 30*time.Second)
 		ch <- result{resp, err}
 	}()
 	select {
@@ -975,6 +979,13 @@ func (q *query) interrupt(ctx context.Context) (*InterruptReceipt, error) {
 			for _, v := range stillQueued {
 				if s, ok := v.(string); ok {
 					receipt.StillQueued = append(receipt.StillQueued, s)
+				}
+			}
+		}
+		if cancelled, ok := r.resp["cancelled"].([]any); ok {
+			for _, v := range cancelled {
+				if s, ok := v.(string); ok {
+					receipt.Cancelled = append(receipt.Cancelled, s)
 				}
 			}
 		}

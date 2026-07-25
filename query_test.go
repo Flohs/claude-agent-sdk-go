@@ -1153,7 +1153,7 @@ func TestInterrupt_PopulatesStillQueued(t *testing.T) {
 	q.start()
 	defer func() { _ = q.close() }()
 
-	receipt, err := q.interrupt(context.Background())
+	receipt, err := q.interrupt(context.Background(), false)
 	if err != nil {
 		t.Fatalf("interrupt failed: %v", err)
 	}
@@ -1180,7 +1180,7 @@ func TestInterrupt_OlderCLIOmitsStillQueued(t *testing.T) {
 	q.start()
 	defer func() { _ = q.close() }()
 
-	receipt, err := q.interrupt(context.Background())
+	receipt, err := q.interrupt(context.Background(), false)
 	if err != nil {
 		t.Fatalf("interrupt failed: %v", err)
 	}
@@ -1189,6 +1189,51 @@ func TestInterrupt_OlderCLIOmitsStillQueued(t *testing.T) {
 	}
 	if receipt.StillQueued != nil {
 		t.Fatalf("StillQueued = %v, want nil", receipt.StillQueued)
+	}
+}
+
+// TestInterrupt_CancelQueuedSendsFlagAndPopulatesCancelled verifies that
+// query.interrupt(ctx, true) sends "cancel_queued": true on the wire and
+// surfaces the response's "cancelled" uuids on InterruptReceipt.Cancelled.
+// Port of TypeScript SDK v0.3.219.
+func TestInterrupt_CancelQueuedSendsFlagAndPopulatesCancelled(t *testing.T) {
+	mt := newInterruptRespondTransport(map[string]any{
+		"still_queued": []any{},
+		"cancelled":    []any{"uuid-3", "uuid-4"},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	receipt, err := q.interrupt(context.Background(), true)
+	if err != nil {
+		t.Fatalf("interrupt failed: %v", err)
+	}
+	if receipt == nil {
+		t.Fatal("expected non-nil receipt")
+	}
+	want := []string{"uuid-3", "uuid-4"}
+	if len(receipt.Cancelled) != len(want) {
+		t.Fatalf("Cancelled = %v, want %v", receipt.Cancelled, want)
+	}
+	for i, s := range want {
+		if receipt.Cancelled[i] != s {
+			t.Fatalf("Cancelled[%d] = %q, want %q", i, receipt.Cancelled[i], s)
+		}
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"cancel_queued":true`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written control_request containing cancel_queued:true, got %v", written)
 	}
 }
 

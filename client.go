@@ -320,7 +320,24 @@ func (c *Client) Interrupt(ctx context.Context) (*InterruptReceipt, error) {
 	if c.q == nil {
 		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
-	return c.q.interrupt(ctx)
+	return c.q.interrupt(ctx, false)
+}
+
+// InterruptCancelQueued is like [Client.Interrupt], but also cancels every
+// uuid-stamped main-thread command still queued or already dequeued for the
+// imminent turn but not yet reachable by the abort — the same set
+// [Client.Interrupt] would otherwise leave for the returned receipt's
+// StillQueued. Each cancelled uuid is listed under the returned receipt's
+// Cancelled field instead, and StillQueued is empty.
+//
+// On CLIs advertising the "interrupt_cancel_queued_v1" protocol capability
+// (see [ServerCapabilities.Capabilities]), older CLIs ignore the request and
+// behave exactly like [Client.Interrupt]. Port of TypeScript SDK v0.3.219.
+func (c *Client) InterruptCancelQueued(ctx context.Context) (*InterruptReceipt, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.interrupt(ctx, true)
 }
 
 // SetPermissionMode changes the permission mode during a conversation.
