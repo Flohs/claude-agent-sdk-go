@@ -82,6 +82,11 @@ const (
 	// HookEventTaskCreated fires when a new task is being created (e.g. via
 	// the TaskCreate tool). Returning decision:"block" rolls back the creation.
 	HookEventTaskCreated HookEvent = "TaskCreated"
+	// HookEventDirectoryAdded fires when a new working directory is
+	// registered mid-session, via the /add-dir slash command or the SDK's
+	// register_repo_root control request. Observability only — output is
+	// not acted on. Port of TypeScript SDK v0.3.219.
+	HookEventDirectoryAdded HookEvent = "DirectoryAdded"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -540,6 +545,19 @@ type FileChangedHookInput struct {
 }
 
 func (*FileChangedHookInput) hookInputMarker() {}
+
+// DirectoryAddedHookInput is the typed input for DirectoryAdded hook events.
+// Fires when a new working directory is registered mid-session.
+type DirectoryAddedHookInput struct {
+	BaseHookInput
+	// Directory is the absolute path of the directory that was added.
+	Directory string `json:"directory"`
+	// Source describes how the directory was added: "slash_command" for
+	// /add-dir, or "register_repo_root" for the SDK control request.
+	Source string `json:"source"`
+}
+
+func (*DirectoryAddedHookInput) hookInputMarker() {}
 
 // WorktreeCreateHookInput is the typed input for WorktreeCreate hook events.
 // Fires when the CLI is about to create a git worktree for a parallel agent

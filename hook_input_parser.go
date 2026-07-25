@@ -221,6 +221,13 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			ChangeType:    stringField(input, "change_type"),
 		}, nil
 
+	case HookEventDirectoryAdded:
+		return &DirectoryAddedHookInput{
+			BaseHookInput: base,
+			Directory:     stringField(input, "directory"),
+			Source:        stringField(input, "source"),
+		}, nil
+
 	case HookEventWorktreeCreate:
 		return &WorktreeCreateHookInput{
 			BaseHookInput:  base,
