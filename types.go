@@ -1364,6 +1364,13 @@ type InterruptReceipt struct {
 	// auto-resume continuations) — treat unknown uuids as informational
 	// rather than an error.
 	StillQueued []string
+	// Cancelled lists uuids of main-thread commands cancelled by this
+	// interrupt. Populated only by [Client.InterruptCancelQueued] on CLIs
+	// advertising the "interrupt_cancel_queued_v1" protocol capability (see
+	// [ServerCapabilities.Capabilities]); nil for [Client.Interrupt] and on
+	// older CLIs, in which case StillQueued reports the same commands
+	// instead. Port of TypeScript SDK v0.3.219.
+	Cancelled []string
 }
 
 // RewindFilesResult is the result of a [Client.RewindFiles] operation.
@@ -1426,8 +1433,10 @@ type ServerCapabilities struct {
 	// set: ignore unknown values and check only for the specific values you
 	// use. Known values include "interrupt_receipt_v1" (the interrupt
 	// control response's success payload carries a still_queued list of
-	// uuids). Empty on CLIs that predate this field. Port of TypeScript SDK
-	// v0.3.205.
+	// uuids) and "interrupt_cancel_queued_v1" ([Client.InterruptCancelQueued]
+	// is honored; cancelled commands are listed under the response's
+	// cancelled field). Empty on CLIs that predate this field. Port of
+	// TypeScript SDK v0.3.205 / v0.3.219.
 	Capabilities []string `json:"capabilities,omitempty"`
 }
 
