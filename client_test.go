@@ -55,6 +55,33 @@ func TestGetServerCapabilities_OlderCLIOmitsCapabilities(t *testing.T) {
 	}
 }
 
+// TestGetServerCapabilities_PopulatesFastModeState verifies that
+// fast_mode_state and fast_mode_disabled_reason from the CLI's
+// initialization result are surfaced on ServerCapabilities. Port of
+// TypeScript SDK v0.3.219.
+func TestGetServerCapabilities_PopulatesFastModeState(t *testing.T) {
+	c := &Client{
+		q: &query{
+			initializationResult: map[string]any{
+				"supportsFastMode":          true,
+				"fast_mode_state":           "cooldown",
+				"fast_mode_disabled_reason": "extra_usage_disabled",
+			},
+		},
+	}
+
+	caps := c.GetServerCapabilities()
+	if caps == nil {
+		t.Fatal("expected non-nil ServerCapabilities")
+	}
+	if caps.FastModeState != FastModeStateCooldown {
+		t.Errorf("FastModeState = %q, want %q", caps.FastModeState, FastModeStateCooldown)
+	}
+	if caps.FastModeDisabledReason != FastModeDisabledReasonExtraUsageDisabled {
+		t.Errorf("FastModeDisabledReason = %q, want %q", caps.FastModeDisabledReason, FastModeDisabledReasonExtraUsageDisabled)
+	}
+}
+
 // TestSetPermissionMode_RejectsInvalidModeWithoutSendingRequest verifies
 // that Client.SetPermissionMode validates the mode before dispatching a
 // set_permission_mode control request, so a typo never reaches the CLI.
