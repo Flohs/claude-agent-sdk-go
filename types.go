@@ -797,6 +797,47 @@ const (
 	ModelFallbackTriggerLastResort ModelFallbackTrigger = "last_resort"
 )
 
+// FastModeState describes whether fast inference mode is currently active for
+// the session. Port of TypeScript SDK v0.3.219.
+type FastModeState string
+
+const (
+	// FastModeStateOff means fast mode is not active.
+	FastModeStateOff FastModeState = "off"
+	// FastModeStateCooldown means fast mode is temporarily unavailable after
+	// recent use and will become available again after a cooldown period.
+	FastModeStateCooldown FastModeState = "cooldown"
+	// FastModeStateOn means fast mode is active.
+	FastModeStateOn FastModeState = "on"
+)
+
+// FastModeDisabledReason explains why fast mode is unavailable when
+// FastModeState is not FastModeStateOn. Port of TypeScript SDK v0.3.219.
+type FastModeDisabledReason string
+
+const (
+	// FastModeDisabledReasonFree is set when the account's plan doesn't include fast mode.
+	FastModeDisabledReasonFree FastModeDisabledReason = "free"
+	// FastModeDisabledReasonPreference is set when the user has turned fast mode off.
+	FastModeDisabledReasonPreference FastModeDisabledReason = "preference"
+	// FastModeDisabledReasonExtraUsageDisabled is set when fast mode would incur extra usage that is disabled.
+	FastModeDisabledReasonExtraUsageDisabled FastModeDisabledReason = "extra_usage_disabled"
+	// FastModeDisabledReasonNetworkError is set when a network error prevented enabling fast mode.
+	FastModeDisabledReasonNetworkError FastModeDisabledReason = "network_error"
+	// FastModeDisabledReasonUnknown is set when the CLI could not determine a specific reason.
+	FastModeDisabledReasonUnknown FastModeDisabledReason = "unknown"
+	// FastModeDisabledReasonNotFirstParty is set when the current provider isn't Anthropic's first-party API.
+	FastModeDisabledReasonNotFirstParty FastModeDisabledReason = "not_first_party"
+	// FastModeDisabledReasonDisabledByEnv is set when an environment variable disables fast mode.
+	FastModeDisabledReasonDisabledByEnv FastModeDisabledReason = "disabled_by_env"
+	// FastModeDisabledReasonModelNotAllowed is set when the current model doesn't support fast mode.
+	FastModeDisabledReasonModelNotAllowed FastModeDisabledReason = "model_not_allowed"
+	// FastModeDisabledReasonSDKOptInRequired is set when the SDK host must opt in via Options.FastMode.
+	FastModeDisabledReasonSDKOptInRequired FastModeDisabledReason = "sdk_opt_in_required"
+	// FastModeDisabledReasonPending is set while the CLI is still determining fast mode eligibility.
+	FastModeDisabledReasonPending FastModeDisabledReason = "pending"
+)
+
 // ModelFallbackMessage is emitted when the CLI falls back to a different model.
 // Received for all fallback triggers: model_not_found, permission_denied,
 // overloaded, server_error, and last_resort. Port of TypeScript SDK v0.3.174.
@@ -1021,6 +1062,14 @@ type ResultMessage struct {
 	// "aborted_tools", "max_turns", "blocking_limit"). Empty when not
 	// provided by the CLI.
 	TerminalReason string `json:"terminal_reason,omitempty"`
+	// FastModeState reports whether fast inference mode was active for this
+	// turn. Empty when not provided by the CLI. Port of TypeScript SDK
+	// v0.3.219.
+	FastModeState FastModeState `json:"fast_mode_state,omitempty"`
+	// FastModeDisabledReason explains why FastModeState isn't
+	// FastModeStateOn. Empty when fast mode is on or the CLI didn't report a
+	// reason. Port of TypeScript SDK v0.3.219.
+	FastModeDisabledReason FastModeDisabledReason `json:"fast_mode_disabled_reason,omitempty"`
 	// APIErrorStatus is the HTTP status code (e.g. 429, 500, 529) from a
 	// failing API call when IsError is true. Zero when not provided by the
 	// CLI (requires CLI >= v2.1.110).
@@ -1360,6 +1409,15 @@ type ServerCapabilities struct {
 	// SupportsFastMode is true when the current model supports fast mode
 	// (e.g. Opus fast mode). Port of TypeScript SDK v0.2.69.
 	SupportsFastMode bool `json:"supportsFastMode"`
+	// FastModeState reports whether fast inference mode is currently active
+	// for the session, distinct from SupportsFastMode's static per-model
+	// capability bit. Empty on CLIs that predate this field. Port of
+	// TypeScript SDK v0.3.219.
+	FastModeState FastModeState `json:"fast_mode_state,omitempty"`
+	// FastModeDisabledReason explains why FastModeState isn't
+	// FastModeStateOn. Empty when fast mode is on or the CLI didn't report a
+	// reason. Port of TypeScript SDK v0.3.219.
+	FastModeDisabledReason FastModeDisabledReason `json:"fast_mode_disabled_reason,omitempty"`
 	// MemoryPaths is the list of memory file paths loaded at session initialization.
 	// Empty when no memory files are configured.
 	MemoryPaths []string `json:"memoryPaths,omitempty"`

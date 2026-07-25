@@ -385,14 +385,18 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 
 func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 	msg := &ResultMessage{
-		Subtype:         stringField(data, "subtype"),
-		DurationMs:      intField(data, "duration_ms"),
-		DurationAPIMs:   intField(data, "duration_api_ms"),
-		IsError:         boolField(data, "is_error"),
-		NumTurns:        intField(data, "num_turns"),
-		SessionID:       stringField(data, "session_id"),
-		StopReason:      stringField(data, "stop_reason"),
-		TerminalReason:  stringField(data, "terminal_reason"),
+		Subtype:        stringField(data, "subtype"),
+		DurationMs:     intField(data, "duration_ms"),
+		DurationAPIMs:  intField(data, "duration_api_ms"),
+		IsError:        boolField(data, "is_error"),
+		NumTurns:       intField(data, "num_turns"),
+		SessionID:      stringField(data, "session_id"),
+		StopReason:     stringField(data, "stop_reason"),
+		TerminalReason: stringField(data, "terminal_reason"),
+		FastModeState:  FastModeState(stringField(data, "fast_mode_state")),
+		FastModeDisabledReason: FastModeDisabledReason(
+			stringField(data, "fast_mode_disabled_reason"),
+		),
 		Origin:          parseMessageOrigin(data),
 		RequestID:       stringField(data, "request_id"),
 		Result:          stringField(data, "result"),

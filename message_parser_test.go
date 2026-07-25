@@ -578,6 +578,31 @@ func TestParseMessage_ResultMessage_TerminalReason(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_FastMode(t *testing.T) {
+	data := map[string]any{
+		"type":                      "result",
+		"subtype":                   "success",
+		"duration_ms":               1000,
+		"duration_api_ms":           900,
+		"is_error":                  false,
+		"num_turns":                 1,
+		"session_id":                "s",
+		"fast_mode_state":           "cooldown",
+		"fast_mode_disabled_reason": "extra_usage_disabled",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := msg.(*ResultMessage)
+	if result.FastModeState != FastModeStateCooldown {
+		t.Errorf("FastModeState = %q, want %q", result.FastModeState, FastModeStateCooldown)
+	}
+	if result.FastModeDisabledReason != FastModeDisabledReasonExtraUsageDisabled {
+		t.Errorf("FastModeDisabledReason = %q, want %q", result.FastModeDisabledReason, FastModeDisabledReasonExtraUsageDisabled)
+	}
+}
+
 func TestParseMessage_ResultMessage_ModelUsage(t *testing.T) {
 	data := map[string]any{
 		"type":            "result",

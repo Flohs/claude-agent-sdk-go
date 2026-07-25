@@ -548,6 +548,12 @@ func (c *Client) GetServerCapabilities() *ServerCapabilities {
 	if v, ok := c.q.initializationResult["supportsFastMode"].(bool); ok {
 		caps.SupportsFastMode = v
 	}
+	if v, ok := c.q.initializationResult["fast_mode_state"].(string); ok {
+		caps.FastModeState = FastModeState(v)
+	}
+	if v, ok := c.q.initializationResult["fast_mode_disabled_reason"].(string); ok {
+		caps.FastModeDisabledReason = FastModeDisabledReason(v)
+	}
 	if levels, ok := c.q.initializationResult["supportedEffortLevels"].([]any); ok {
 		for _, l := range levels {
 			if s, ok := l.(string); ok {
