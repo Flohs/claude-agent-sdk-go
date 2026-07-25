@@ -596,6 +596,25 @@ func TestBuildSettingsValue_SandboxFailIfUnavailable(t *testing.T) {
 	}
 }
 
+func TestBuildSettingsValue_SandboxNetworkStrictAllowlist(t *testing.T) {
+	trueVal := true
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			Sandbox: &SandboxSettings{
+				Network: &SandboxNetworkConfig{
+					AllowedDomains:  []string{"example.com"},
+					StrictAllowlist: &trueVal,
+				},
+			},
+		},
+	}
+	value := transport.buildSettingsValue()
+	if !strings.Contains(value, `"strictAllowlist":true`) {
+		t.Errorf("expected strictAllowlist in settings JSON, got %s", value)
+	}
+}
+
 func TestBuildCommand_ThinkingDisplay(t *testing.T) {
 	t.Run("no display omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{cliPath: "claude", options: &Options{
