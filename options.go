@@ -267,6 +267,14 @@ type SandboxNetworkConfig struct {
 	AllowedDomains []string `json:"allowedDomains,omitempty"`
 	// DeniedDomains blocks outbound connections to the listed hostnames.
 	DeniedDomains []string `json:"deniedDomains,omitempty"`
+	// StrictAllowlist, when true, makes the sandbox runtime deterministically
+	// deny hosts not in AllowedDomains instead of prompting. Enforced for
+	// sandboxed commands only — in-process tools such as WebFetch are not
+	// gated by this setting. Only honored from user, managed/policy, or CLI
+	// (--settings) settings; project settings (.claude/settings.json and
+	// .claude/settings.local.json) are ignored. Port of TypeScript SDK
+	// v0.3.219.
+	StrictAllowlist *bool `json:"strictAllowlist,omitempty"`
 	// AllowManagedDomainsOnly restricts traffic to organization-managed domains.
 	AllowManagedDomainsOnly *bool `json:"allowManagedDomainsOnly,omitempty"`
 	// AllowMachLookup permits mach port lookup (macOS only).
