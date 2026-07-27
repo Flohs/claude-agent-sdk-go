@@ -555,6 +555,22 @@ type ProposeSkillsOutput struct {
 	ProposalCount int `json:"proposalCount"`
 }
 
+// SkillToolOutput is the result returned by the Skill tool.
+// Accessible from [PostToolUseHookInput].ToolResponse when ToolName is "Skill"
+// (decode the map[string]any with json.Marshal/Unmarshal, as with [NotebookEditResult]).
+// Port of TypeScript SDK v0.3.218 — unlike most other TS-only wire types in
+// this file, this struct does not appear in the published
+// @anthropic-ai/claude-agent-sdk@0.3.220 npm package's bundled sdk-tools.d.ts
+// (checked, no "Skill" occurrence at all); modeled directly from the upstream
+// changelog's prose description only, so the field is a best-effort
+// interpretation and may need revision once a typed source is available,
+// consistent with how issue #530 (ToolResultMeta) handled the same situation.
+type SkillToolOutput struct {
+	// Background is true when the skill was dispatched as a detached
+	// background agent (a "forked" skill) rather than run inline.
+	Background bool `json:"background,omitempty"`
+}
+
 // BashToolOutput is the result returned by the Bash tool.
 // Accessible from [PostToolUseHookInput].ToolResponse when ToolName is "Bash"
 // (decode the map[string]any with json.Marshal/Unmarshal, as with [NotebookEditResult]).
