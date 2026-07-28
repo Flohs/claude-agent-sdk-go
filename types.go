@@ -179,13 +179,16 @@ type ToolResultMeta struct {
 type AssistantMessageError string
 
 const (
-	AssistantMessageErrorAuthFailed     AssistantMessageError = "authentication_failed"
-	AssistantMessageErrorBilling        AssistantMessageError = "billing_error"
-	AssistantMessageErrorRateLimit      AssistantMessageError = "rate_limit"
-	AssistantMessageErrorInvalidRequest AssistantMessageError = "invalid_request"
-	AssistantMessageErrorServer         AssistantMessageError = "server_error"
-	AssistantMessageErrorUnknown        AssistantMessageError = "unknown"
-	AssistantMessageErrorModelNotFound  AssistantMessageError = "model_not_found"
+	AssistantMessageErrorAuthFailed         AssistantMessageError = "authentication_failed"
+	AssistantMessageErrorOAuthOrgNotAllowed AssistantMessageError = "oauth_org_not_allowed"
+	AssistantMessageErrorBilling            AssistantMessageError = "billing_error"
+	AssistantMessageErrorRateLimit          AssistantMessageError = "rate_limit"
+	AssistantMessageErrorOverloaded         AssistantMessageError = "overloaded"
+	AssistantMessageErrorInvalidRequest     AssistantMessageError = "invalid_request"
+	AssistantMessageErrorModelNotFound      AssistantMessageError = "model_not_found"
+	AssistantMessageErrorServer             AssistantMessageError = "server_error"
+	AssistantMessageErrorUnknown            AssistantMessageError = "unknown"
+	AssistantMessageErrorMaxOutputTokens    AssistantMessageError = "max_output_tokens"
 )
 
 // ToolUseMetaEntry holds display-friendly metadata for a single tool call.
