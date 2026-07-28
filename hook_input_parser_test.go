@@ -181,7 +181,7 @@ func TestParseHookInput_PostToolUseFailure(t *testing.T) {
 		"tool_input":   map[string]any{"path": "/etc/passwd"},
 		"tool_use_id":  "toolu_fail1",
 		"error":        "permission denied",
-		"is_interrupt":  true,
+		"is_interrupt": true,
 		"agent_id":     "agent-99",
 		"agent_type":   "code-reviewer",
 	})
@@ -238,7 +238,32 @@ func TestParseHookInput_UserPromptSubmit(t *testing.T) {
 
 func TestParseHookInput_Stop(t *testing.T) {
 	input := merge(base("Stop"), HookInput{
-		"stop_hook_active": true,
+		"stop_hook_active":       true,
+		"last_assistant_message": "All done.",
+		"background_tasks": []any{
+			map[string]any{
+				"id":          "task-1",
+				"type":        "shell",
+				"status":      "running",
+				"description": "running tests",
+				"command":     "go test ./...",
+			},
+			map[string]any{
+				"id":          "task-2",
+				"type":        "workflow",
+				"status":      "pending",
+				"description": "sync workflow",
+				"name":        "sync-upstream",
+			},
+		},
+		"session_crons": []any{
+			map[string]any{
+				"id":        "cron-1",
+				"schedule":  "0 9 * * 1-5",
+				"recurring": true,
+				"prompt":    "daily standup",
+			},
+		},
 	})
 
 	result, err := ParseHookInput(input)
@@ -250,14 +275,61 @@ func TestParseHookInput_Stop(t *testing.T) {
 	if !typed.StopHookActive {
 		t.Error("StopHookActive should be true")
 	}
+	if typed.LastAssistantMessage != "All done." {
+		t.Errorf("LastAssistantMessage = %q, want %q", typed.LastAssistantMessage, "All done.")
+	}
+	if len(typed.BackgroundTasks) != 2 {
+		t.Fatalf("BackgroundTasks: got %d entries, want 2", len(typed.BackgroundTasks))
+	}
+	if got, want := typed.BackgroundTasks[0], (BackgroundTaskSummary{
+		ID: "task-1", Type: "shell", Status: "running",
+		Description: "running tests", Command: "go test ./...",
+	}); got != want {
+		t.Errorf("BackgroundTasks[0] = %+v, want %+v", got, want)
+	}
+	if got, want := typed.BackgroundTasks[1], (BackgroundTaskSummary{
+		ID: "task-2", Type: "workflow", Status: "pending",
+		Description: "sync workflow", Name: "sync-upstream",
+	}); got != want {
+		t.Errorf("BackgroundTasks[1] = %+v, want %+v", got, want)
+	}
+	if len(typed.SessionCrons) != 1 {
+		t.Fatalf("SessionCrons: got %d entries, want 1", len(typed.SessionCrons))
+	}
+	if got, want := typed.SessionCrons[0], (SessionCronSummary{
+		ID: "cron-1", Schedule: "0 9 * * 1-5", Recurring: true, Prompt: "daily standup",
+	}); got != want {
+		t.Errorf("SessionCrons[0] = %+v, want %+v", got, want)
+	}
+}
+
+func TestParseHookInput_Stop_EmptyOptionalFields(t *testing.T) {
+	input := merge(base("Stop"), HookInput{
+		"stop_hook_active": false,
+	})
+
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	typed := result.(*StopHookInput)
+	if typed.LastAssistantMessage != "" {
+		t.Errorf("LastAssistantMessage = %q, want empty", typed.LastAssistantMessage)
+	}
+	if typed.BackgroundTasks != nil {
+		t.Errorf("BackgroundTasks = %v, want nil", typed.BackgroundTasks)
+	}
+	if typed.SessionCrons != nil {
+		t.Errorf("SessionCrons = %v, want nil", typed.SessionCrons)
+	}
 }
 
 func TestParseHookInput_SubagentStop(t *testing.T) {
 	input := merge(base("SubagentStop"), HookInput{
-		"stop_hook_active":       false,
-		"agent_id":               "agent-42",
-		"agent_transcript_path":  "/tmp/agent-42.jsonl",
-		"agent_type":             "general-purpose",
+		"stop_hook_active":      false,
+		"agent_id":              "agent-42",
+		"agent_transcript_path": "/tmp/agent-42.jsonl",
+		"agent_type":            "general-purpose",
 	})
 
 	result, err := ParseHookInput(input)
@@ -299,8 +371,8 @@ func TestParseHookInput_SubagentStart(t *testing.T) {
 
 func TestParseHookInput_PreCompact(t *testing.T) {
 	input := merge(base("PreCompact"), HookInput{
-		"trigger":              "auto",
-		"custom_instructions":  "keep it short",
+		"trigger":             "auto",
+		"custom_instructions": "keep it short",
 	})
 
 	result, err := ParseHookInput(input)
@@ -489,11 +561,11 @@ func TestParseHookInput_MissingOptionalFields(t *testing.T) {
 func TestParseHookInput_ExtraUnknownFields(t *testing.T) {
 	// CLI sends a field we don't know about — ParseHookInput should not fail.
 	input := merge(base("PreToolUse"), HookInput{
-		"tool_name":      "Bash",
-		"tool_input":     map[string]any{"command": "echo hi"},
-		"tool_use_id":    "toolu_xyz",
-		"future_field":   "some_value",
-		"another_field":  42,
+		"tool_name":     "Bash",
+		"tool_input":    map[string]any{"command": "echo hi"},
+		"tool_use_id":   "toolu_xyz",
+		"future_field":  "some_value",
+		"another_field": 42,
 	})
 
 	result, err := ParseHookInput(input)
@@ -801,15 +873,15 @@ func TestExitPlanModeToolInput_Roundtrip(t *testing.T) {
 
 func TestParseHookInput_Elicitation(t *testing.T) {
 	input := HookInput{
-		"session_id":        "sess-elicit",
-		"transcript_path":   "/tmp/sess-elicit.jsonl",
-		"cwd":               "/project",
-		"permission_mode":   "default",
-		"hook_event_name":   "Elicitation",
-		"request_id":        "req-abc-123",
-		"server_name":       "my-mcp-server",
-		"message":           "Please provide your API key",
-		"requestedSchema":   map[string]any{"type": "object", "properties": map[string]any{"api_key": map[string]any{"type": "string"}}},
+		"session_id":      "sess-elicit",
+		"transcript_path": "/tmp/sess-elicit.jsonl",
+		"cwd":             "/project",
+		"permission_mode": "default",
+		"hook_event_name": "Elicitation",
+		"request_id":      "req-abc-123",
+		"server_name":     "my-mcp-server",
+		"message":         "Please provide your API key",
+		"requestedSchema": map[string]any{"type": "object", "properties": map[string]any{"api_key": map[string]any{"type": "string"}}},
 	}
 	result, err := ParseHookInput(input)
 	if err != nil {
@@ -920,6 +992,32 @@ func TestParseHookInput_StopFailure(t *testing.T) {
 	}
 	if m.SessionID != "sess-1" {
 		t.Errorf("SessionID: got %q, want 'sess-1'", m.SessionID)
+	}
+}
+
+func TestParseHookInput_StopFailure_ErrorFields(t *testing.T) {
+	input := merge(base("StopFailure"), HookInput{
+		"error":                  "rate_limit",
+		"error_details":          "429 from the API",
+		"last_assistant_message": "Working on it...",
+	})
+
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*StopFailureHookInput)
+	if !ok {
+		t.Fatalf("expected *StopFailureHookInput, got %T", result)
+	}
+	if m.Error != AssistantMessageErrorRateLimit {
+		t.Errorf("Error = %q, want %q", m.Error, AssistantMessageErrorRateLimit)
+	}
+	if m.ErrorDetails != "429 from the API" {
+		t.Errorf("ErrorDetails = %q, want %q", m.ErrorDetails, "429 from the API")
+	}
+	if m.LastAssistantMessage != "Working on it..." {
+		t.Errorf("LastAssistantMessage = %q, want %q", m.LastAssistantMessage, "Working on it...")
 	}
 }
 
@@ -1197,16 +1295,16 @@ func TestParseMessage_ElicitationComplete(t *testing.T) {
 
 func TestParseHookInput_MessageDisplay(t *testing.T) {
 	input := HookInput{
-		"session_id":       "sess-md",
-		"transcript_path":  "/path/session.jsonl",
-		"cwd":              "/home/user",
-		"permission_mode":  "default",
-		"hook_event_name":  "MessageDisplay",
-		"turn_id":          "turn-001",
-		"message_id":       "msg-xyz",
-		"index":            float64(3),
-		"final":            true,
-		"delta":            "Hello, world!\n",
+		"session_id":      "sess-md",
+		"transcript_path": "/path/session.jsonl",
+		"cwd":             "/home/user",
+		"permission_mode": "default",
+		"hook_event_name": "MessageDisplay",
+		"turn_id":         "turn-001",
+		"message_id":      "msg-xyz",
+		"index":           float64(3),
+		"final":           true,
+		"delta":           "Hello, world!\n",
 	}
 	result, err := ParseHookInput(input)
 	if err != nil {
@@ -1253,13 +1351,13 @@ func TestMessageDisplayHookOutput_ToHookJSONOutput(t *testing.T) {
 
 func TestParseHookInput_WorktreeCreate(t *testing.T) {
 	input := HookInput{
-		"session_id":       "sess-wt",
-		"transcript_path":  "/tmp/sess-wt.jsonl",
-		"cwd":              "/project",
-		"permission_mode":  "default",
-		"hook_event_name":  "WorktreeCreate",
-		"worktree_name":    "feature-branch",
-		"isolation_level":  "worktree",
+		"session_id":      "sess-wt",
+		"transcript_path": "/tmp/sess-wt.jsonl",
+		"cwd":             "/project",
+		"permission_mode": "default",
+		"hook_event_name": "WorktreeCreate",
+		"worktree_name":   "feature-branch",
+		"isolation_level": "worktree",
 	}
 	result, err := ParseHookInput(input)
 	if err != nil {
