@@ -939,12 +939,13 @@ func normaliseDisallowedTools(tools []string) []string {
 func (t *SubprocessTransport) buildSettingsValue() string {
 	hasSettings := t.options.Settings != ""
 	hasSandbox := t.options.Sandbox != nil
+	hasWorkflowSizeGuideline := t.options.WorkflowSizeGuideline != ""
 
-	if !hasSettings && !hasSandbox {
+	if !hasSettings && !hasSandbox && !hasWorkflowSizeGuideline {
 		return ""
 	}
 
-	if hasSettings && !hasSandbox {
+	if hasSettings && !hasSandbox && !hasWorkflowSizeGuideline {
 		return t.options.Settings
 	}
 
@@ -964,6 +965,10 @@ func (t *SubprocessTransport) buildSettingsValue() string {
 
 	if hasSandbox {
 		settingsObj["sandbox"] = t.options.Sandbox
+	}
+
+	if hasWorkflowSizeGuideline {
+		settingsObj["workflowSizeGuideline"] = t.options.WorkflowSizeGuideline
 	}
 
 	data, _ := json.Marshal(settingsObj)
