@@ -18,7 +18,7 @@ import (
 	"os"
 	"path/filepath"
 
-	claude "github.com/Flohs/claude-agent-sdk-go/v2"
+	claude "github.com/Flohs/claude-agent-sdk-go/v3"
 )
 
 func displayMessage(msg claude.Message) {

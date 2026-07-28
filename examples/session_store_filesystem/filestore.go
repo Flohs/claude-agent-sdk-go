@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	claude "github.com/Flohs/claude-agent-sdk-go/v2"
+	claude "github.com/Flohs/claude-agent-sdk-go/v3"
 )
 
 // FileSystemSessionStore is a pure-Go reference SessionStore adapter that
