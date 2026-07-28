@@ -615,6 +615,37 @@ func TestBuildSettingsValue_SandboxNetworkStrictAllowlist(t *testing.T) {
 	}
 }
 
+func TestBuildSettingsValue_WorkflowSizeGuideline(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			WorkflowSizeGuideline: WorkflowSizeGuidelineLarge,
+		},
+	}
+	value := transport.buildSettingsValue()
+	if !strings.Contains(value, `"workflowSizeGuideline":"large"`) {
+		t.Errorf("expected workflowSizeGuideline in settings JSON, got %s", value)
+	}
+}
+
+func TestBuildSettingsValue_WorkflowSizeGuidelineMergesWithSandboxAndSettings(t *testing.T) {
+	trueVal := true
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			Settings:              `{"env":{"FOO":"bar"}}`,
+			Sandbox:               &SandboxSettings{Enabled: &trueVal},
+			WorkflowSizeGuideline: WorkflowSizeGuidelineSmall,
+		},
+	}
+	value := transport.buildSettingsValue()
+	for _, want := range []string{`"workflowSizeGuideline":"small"`, `"enabled":true`, `"FOO":"bar"`} {
+		if !strings.Contains(value, want) {
+			t.Errorf("expected %s in merged settings JSON, got %s", want, value)
+		}
+	}
+}
+
 func TestBuildCommand_ThinkingDisplay(t *testing.T) {
 	t.Run("no display omits flag", func(t *testing.T) {
 		transport := &SubprocessTransport{cliPath: "claude", options: &Options{

@@ -256,6 +256,23 @@ type SdkPluginConfig struct {
 	SkipMcpDiscovery bool `json:"skipMcpDiscovery,omitempty"`
 }
 
+// WorkflowSizeGuideline is an advisory size guideline for the dynamic
+// workflows Claude writes, set via Options.WorkflowSizeGuideline. Port of
+// TypeScript SDK v0.3.219.
+type WorkflowSizeGuideline string
+
+const (
+	// WorkflowSizeGuidelineUnrestricted sends no size guideline.
+	WorkflowSizeGuidelineUnrestricted WorkflowSizeGuideline = "unrestricted"
+	// WorkflowSizeGuidelineSmall aims for fewer than 5 agents.
+	WorkflowSizeGuidelineSmall WorkflowSizeGuideline = "small"
+	// WorkflowSizeGuidelineMedium aims for fewer than 15 agents. This is the
+	// CLI's default when no guideline is set.
+	WorkflowSizeGuidelineMedium WorkflowSizeGuideline = "medium"
+	// WorkflowSizeGuidelineLarge aims for fewer than 50 agents.
+	WorkflowSizeGuidelineLarge WorkflowSizeGuideline = "large"
+)
+
 // SandboxNetworkConfig contains network configuration for sandbox.
 type SandboxNetworkConfig struct {
 	AllowUnixSockets    []string `json:"allowUnixSockets,omitempty"`
@@ -498,6 +515,14 @@ type Options struct {
 	SettingSources []SettingSource
 	// Sandbox configures bash command isolation.
 	Sandbox *SandboxSettings
+	// WorkflowSizeGuideline sets an advisory size guideline for the dynamic
+	// workflows Claude writes: WorkflowSizeGuidelineSmall aims for fewer than
+	// 5 agents, WorkflowSizeGuidelineMedium (the CLI default) fewer than 15,
+	// WorkflowSizeGuidelineLarge fewer than 50, and WorkflowSizeGuidelineUnrestricted
+	// sends no guideline. This is a guideline, not an enforced limit. Empty
+	// leaves the CLI/managed-settings default in place. Port of TypeScript
+	// SDK v0.3.219.
+	WorkflowSizeGuideline WorkflowSizeGuideline
 	// Plugins configures custom plugins.
 	Plugins []SdkPluginConfig
 	// MaxThinkingTokens limits thinking block tokens. Deprecated: use Thinking instead.
