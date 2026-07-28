@@ -27,7 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	claude "github.com/Flohs/claude-agent-sdk-go/v2"
+	claude "github.com/Flohs/claude-agent-sdk-go/v3"
 )
 
 // S3SessionStore is a [claude.SessionStore] backed by Amazon S3.

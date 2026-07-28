@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"log"
 
-	claude "github.com/Flohs/claude-agent-sdk-go/v2"
+	claude "github.com/Flohs/claude-agent-sdk-go/v3"
 )
 
 func main() {

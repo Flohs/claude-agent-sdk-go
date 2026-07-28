@@ -33,7 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	claude "github.com/Flohs/claude-agent-sdk-go/v2"
+	claude "github.com/Flohs/claude-agent-sdk-go/v3"
 )
 
 // faultyStore wraps a SessionStore and starts returning an error from
