@@ -155,6 +155,10 @@ func NewSubprocessTransport(opts *Options) (*SubprocessTransport, error) {
 		return nil, err
 	}
 
+	if err := validateSkills(opts.Skills); err != nil {
+		return nil, err
+	}
+
 	t := &SubprocessTransport{
 		options:    opts,
 		cwd:       opts.Cwd,

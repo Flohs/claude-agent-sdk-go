@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Model string constants for use with Options.Model.
@@ -77,6 +79,100 @@ func validatePermissionMode(mode PermissionMode) error {
 		"invalid PermissionMode %q: must be one of %s",
 		string(mode), strings.Join(valid, ", "),
 	)}
+}
+
+// validateSkills rejects an Options.Skills value that isn't nil, "all", or
+// []string, and validates every name in a []string. Names are formatted by
+// applySkillsDefaults into "Skill(name)" rules joined into the CLI's
+// --allowedTools argument, which is tokenized on commas and spaces outside
+// parentheses with no escape sequences — a name carrying one of those
+// delimiters cannot be passed through reliably. Names that tokenize cleanly
+// but can never match the listed skill (surrounding whitespace, a leading
+// "/", a wildcard suffix) are rejected too, so a dead rule fails loudly here
+// instead of silently granting nothing. Port of Python SDK PR
+// anthropics/claude-agent-sdk-python#1145, mirrored in TypeScript SDK
+// v0.3.221. ([#557](https://github.com/Flohs/claude-agent-sdk-go/issues/557))
+func validateSkills(skills any) error {
+	if skills == nil {
+		return nil
+	}
+	switch s := skills.(type) {
+	case string:
+		if s == "all" {
+			return nil
+		}
+		return &SDKError{Message: fmt.Sprintf(
+			`Options.Skills must be []string or "all", got %q. Did you mean []string{%q}?`,
+			s, s,
+		)}
+	case []string:
+		for _, name := range s {
+			if err := validateSkillName(name); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		return &SDKError{Message: fmt.Sprintf(
+			`Options.Skills must be []string or "all", got %T`, skills,
+		)}
+	}
+}
+
+// validateSkillName rejects a single skill name unsafe for or unable to
+// match through a "Skill(name)" --allowedTools rule. See validateSkills.
+func validateSkillName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return &SDKError{Message: "skill names must be non-empty strings"}
+	}
+	if !utf8.ValidString(name) {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: not valid UTF-8, which can never match a skill the CLI discovered",
+			name,
+		)}
+	}
+	if strings.TrimSpace(name) != name {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: leading or trailing whitespace can never match — the Skill tool trims the invoked name",
+			name,
+		)}
+	}
+	for _, r := range name {
+		if r == '(' || r == ')' || r == ',' || r == '\ufeff' || unicode.IsControl(r) {
+			return &SDKError{Message: fmt.Sprintf(
+				"invalid skill name %q: parentheses, commas, control characters, and byte-order marks are not allowed. Names match the skill's directory name, or \"plugin:skill\" for plugin-qualified skills",
+				name,
+			)}
+		}
+	}
+	if name == "*" {
+		return &SDKError{Message: `invalid skill name "*": use Skills: "all" to enable every skill`}
+	}
+	if strings.HasSuffix(name, ":*") || strings.HasSuffix(name, " *") {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: wildcard-suffix names are not allowed; list each skill by its exact name",
+			name,
+		)}
+	}
+	if strings.HasPrefix(name, "/") {
+		return &SDKError{Message: fmt.Sprintf(
+			`invalid skill name %q: skill names may not start with "/". The Skills option takes the canonical name, not the slash-command form`,
+			name,
+		)}
+	}
+	if strings.Contains(name, `\\`) {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: consecutive backslashes are not allowed — the per-rule parser collapses them, so the rule would name a different skill",
+			name,
+		)}
+	}
+	if strings.HasSuffix(name, `\`) {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: names may not end with an unpaired backslash",
+			name,
+		)}
+	}
+	return nil
 }
 
 // SdkBeta represents beta feature flags.
@@ -510,6 +606,10 @@ type Options struct {
 	// the string "all" for every discovered skill, or leave nil to disable.
 	// When set, the SDK automatically injects Skill tool entries into
 	// AllowedTools and defaults SettingSources to [user, project] if unset.
+	// Any other value, and any []string name containing delimiters
+	// (parentheses, commas, control characters), a leading "/", a wildcard
+	// suffix, surrounding whitespace, or invalid UTF-8, is rejected with an
+	// error at connect time.
 	Skills any // []string | "all" | nil
 	// SettingSources specifies which setting sources to load.
 	SettingSources []SettingSource

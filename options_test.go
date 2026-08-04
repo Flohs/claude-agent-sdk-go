@@ -266,3 +266,103 @@ func TestValidatePermissionMode_InvalidValue(t *testing.T) {
 		t.Errorf("expected error to be a *SDKError, got %T", err)
 	}
 }
+
+// TestValidateSkills_Accepted verifies that nil, "all", and ordinary
+// []string names (including plugin-qualified names, interior spaces, single
+// backslashes, and non-ASCII) build without error.
+func TestValidateSkills_Accepted(t *testing.T) {
+	accepted := []any{
+		nil,
+		"all",
+		[]string{},
+		[]string{"pdf-tools"},
+		[]string{"plugin:skill"},
+		[]string{"my skill"},
+		[]string{"a\\b"},
+		[]string{"日本語スキル"},
+	}
+	for _, skills := range accepted {
+		if err := validateSkills(skills); err != nil {
+			t.Errorf("validateSkills(%#v) = %v, want nil", skills, err)
+		}
+	}
+}
+
+// TestValidateSkills_RejectedShape verifies that an Options.Skills value
+// other than nil, "all", or []string is rejected instead of silently
+// no-op'd.
+func TestValidateSkills_RejectedShape(t *testing.T) {
+	rejected := []any{"named", 42, []int{1, 2}}
+	for _, skills := range rejected {
+		if err := validateSkills(skills); err == nil {
+			t.Errorf("validateSkills(%#v) = nil, want error", skills)
+		} else if _, ok := err.(*SDKError); !ok {
+			t.Errorf("validateSkills(%#v) error type = %T, want *SDKError", skills, err)
+		}
+	}
+}
+
+// TestValidateSkillName_Rejected verifies every documented rejection case:
+// delimiters that the --allowedTools tokenizer can't carry safely, and
+// shapes that tokenize cleanly but can never match a real skill.
+func TestValidateSkillName_Rejected(t *testing.T) {
+	cases := []struct {
+		name string
+	}{
+		{""},
+		{"   "},
+		{" name"},
+		{"name "},
+		{"a(b"},
+		{"a)b"},
+		{"a,b"},
+		{"a\x01b"},
+		{"a\x7fb"},
+		{"a\ufeffb"},
+		{"*"},
+		{"plugin:*"},
+		{"name *"},
+		{"/name"},
+		{"a\\\\b"},
+		{"name\\"},
+	}
+	for _, c := range cases {
+		if err := validateSkillName(c.name); err == nil {
+			t.Errorf("validateSkillName(%q) = nil, want error", c.name)
+		} else if _, ok := err.(*SDKError); !ok {
+			t.Errorf("validateSkillName(%q) error type = %T, want *SDKError", c.name, err)
+		}
+	}
+}
+
+// TestValidateSkillName_Accepted verifies names that must keep working
+// identically: plugin-qualified names, interior spaces, a single backslash,
+// and non-ASCII.
+func TestValidateSkillName_Accepted(t *testing.T) {
+	accepted := []string{
+		"pdf-tools",
+		"plugin:skill",
+		"my skill",
+		"a\\b",
+		"日本語スキル",
+		"name:not-a-wildcard",
+	}
+	for _, name := range accepted {
+		if err := validateSkillName(name); err != nil {
+			t.Errorf("validateSkillName(%q) = %v, want nil", name, err)
+		}
+	}
+}
+
+// TestNewSubprocessTransport_RejectsInvalidSkills verifies that an invalid
+// Options.Skills value fails at construction, before any CLI process is
+// spawned.
+func TestNewSubprocessTransport_RejectsInvalidSkills(t *testing.T) {
+	_, err := NewSubprocessTransport(&Options{Skills: []string{"bad,name"}})
+	if err == nil {
+		t.Fatal("expected error for invalid skill name, got nil")
+	}
+	if !strings.Contains(err.Error(), "bad,name") {
+		t.Errorf("error message = %q, want it to contain %q", err.Error(), "bad,name")
+	}
+}
