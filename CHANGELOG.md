@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `Options.Skills` names are now validated at connect time before being formatted into `Skill(name)` `--allowedTools` rules. The CLI tokenizes `--allowedTools` on commas and spaces outside parentheses with no escape sequences, so a name carrying one of those delimiters couldn't ride through reliably; some other shapes tokenized cleanly but could never match a real skill, silently granting nothing. `NewSubprocessTransport` now rejects, with a `*SDKError`: an `Options.Skills` value that isn't `nil`, `"all"`, or `[]string`; and, per name, empty/whitespace-only names, invalid UTF-8, parentheses/commas/control characters/byte-order marks, a literal `"*"`, a `":*"`/`" *"` wildcard suffix, a leading `"/"`, consecutive backslashes, and a trailing unpaired backslash. Plugin-qualified names, interior spaces, single backslashes, and non-ASCII names are unaffected. **Breaking:** `Skills: []string{"plugin:*"}` and `Skills: []string{"*"}` now return an error instead of silently building a dead rule — use `Skills: "all"` or a `Skill(...)` `AllowedTools` entry instead. Port of Python SDK PR anthropics/claude-agent-sdk-python#1145, mirrored in TypeScript SDK v0.3.221. ([#557](https://github.com/Flohs/claude-agent-sdk-go/issues/557))
+
 ## [3.0.0] - 2026-07-28
 
 ### Breaking
