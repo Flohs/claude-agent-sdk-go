@@ -1719,6 +1719,68 @@ func TestParsePermissionDeniedAdvisoryMessage_Minimal(t *testing.T) {
 	}
 }
 
+func TestParsePermissionDeniedMessage(t *testing.T) {
+	data := map[string]any{
+		"type":        "system",
+		"subtype":     "permission_denied",
+		"tool_name":   "Bash",
+		"tool_input":  map[string]any{"command": "rm -rf /"},
+		"tool_use_id": "toolu_123",
+		"reason":      "auto-denied in bare headless mode",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*PermissionDeniedMessage)
+	if !ok {
+		t.Fatalf("expected *PermissionDeniedMessage, got %T", msg)
+	}
+	if m.ToolName != "Bash" {
+		t.Errorf("ToolName = %q, want %q", m.ToolName, "Bash")
+	}
+	if m.ToolUseID != "toolu_123" {
+		t.Errorf("ToolUseID = %q, want %q", m.ToolUseID, "toolu_123")
+	}
+	if m.Reason != "auto-denied in bare headless mode" {
+		t.Errorf("Reason = %q, want %q", m.Reason, "auto-denied in bare headless mode")
+	}
+	toolInput, ok := m.ToolInput.(map[string]any)
+	if !ok {
+		t.Fatalf("expected ToolInput to be map[string]any, got %T", m.ToolInput)
+	}
+	if toolInput["command"] != "rm -rf /" {
+		t.Errorf("ToolInput[command] = %v, want %q", toolInput["command"], "rm -rf /")
+	}
+}
+
+func TestParsePermissionDeniedMessage_Minimal(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "permission_denied",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*PermissionDeniedMessage)
+	if !ok {
+		t.Fatalf("expected *PermissionDeniedMessage, got %T", msg)
+	}
+	if m.ToolName != "" {
+		t.Errorf("ToolName should be empty, got %q", m.ToolName)
+	}
+	if m.ToolInput != nil {
+		t.Errorf("ToolInput should be nil, got %v", m.ToolInput)
+	}
+	if m.ToolUseID != "" {
+		t.Errorf("ToolUseID should be empty, got %q", m.ToolUseID)
+	}
+	if m.Reason != "" {
+		t.Errorf("Reason should be empty, got %q", m.Reason)
+	}
+}
+
 func TestParseMessage_MemoryRecall(t *testing.T) {
 	data := map[string]any{
 		"type":    "system",

@@ -5,6 +5,7 @@
 ### Added
 
 - `Options.ResumeSessionAt` and `Options.ResumeDropsTurn` fields, bound to the CLI's `--resume-session-at`/`--resume-drops-turn` flags via the existing `appendFlagValue` dash-leading-safe helper. `ResumeSessionAt` truncates a `Resume`d session to a specific chain-entry UUID instead of loading the full transcript; `ResumeDropsTurn` declares the prompt UUID of the turn a truncating resume intends to discard, so the CLI can refuse the resume if the discarded range contains anything the caller hadn't already observed. Print/headless lane only — interactive `--resume` and background-job worker boots ignore both. Port of TypeScript SDK v0.3.212 (`resumeSessionAt`) / v0.3.223 (`resumeDropsTurn`). ([#561](https://github.com/Flohs/claude-agent-sdk-go/issues/561))
+- `PermissionDeniedMessage` typed struct for the `system/permission_denied` subtype (`ToolName`, `ToolInput`, `ToolUseID`, `Reason`), emitted when bare headless mode (`-p` / SDK `query()` without `CanUseTool`) auto-denies a tool call. `ParseMessage` now returns `*PermissionDeniedMessage` for this subtype instead of a generic `*SystemMessage`. Distinct from the existing `PermissionDeniedAdvisoryMessage` (`permission_denied_advisory` subtype), which only carries `ToolName`/`DenialReason`. Port of TypeScript SDK v0.3.223. ([#562](https://github.com/Flohs/claude-agent-sdk-go/issues/562))
 
 ### Fixed
 

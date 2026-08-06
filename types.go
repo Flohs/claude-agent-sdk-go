@@ -983,6 +983,26 @@ type PermissionDeniedAdvisoryMessage struct {
 	DenialReason PermissionDeniedAdvisoryReason `json:"denial_reason,omitempty"`
 }
 
+// PermissionDeniedMessage is emitted for the system/permission_denied subtype:
+// bare headless (`-p` / SDK query() without CanUseTool) auto-denying a tool
+// call. Distinct from PermissionDeniedAdvisoryMessage (permission_denied_advisory),
+// which only carries ToolName/DenialReason; this subtype carries the full
+// denied-call details, matching PermissionDeniedHookInput's shape. Port of
+// TypeScript SDK v0.3.223. ([#562])
+//
+// [#562]: https://github.com/Flohs/claude-agent-sdk-go/issues/562
+type PermissionDeniedMessage struct {
+	SystemMessage
+	// ToolName is the name of the tool that was denied.
+	ToolName string `json:"tool_name,omitempty"`
+	// ToolInput is the input the tool call was made with.
+	ToolInput any `json:"tool_input,omitempty"`
+	// ToolUseID is the tool-use ID of the denied call.
+	ToolUseID string `json:"tool_use_id,omitempty"`
+	// Reason is a human-readable explanation for the denial.
+	Reason string `json:"reason,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 
