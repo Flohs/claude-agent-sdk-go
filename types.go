@@ -1119,12 +1119,24 @@ type ResultMessage struct {
 	// results).
 	Origin *MessageOrigin `json:"origin,omitempty"`
 	// RequestID is the API request identifier for the final API call.
-	RequestID    string         `json:"request_id,omitempty"`
-	TotalCostUSD *float64       `json:"total_cost_usd,omitempty"`
-	Usage        map[string]any `json:"usage,omitempty"`
+	RequestID    string   `json:"request_id,omitempty"`
+	TotalCostUSD *float64 `json:"total_cost_usd,omitempty"`
+	// Usage is the raw main-loop usage blob for this turn only — it does not
+	// include tokens consumed by subagents, background tasks, or other
+	// query-pipeline calls outside the main loop. For cumulative,
+	// cost-accounting-authoritative usage across the whole query pipeline,
+	// use ModelUsage instead. Documented distinction per TypeScript SDK
+	// v0.3.223. ([#563])
+	//
+	// [#563]: https://github.com/Flohs/claude-agent-sdk-go/issues/563
+	Usage map[string]any `json:"usage,omitempty"`
 	// ModelUsage contains a per-model token usage and cost breakdown, keyed
 	// by the raw model string reported by the CLI. Nil when not provided.
-	// Port of TypeScript SDK v0.3.218 / Python SDK v0.2.126.
+	// Unlike Usage, this is cumulative across every call in the query
+	// pipeline (main loop, subagents, background tasks), not just the main
+	// loop, and is the field to use for cost accounting. Port of TypeScript
+	// SDK v0.3.218 / Python SDK v0.2.126; cumulative-vs-per-turn distinction
+	// documented in TypeScript SDK v0.3.223. ([#563])
 	ModelUsage       map[string]ModelUsage `json:"model_usage,omitempty"`
 	Result           string                `json:"result,omitempty"`
 	StructuredOutput any                   `json:"structured_output,omitempty"`
