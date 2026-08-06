@@ -469,7 +469,9 @@ func TestMaterializeResumeSession_AuthFilesCopied(t *testing.T) {
 	// Python's source of truth copies `.credentials.json` and
 	// `.claude.json`. `.credentials.json` gets the refreshToken redaction
 	// dance; `.claude.json` copies as-is. `.claude.json` lives at
-	// $CLAUDE_CONFIG_DIR/.claude.json when set.
+	// $CLAUDE_CONFIG_DIR/.claude.json when set. `settings.json` (carrying
+	// apiKeyHelper/env/hooks/permissions) also copies as-is, alongside
+	// `.credentials.json` under the config dir.
 	credsPath := filepath.Join(fakeHome, ".credentials.json")
 	credsContent := `{"claudeAiOauth":{"accessToken":"AT","refreshToken":"RT","expiresAt":"tomorrow"},"other":"x"}`
 	if err := os.WriteFile(credsPath, []byte(credsContent), 0o600); err != nil {
@@ -478,6 +480,10 @@ func TestMaterializeResumeSession_AuthFilesCopied(t *testing.T) {
 	claudePath := filepath.Join(fakeHome, ".claude.json")
 	if err := os.WriteFile(claudePath, []byte(`{"foo":"bar"}`), 0o600); err != nil {
 		t.Fatalf("write .claude.json: %v", err)
+	}
+	settingsPath := filepath.Join(fakeHome, "settings.json")
+	if err := os.WriteFile(settingsPath, []byte(`{"apiKeyHelper":"/bin/helper"}`), 0o600); err != nil {
+		t.Fatalf("write settings.json: %v", err)
 	}
 
 	ctx := context.Background()
@@ -523,10 +529,20 @@ func TestMaterializeResumeSession_AuthFilesCopied(t *testing.T) {
 	if string(claudeOut) != `{"foo":"bar"}` {
 		t.Errorf(".claude.json not copied verbatim, got %q", string(claudeOut))
 	}
+
+	// settings.json copies verbatim.
+	settingsOut, err := os.ReadFile(filepath.Join(mr.configDir, "settings.json"))
+	if err != nil {
+		t.Fatalf("read copied settings.json: %v", err)
+	}
+	if string(settingsOut) != `{"apiKeyHelper":"/bin/helper"}` {
+		t.Errorf("settings.json not copied verbatim, got %q", string(settingsOut))
+	}
 }
 
 func TestMaterializeResumeSession_AuthFilesMissingIsOK(t *testing.T) {
-	// Fresh install: no .credentials.json, no .claude.json. Must not error.
+	// Fresh install: no .credentials.json, no .claude.json, no
+	// settings.json. Must not error.
 	fakeHome := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", fakeHome)
 
@@ -545,9 +561,12 @@ func TestMaterializeResumeSession_AuthFilesMissingIsOK(t *testing.T) {
 	}
 	defer mr.cleanup()
 
-	// No credential file should exist at the target.
+	// No credential or settings file should exist at the target.
 	if _, err := os.Stat(filepath.Join(mr.configDir, ".credentials.json")); !os.IsNotExist(err) {
 		t.Errorf(".credentials.json should not exist when source is missing, stat err: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(mr.configDir, "settings.json")); !os.IsNotExist(err) {
+		t.Errorf("settings.json should not exist when source is missing, stat err: %v", err)
 	}
 }
 

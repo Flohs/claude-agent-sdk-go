@@ -647,17 +647,25 @@ func isSafeSubpath(subpath, sessionDir string) bool {
 	return true
 }
 
-// copyAuthFiles copies ~/.credentials.json (with refreshToken redacted) and
-// ~/.claude.json from the caller's effective config dir into tempDir so the
-// spawned CLI can reuse existing credentials.
+// copyAuthFiles copies ~/.credentials.json (with refreshToken redacted),
+// ~/.claude.json, and settings.json from the caller's effective config dir
+// into tempDir so the spawned CLI can reuse existing credentials and
+// settings.
 //
 // Resolution mirrors the CLI:
-//   - .credentials.json lives under the config dir (default ~/.claude/)
+//   - .credentials.json and settings.json live under the config dir
+//     (default ~/.claude/)
 //   - .claude.json lives at $CLAUDE_CONFIG_DIR/.claude.json when set,
 //     else ~/.claude.json (NOT ~/.claude/.claude.json)
 //
 // All copies are best-effort; missing files are silently skipped (API-key
 // auth or a fresh install is fine).
+//
+// The resumed subprocess runs under a redirected CLAUDE_CONFIG_DIR, so
+// without this copy, settings.json (and the apiKeyHelper/env/hooks/
+// permissions it carries) would silently stop applying for a
+// sessionStore-backed resume even though it applies for a normal resume.
+// Port of TypeScript SDK v0.3.222.
 func copyAuthFiles(tempDir string, optEnv map[string]string) {
 	callerConfigDir := optEnv["CLAUDE_CONFIG_DIR"]
 	if callerConfigDir == "" {
@@ -675,6 +683,9 @@ func copyAuthFiles(tempDir string, optEnv map[string]string) {
 	credsSrc := filepath.Join(sourceConfigDir, ".credentials.json")
 	credsJSON, _ := os.ReadFile(credsSrc)
 	writeRedactedCredentials(credsJSON, filepath.Join(tempDir, ".credentials.json"))
+
+	settingsSrc := filepath.Join(sourceConfigDir, "settings.json")
+	copyIfPresent(settingsSrc, filepath.Join(tempDir, "settings.json"))
 
 	var claudeJSONSrc string
 	if callerConfigDir != "" {
