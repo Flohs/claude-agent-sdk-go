@@ -727,6 +727,14 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = appendFlagValue(cmd, "resume", opts.Resume)
 	}
 
+	if opts.ResumeSessionAt != "" {
+		cmd = appendFlagValue(cmd, "resume-session-at", opts.ResumeSessionAt)
+	}
+
+	if opts.ResumeDropsTurn != "" {
+		cmd = appendFlagValue(cmd, "resume-drops-turn", opts.ResumeDropsTurn)
+	}
+
 	if opts.SessionID != "" {
 		cmd = appendFlagValue(cmd, "session-id", opts.SessionID)
 	}

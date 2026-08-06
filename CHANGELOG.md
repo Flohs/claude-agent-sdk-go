@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `Options.ResumeSessionAt` and `Options.ResumeDropsTurn` fields, bound to the CLI's `--resume-session-at`/`--resume-drops-turn` flags via the existing `appendFlagValue` dash-leading-safe helper. `ResumeSessionAt` truncates a `Resume`d session to a specific chain-entry UUID instead of loading the full transcript; `ResumeDropsTurn` declares the prompt UUID of the turn a truncating resume intends to discard, so the CLI can refuse the resume if the discarded range contains anything the caller hadn't already observed. Print/headless lane only — interactive `--resume` and background-job worker boots ignore both. Port of TypeScript SDK v0.3.212 (`resumeSessionAt`) / v0.3.223 (`resumeDropsTurn`). ([#561](https://github.com/Flohs/claude-agent-sdk-go/issues/561))
+
 ### Fixed
 
 - `materializeResumeSession` (used by `Options.SessionStore` + `Options.Resume`/`ContinueConversation`) now copies the caller's `settings.json` into the resumed subprocess's temp `CLAUDE_CONFIG_DIR`, alongside the existing `.credentials.json`/`.claude.json` copies. Previously, because the resumed subprocess runs under a redirected `CLAUDE_CONFIG_DIR`, the caller's real `settings.json` — and with it `apiKeyHelper`, `env`, `hooks`, and `permissions` — silently stopped applying for a session-store-backed resume, even though it applies for a normal (non-store) resume. Port of TypeScript SDK v0.3.222. ([#559](https://github.com/Flohs/claude-agent-sdk-go/issues/559))
