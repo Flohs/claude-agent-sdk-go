@@ -219,6 +219,56 @@ func TestBuildCommand_SessionIDFlagLikeValue(t *testing.T) {
 	assertNotContainsFlag(t, cmd, "--version")
 }
 
+func TestBuildCommand_ResumeSessionAt(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			Resume:          "session-abc",
+			ResumeSessionAt: "msg-uuid-123",
+		},
+	}
+	cmd := transport.buildCommand()
+	assertContains(t, cmd, "--resume", "session-abc")
+	assertContains(t, cmd, "--resume-session-at", "msg-uuid-123")
+}
+
+func TestBuildCommand_ResumeSessionAtFlagLikeValue(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			ResumeSessionAt: "--version",
+		},
+	}
+	cmd := transport.buildCommand()
+	assertContainsFlag(t, cmd, "--resume-session-at=--version")
+	assertNotContainsFlag(t, cmd, "--version")
+}
+
+func TestBuildCommand_ResumeDropsTurn(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			Resume:          "session-abc",
+			ResumeSessionAt: "msg-uuid-123",
+			ResumeDropsTurn: "prompt-uuid-456",
+		},
+	}
+	cmd := transport.buildCommand()
+	assertContains(t, cmd, "--resume-drops-turn", "prompt-uuid-456")
+}
+
+func TestBuildCommand_ResumeDropsTurnFlagLikeValue(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "claude",
+		options: &Options{
+			ResumeDropsTurn: "--version",
+		},
+	}
+	cmd := transport.buildCommand()
+	assertContainsFlag(t, cmd, "--resume-drops-turn=--version")
+	assertNotContainsFlag(t, cmd, "--version")
+}
+
 func TestConnectEnv_IncludePartialMessages(t *testing.T) {
 	t.Run("does not set CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING even when true", func(t *testing.T) {
 		env := buildTestEnv(&Options{IncludePartialMessages: true})

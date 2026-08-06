@@ -505,6 +505,28 @@ type Options struct {
 	ContinueConversation bool
 	// Resume resumes a specific session by ID.
 	Resume string
+	// ResumeSessionAt truncates a Resume'd session to a specific chain-entry
+	// UUID instead of loading the full transcript — only messages up to and
+	// including this UUID are resumed. Use together with Resume. Accepts any
+	// chain-entry UUID, typically an AssistantMessage's UUID. Print/headless
+	// lane only: interactive `--resume` and background-job worker boots
+	// ignore this option and load the full chain unmodified. Port of
+	// TypeScript SDK v0.3.212. ([#561])
+	//
+	// [#561]: https://github.com/Flohs/claude-agent-sdk-go/issues/561
+	ResumeSessionAt string
+	// ResumeDropsTurn declares, together with ResumeSessionAt, the prompt
+	// UUID of the turn a truncating resume intends to discard. The CLI
+	// validates at fork time that every entry past ResumeSessionAt is
+	// attributable to that turn and refuses the resume — an
+	// error_during_execution result whose message starts with "Resume
+	// rejected by --resume-drops-turn:" — if the discarded range contains
+	// anything else (e.g. a queued user message the caller hadn't yet
+	// observed). The refusal is deterministic: map it to a rewind-recovery
+	// path rather than retrying the same fork request. Print/headless lane
+	// only, same as ResumeSessionAt. Port of TypeScript SDK v0.3.223.
+	// ([#561])
+	ResumeDropsTurn string
 	// SessionID specifies a custom session ID for the conversation.
 	SessionID string
 	// Title sets the session title and skips auto-generation.
