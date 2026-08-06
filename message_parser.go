@@ -378,6 +378,15 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			DenialReason:  PermissionDeniedAdvisoryReason(stringField(data, "denial_reason")),
 		}, nil
 
+	case "permission_denied":
+		return &PermissionDeniedMessage{
+			SystemMessage: base,
+			ToolName:      stringField(data, "tool_name"),
+			ToolInput:     data["tool_input"],
+			ToolUseID:     stringField(data, "tool_use_id"),
+			Reason:        stringField(data, "reason"),
+		}, nil
+
 	default:
 		return &base, nil
 	}
