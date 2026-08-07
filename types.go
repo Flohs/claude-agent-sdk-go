@@ -1043,8 +1043,10 @@ const (
 	// From, Name, SenderTaskID, and Body may be populated.
 	MessageOriginKindPeer MessageOriginKind = "peer"
 	// MessageOriginKindTaskNotification is a message delivered as the result
-	// of a completed task. Subkind is "scheduled-trigger" when the delivery
-	// is the fired prompt of a scheduled task/routine.
+	// of a completed task. Subkind is MessageOriginSubkindScheduledTrigger
+	// when the delivery is the fired prompt of a scheduled task/routine, or
+	// MessageOriginSubkindPeerSendMessage when it's a cross-session
+	// SendMessage delivery from another of the same user's sessions.
 	MessageOriginKindTaskNotification MessageOriginKind = "task-notification"
 	// MessageOriginKindCoordinator is a message sent by the coordinator.
 	MessageOriginKindCoordinator MessageOriginKind = "coordinator"
@@ -1057,6 +1059,24 @@ const (
 	// MessageOriginKindObserverActivity is a message reporting observer
 	// activity.
 	MessageOriginKindObserverActivity MessageOriginKind = "observer-activity"
+)
+
+// MessageOriginSubkind values further classify
+// MessageOriginKindTaskNotification, populated in MessageOrigin.Subkind.
+// Port of TypeScript SDK v0.3.224.
+const (
+	// MessageOriginSubkindScheduledTrigger marks a delivery that is the
+	// fired stored prompt of a scheduled task/routine (server-asserted
+	// provenance; the schedule attests storage, not authorship). The harness
+	// frames this delivery as the session's assigned task instead of the
+	// generic background-notification frame.
+	MessageOriginSubkindScheduledTrigger = "scheduled-trigger"
+	// MessageOriginSubkindPeerSendMessage marks a coordinator co-member
+	// SendMessage delivery: model-authored text from another of the same
+	// user's sessions, verified by server-stamped receiver co-membership.
+	// Distinguishable from a plain task-notification so the receive-side
+	// crossSessionInbound setting can apply to it.
+	MessageOriginSubkindPeerSendMessage = "peer-send-message"
 )
 
 // MessageOrigin identifies what triggered a message (e.g. distinguishing a
@@ -1079,8 +1099,10 @@ type MessageOrigin struct {
 	// Body is the raw relayed message body. Populated for
 	// MessageOriginKindPeer.
 	Body string `json:"body,omitempty"`
-	// Subkind further classifies MessageOriginKindTaskNotification.
-	// Currently only "scheduled-trigger" is emitted by the CLI.
+	// Subkind further classifies MessageOriginKindTaskNotification: either
+	// MessageOriginSubkindScheduledTrigger or
+	// MessageOriginSubkindPeerSendMessage. Absent on webhook, PR-steward,
+	// plugin, and background-event deliveries.
 	Subkind string `json:"subkind,omitempty"`
 }
 
