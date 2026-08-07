@@ -1246,8 +1246,35 @@ func TestParseMessage_ResultMessage_Origin(t *testing.T) {
 	if r.Origin.Kind != MessageOriginKindTaskNotification {
 		t.Errorf("Origin.Kind = %q, want %q", r.Origin.Kind, MessageOriginKindTaskNotification)
 	}
-	if r.Origin.Subkind != "scheduled-trigger" {
-		t.Errorf("Origin.Subkind = %q, want scheduled-trigger", r.Origin.Subkind)
+	if r.Origin.Subkind != MessageOriginSubkindScheduledTrigger {
+		t.Errorf("Origin.Subkind = %q, want %q", r.Origin.Subkind, MessageOriginSubkindScheduledTrigger)
+	}
+}
+
+func TestParseMessage_ResultMessage_Origin_PeerSendMessage(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+		"origin": map[string]any{
+			"kind":    "task-notification",
+			"subkind": "peer-send-message",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.Origin == nil {
+		t.Fatal("Origin = nil, want non-nil")
+	}
+	if r.Origin.Kind != MessageOriginKindTaskNotification {
+		t.Errorf("Origin.Kind = %q, want %q", r.Origin.Kind, MessageOriginKindTaskNotification)
+	}
+	if r.Origin.Subkind != MessageOriginSubkindPeerSendMessage {
+		t.Errorf("Origin.Subkind = %q, want %q", r.Origin.Subkind, MessageOriginSubkindPeerSendMessage)
 	}
 }
 
