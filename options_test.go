@@ -231,6 +231,95 @@ func TestSandboxCredentialsConfig_JSONMarshal_OmitEmpty(t *testing.T) {
 	}
 }
 
+// TestSandboxCredentialsConfig_JSONMarshal_JwtDecodeAndAws verifies the
+// v0.3.224 credential-masking fields (extract/onExtractNoMatch/decode/
+// maskClaims/maskDuplicates on file and env var entries, awsPairs/sigv4 on
+// the top-level config) round-trip through JSON with the upstream field
+// names.
+func TestSandboxCredentialsConfig_JSONMarshal_JwtDecodeAndAws(t *testing.T) {
+	maskDup := true
+	cfg := SandboxCredentialsConfig{
+		Files: []SandboxCredentialFileEntry{
+			{
+				Path:             "~/.config/gh/hosts.yml",
+				Mode:             "mask",
+				Extract:          `token:\s*(\S+)`,
+				OnExtractNoMatch: "deny",
+				MaskDuplicates:   &maskDup,
+			},
+		},
+		EnvVars: []SandboxCredentialEnvVarEntry{
+			{
+				Name:       "AUTH0_TOKEN",
+				Mode:       "mask",
+				Decode:     "jwt",
+				MaskClaims: []string{"sub", "email"},
+			},
+		},
+		AwsPairs: []SandboxAwsCredentialPair{
+			{
+				AccessKeyIDVar:     "MY_AWS_KEY_ID",
+				SecretAccessKeyVar: "MY_AWS_SECRET",
+				SessionTokenVar:    "MY_AWS_TOKEN",
+			},
+		},
+		Sigv4: &SandboxSigv4Policy{
+			Streaming: "passthrough",
+			Presigned: "deny",
+			Sigv4a:    "deny",
+		},
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	files, ok := result["files"].([]any)
+	if !ok || len(files) != 1 {
+		t.Fatalf("expected 1 file entry, got %v", result["files"])
+	}
+	file, ok := files[0].(map[string]any)
+	if !ok || file["extract"] != `token:\s*(\S+)` || file["onExtractNoMatch"] != "deny" || file["maskDuplicates"] != true {
+		t.Errorf("unexpected file entry: %v", file)
+	}
+	if _, ok := file["decode"]; ok {
+		t.Errorf("expected decode to be omitted when unset, got %v", file["decode"])
+	}
+
+	envVars, ok := result["envVars"].([]any)
+	if !ok || len(envVars) != 1 {
+		t.Fatalf("expected 1 envVar entry, got %v", result["envVars"])
+	}
+	envVar, ok := envVars[0].(map[string]any)
+	if !ok || envVar["decode"] != "jwt" {
+		t.Errorf("expected envVar decode 'jwt', got %v", envVar)
+	}
+	claims, ok := envVar["maskClaims"].([]any)
+	if !ok || len(claims) != 2 || claims[0] != "sub" || claims[1] != "email" {
+		t.Errorf("expected maskClaims [sub, email], got %v", envVar["maskClaims"])
+	}
+
+	awsPairs, ok := result["awsPairs"].([]any)
+	if !ok || len(awsPairs) != 1 {
+		t.Fatalf("expected 1 awsPairs entry, got %v", result["awsPairs"])
+	}
+	pair, ok := awsPairs[0].(map[string]any)
+	if !ok || pair["accessKeyIdVar"] != "MY_AWS_KEY_ID" || pair["secretAccessKeyVar"] != "MY_AWS_SECRET" || pair["sessionTokenVar"] != "MY_AWS_TOKEN" {
+		t.Errorf("unexpected awsPairs entry: %v", pair)
+	}
+
+	sigv4, ok := result["sigv4"].(map[string]any)
+	if !ok || sigv4["streaming"] != "passthrough" || sigv4["presigned"] != "deny" || sigv4["sigv4a"] != "deny" {
+		t.Errorf("unexpected sigv4 policy: %v", sigv4)
+	}
+}
+
 // TestValidatePermissionMode_ValidValues verifies that every known
 // PermissionMode constant (including the "manual" alias) and the empty
 // string (unset — CLI default applies) are accepted.
