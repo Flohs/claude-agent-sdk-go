@@ -414,11 +414,57 @@ type SandboxFilesystemConfig struct {
 	AllowManagedReadPathsOnly *bool `json:"allowManagedReadPathsOnly,omitempty"`
 }
 
-// SandboxCredentialFileEntry declares a single file or directory path whose reads
-// are denied inside sandboxed commands. Mode is always "deny".
+// SandboxCredentialFileEntry declares a single file or directory path to
+// protect inside sandboxed commands. Mode "deny" blocks reads inside the
+// sandbox. Mode "mask" substitutes a sentinel (whole-file, or only the spans
+// captured by Extract) and the host proxy swaps sentinel for the real value
+// on egress to InjectHosts; on macOS and Windows, "mask" currently degrades
+// to "deny".
 type SandboxCredentialFileEntry struct {
 	Path string `json:"path"`
 	Mode string `json:"mode"`
+	// Extract is an optional regex for structured masking when Mode is
+	// "mask". Applied globally to the file; capture group 1 of each match is
+	// a credential value, and only those captured spans are replaced with
+	// sentinels — the rest of the file is preserved so a tool that parses it
+	// (.netrc, JSON, YAML) still succeeds. Without Extract, the entire file
+	// content is replaced with one sentinel (whole-file masking, suited to
+	// single-secret files). Accepted but ignored for "deny". Port of
+	// TypeScript SDK v0.3.224.
+	Extract string `json:"extract,omitempty"`
+	// OnExtractNoMatch controls behavior when Extract matches nothing in the
+	// file — or, with Decode, when no candidate survives verification.
+	// "warn" (default) emits a stderr warning and leaves the file readable
+	// as-is (fail-open); "deny" degrades the entry to Mode "deny"
+	// (fail-closed); "error" aborts at sandbox setup. Only meaningful when
+	// Mode is "mask" and Extract or Decode is set; accepted but ignored
+	// otherwise. Port of TypeScript SDK v0.3.224.
+	OnExtractNoMatch string `json:"onExtractNoMatch,omitempty"`
+	// Decode is an optional encoded-credential format for Mode "mask". "jwt":
+	// candidates are located with a built-in JWT regex (or Extract, if set),
+	// verified to actually be JWTs, and replaced with a structurally valid
+	// fake JWT so client-side token parsing inside the sandbox keeps
+	// working. Accepted but ignored for "deny". Port of TypeScript SDK
+	// v0.3.224.
+	Decode string `json:"decode,omitempty"`
+	// MaskClaims names top-level JWT payload claims to mask inside each
+	// decoded value, instead of replacing the whole token; all other claims
+	// are preserved. Requires Decode. Only meaningful when Mode is "mask";
+	// accepted but ignored for "deny". Port of TypeScript SDK v0.3.224.
+	MaskClaims []string `json:"maskClaims,omitempty"`
+	// MaskDuplicates, when true, also replaces verbatim occurrences of each
+	// captured credential value outside the regex-matched spans (e.g. a
+	// secret repeated where the regex does not reach). Matches raw
+	// substrings, so short or common values may corrupt unrelated content;
+	// intended for long, high-entropy secrets. Only meaningful when Mode is
+	// "mask" and Extract or Decode is set; accepted but ignored otherwise.
+	// Port of TypeScript SDK v0.3.224.
+	MaskDuplicates *bool `json:"maskDuplicates,omitempty"`
+	// InjectHosts optionally narrows where the proxy substitutes this
+	// credential. Only meaningful when Mode is "mask"; accepted but ignored
+	// for "deny". If unset, defaults to the sandbox's allowed network
+	// domains. Port of TypeScript SDK v0.3.224.
+	InjectHosts []string `json:"injectHosts,omitempty"`
 }
 
 // SandboxCredentialEnvVarEntry declares a single environment variable to protect
@@ -433,13 +479,71 @@ type SandboxCredentialEnvVarEntry struct {
 	Name        string   `json:"name"`
 	Mode        string   `json:"mode"`
 	InjectHosts []string `json:"injectHosts,omitempty"`
+	// Extract is an optional regex for structured masking when Mode is
+	// "mask". Applied globally to the value; capture group 1 of each match
+	// is a credential value, and only those captured spans are replaced with
+	// sentinels — the rest of the value is preserved so a tool that parses
+	// it (e.g. a DATABASE_URL connection string) still succeeds. Without
+	// Extract, the entire value is replaced with one sentinel. Cannot be
+	// combined with Decode. Accepted but ignored for "deny". Port of
+	// TypeScript SDK v0.3.224.
+	Extract string `json:"extract,omitempty"`
+	// OnExtractNoMatch controls behavior when Extract matches nothing in the
+	// value. "warn" (default) lets the variable pass through unmasked
+	// (fail-open); "deny" unsets the variable (fail-closed); "error" aborts
+	// at sandbox setup. Only meaningful when Mode is "mask" and Extract is
+	// set without Decode. Port of TypeScript SDK v0.3.224.
+	OnExtractNoMatch string `json:"onExtractNoMatch,omitempty"`
+	// Decode is an optional encoded-credential format for Mode "mask". "jwt":
+	// the variable's whole value is verified to actually be a JWT and
+	// replaced with a structurally valid fake JWT. Cannot be combined with
+	// Extract. Accepted but ignored for "deny". Port of TypeScript SDK
+	// v0.3.224.
+	Decode string `json:"decode,omitempty"`
+	// MaskClaims names top-level JWT payload claims to mask inside the
+	// decoded value, instead of replacing the whole token. Requires Decode.
+	// Only meaningful when Mode is "mask"; accepted but ignored for "deny".
+	// Port of TypeScript SDK v0.3.224.
+	MaskClaims []string `json:"maskClaims,omitempty"`
+}
+
+// SandboxAwsCredentialPair explicitly groups masked env vars into an AWS
+// credential pair for SigV4 re-signing, for non-standard variable names. The
+// conventional AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
+// trio is paired automatically when masked. Only honored from user,
+// managed/policy, or CLI (--settings) settings — project settings are
+// ignored. Port of TypeScript SDK v0.3.224.
+type SandboxAwsCredentialPair struct {
+	AccessKeyIDVar     string `json:"accessKeyIdVar"`
+	SecretAccessKeyVar string `json:"secretAccessKeyVar"`
+	// SessionTokenVar optionally names the masked env var holding the AWS
+	// session token (temporary credentials).
+	SessionTokenVar string `json:"sessionTokenVar,omitempty"`
+}
+
+// SandboxSigv4Policy sets policies for AWS SigV4 request shapes the sandbox
+// proxy cannot re-sign (streaming, presigned, sigv4a) when they reference a
+// masked credential pair. Each field is "deny" (default) or "passthrough".
+// Only honored from user, managed/policy, or CLI (--settings) settings —
+// project settings are ignored. Port of TypeScript SDK v0.3.224.
+type SandboxSigv4Policy struct {
+	// Streaming policies aws-chunked streaming uploads, whose per-chunk
+	// signatures chain off a seed signature that can't be recomputed without
+	// rewriting the body.
+	Streaming string `json:"streaming,omitempty"`
+	// Presigned policies presigned URLs, where the signature lives in the
+	// query string itself.
+	Presigned string `json:"presigned,omitempty"`
+	// Sigv4a policies SigV4A (AWS4-ECDSA-P256-SHA256) asymmetric signatures,
+	// which have no shared-key HMAC to recompute.
+	Sigv4a string `json:"sigv4a,omitempty"`
 }
 
 // SandboxCredentialsConfig declares credential sources to protect in sandboxed commands.
-// Files listed in Files are denied for reads (Mode is always "deny" for file
-// entries). Variables in EnvVars are unset ("deny") or masked with a
-// sentinel value ("mask"); see SandboxCredentialEnvVarEntry. Only explicitly
-// listed entries are restricted — there is no built-in deny list.
+// Files listed in Files and variables listed in EnvVars are unset ("deny")
+// or masked with a sentinel value ("mask"); see SandboxCredentialFileEntry
+// and SandboxCredentialEnvVarEntry. Only explicitly listed entries are
+// restricted — there is no built-in deny list.
 type SandboxCredentialsConfig struct {
 	Files   []SandboxCredentialFileEntry   `json:"files,omitempty"`
 	EnvVars []SandboxCredentialEnvVarEntry `json:"envVars,omitempty"`
@@ -450,17 +554,25 @@ type SandboxCredentialsConfig struct {
 	// fixtures. Only honored from user, managed/policy, or CLI settings —
 	// project settings are ignored. Port of TypeScript SDK v0.3.199.
 	AllowPlaintextInject *bool `json:"allowPlaintextInject,omitempty"`
+	// AwsPairs explicitly groups masked env vars into AWS credential pairs
+	// for SigV4 re-signing, for non-standard variable names. Port of
+	// TypeScript SDK v0.3.224.
+	AwsPairs []SandboxAwsCredentialPair `json:"awsPairs,omitempty"`
+	// Sigv4 sets policies for AWS SigV4 request shapes the proxy cannot
+	// re-sign when they reference a masked credential pair. Port of
+	// TypeScript SDK v0.3.224.
+	Sigv4 *SandboxSigv4Policy `json:"sigv4,omitempty"`
 }
 
 // SandboxSettings controls bash command sandboxing.
 type SandboxSettings struct {
-	Enabled                    *bool                    `json:"enabled,omitempty"`
-	AutoAllowBashIfSandboxed   *bool                    `json:"autoAllowBashIfSandboxed,omitempty"`
-	ExcludedCommands           []string                 `json:"excludedCommands,omitempty"`
-	AllowUnsandboxedCommands   *bool                    `json:"allowUnsandboxedCommands,omitempty"`
-	Network                    *SandboxNetworkConfig    `json:"network,omitempty"`
-	IgnoreViolations           *SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
-	EnableWeakerNestedSandbox  *bool                    `json:"enableWeakerNestedSandbox,omitempty"`
+	Enabled                   *bool                    `json:"enabled,omitempty"`
+	AutoAllowBashIfSandboxed  *bool                    `json:"autoAllowBashIfSandboxed,omitempty"`
+	ExcludedCommands          []string                 `json:"excludedCommands,omitempty"`
+	AllowUnsandboxedCommands  *bool                    `json:"allowUnsandboxedCommands,omitempty"`
+	Network                   *SandboxNetworkConfig    `json:"network,omitempty"`
+	IgnoreViolations          *SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
+	EnableWeakerNestedSandbox *bool                    `json:"enableWeakerNestedSandbox,omitempty"`
 	// FailIfUnavailable controls behavior when sandboxing is requested but the
 	// platform's sandbox mechanism is unavailable (no bwrap on Linux, no
 	// Seatbelt on macOS, etc). When true (the CLI default when Enabled is
