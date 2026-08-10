@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-08-10
+
 ### Changed
 
 - Reviewed TypeScript SDK v0.3.225 and v0.3.226 (current npm `latest` as of this review): (1) the `bridge.d.ts` `CredentialsRejection` type/guard and expanded `CredentialsFailure`/`CreateSessionFailure` reason unions are Remote Control credential-bridge-only, same out-of-scope category as [#536](https://github.com/Flohs/claude-agent-sdk-go/issues/536)/[#569](https://github.com/Flohs/claude-agent-sdk-go/issues/569); (2) the `OnElicitation`/`OnUserDialog` callback `requestId` field and nullable-return refinement, and (3) the `RemoteTriggerInput.action` `"create_webhook_trigger"` enum addition, both land on pre-existing unported surface (the Go SDK has never modeled direct elicitation/dialog callbacks or the `RemoteTrigger` tool), so neither is a new-since-sync regression; (4) the v0.3.225 changelog's "background subagents ... never resuming when a background shell command or Monitor they left running completed" fix has no corresponding `sdk.d.ts`/`sdk-tools.d.ts` diff and no visible source commit in either public SDK repo — it is a fix to the closed-source CLI binary's own internal scheduler with no stream-json wire-protocol surface, distinct from the already-ported Python `e6e07f1`/[#539](https://github.com/Flohs/claude-agent-sdk-go/issues/539) stdin-starvation fix; (5) v0.3.226 is a doc/parity-only release, byte-identical types to v0.3.225. No functional Go SDK changes required for either release. ([#573](https://github.com/Flohs/claude-agent-sdk-go/issues/573))

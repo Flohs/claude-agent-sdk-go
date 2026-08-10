@@ -94,7 +94,7 @@ func init() {
 const (
 	defaultMaxBufferSize     = 1024 * 1024 // 1MB
 	minimumClaudeCodeVersion = "2.1.90"
-	sdkVersion               = "3.0.0"
+	sdkVersion               = "3.1.0"
 
 	// stderrMaxBytes caps the rolling stderr buffer at ~8 KB.
 	stderrMaxBytes = 8 * 1024
