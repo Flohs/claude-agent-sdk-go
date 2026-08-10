@@ -1,7 +1,7 @@
 # Claude Agent SDK for Go
 
 [![CI](https://github.com/Flohs/claude-agent-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/Flohs/claude-agent-sdk-go/actions/workflows/ci.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Flohs/claude-agent-sdk-go/v2.svg)](https://pkg.go.dev/github.com/Flohs/claude-agent-sdk-go/v2)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Flohs/claude-agent-sdk-go/v3.svg)](https://pkg.go.dev/github.com/Flohs/claude-agent-sdk-go/v3)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Go SDK for Claude Agent. Communicates with the [Claude Code CLI](https://code.claude.com/docs) via subprocess stdio using a JSON-based bidirectional control protocol.
@@ -9,7 +9,7 @@ Go SDK for Claude Agent. Communicates with the [Claude Code CLI](https://code.cl
 ## Installation
 
 ```bash
-go get github.com/Flohs/claude-agent-sdk-go/v2
+go get github.com/Flohs/claude-agent-sdk-go/v3
 ```
 
 **Prerequisites:**
@@ -37,7 +37,7 @@ import (
     "context"
     "fmt"
 
-    claude "github.com/Flohs/claude-agent-sdk-go/v2"
+    claude "github.com/Flohs/claude-agent-sdk-go/v3"
 )
 
 func main() {

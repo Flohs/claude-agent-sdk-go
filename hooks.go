@@ -6,16 +6,16 @@ import "context"
 type HookEvent string
 
 const (
-	HookEventPreToolUse          HookEvent = "PreToolUse"
-	HookEventPostToolUse         HookEvent = "PostToolUse"
-	HookEventPostToolUseFailure  HookEvent = "PostToolUseFailure"
-	HookEventUserPromptSubmit    HookEvent = "UserPromptSubmit"
-	HookEventStop                HookEvent = "Stop"
-	HookEventSubagentStop        HookEvent = "SubagentStop"
-	HookEventPreCompact          HookEvent = "PreCompact"
-	HookEventNotification        HookEvent = "Notification"
-	HookEventSubagentStart       HookEvent = "SubagentStart"
-	HookEventPermissionRequest   HookEvent = "PermissionRequest"
+	HookEventPreToolUse         HookEvent = "PreToolUse"
+	HookEventPostToolUse        HookEvent = "PostToolUse"
+	HookEventPostToolUseFailure HookEvent = "PostToolUseFailure"
+	HookEventUserPromptSubmit   HookEvent = "UserPromptSubmit"
+	HookEventStop               HookEvent = "Stop"
+	HookEventSubagentStop       HookEvent = "SubagentStop"
+	HookEventPreCompact         HookEvent = "PreCompact"
+	HookEventNotification       HookEvent = "Notification"
+	HookEventSubagentStart      HookEvent = "SubagentStart"
+	HookEventPermissionRequest  HookEvent = "PermissionRequest"
 	// HookEventTeammateIdle fires when a sub-agent idles waiting for input.
 	// Port of TypeScript SDK v0.2.33.
 	HookEventTeammateIdle HookEvent = "TeammateIdle"
@@ -82,6 +82,11 @@ const (
 	// HookEventTaskCreated fires when a new task is being created (e.g. via
 	// the TaskCreate tool). Returning decision:"block" rolls back the creation.
 	HookEventTaskCreated HookEvent = "TaskCreated"
+	// HookEventDirectoryAdded fires when a new working directory is
+	// registered mid-session, via the /add-dir slash command or the SDK's
+	// register_repo_root control request. Observability only — output is
+	// not acted on. Port of TypeScript SDK v0.3.219.
+	HookEventDirectoryAdded HookEvent = "DirectoryAdded"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -163,8 +168,8 @@ func (*PostToolUseFailureHookInput) hookInputMarker() {}
 type PermissionRequestHookInput struct {
 	BaseHookInput
 	SubagentContext
-	ToolName              string         `json:"tool_name"`
-	ToolInput             map[string]any `json:"tool_input"`
+	ToolName              string           `json:"tool_name"`
+	ToolInput             map[string]any   `json:"tool_input"`
 	PermissionSuggestions []map[string]any `json:"permission_suggestions,omitempty"`
 }
 
@@ -178,10 +183,69 @@ type UserPromptSubmitHookInput struct {
 
 func (*UserPromptSubmitHookInput) hookInputMarker() {}
 
+// BackgroundTaskSummary describes one piece of in-flight background work
+// (running/pending or backgrounded) registered in a session, as reported by
+// [StopHookInput.BackgroundTasks]. Only the fields relevant to Type are
+// populated: Command for "shell" tasks, AgentType for "subagent" tasks,
+// Server/Tool for "monitor"/"MCP task" tasks, and Name for "workflow" tasks.
+// Not to be confused with [BackgroundTaskInfo], a differently-shaped type
+// used by [BackgroundTasksChangedMessage].
+// Port of TypeScript SDK sdk.d.ts (undocumented in the changelog prose).
+type BackgroundTaskSummary struct {
+	ID string `json:"id"`
+	// Type is a friendly task-type label (e.g. "shell", "subagent",
+	// "monitor", "workflow"). Falls back to the raw discriminant for unknown
+	// types.
+	Type   string `json:"type"`
+	Status string `json:"status"`
+	// Description is free-text, capped at 1000 chars; clipped values append
+	// an in-string "… [+N chars]" marker.
+	Description string `json:"description"`
+	// Command is the shell command line. Only present for "shell" tasks.
+	Command string `json:"command,omitempty"`
+	// AgentType is the subagent type name. Only present for "subagent" tasks.
+	AgentType string `json:"agent_type,omitempty"`
+	// Server is the MCP server name. Only present for "monitor"/"MCP task" tasks.
+	Server string `json:"server,omitempty"`
+	// Tool is the MCP tool name. Only present for "monitor"/"MCP task" tasks.
+	Tool string `json:"tool,omitempty"`
+	// Name is the workflow name. Only present for "workflow" tasks.
+	Name string `json:"name,omitempty"`
+}
+
+// SessionCronSummary describes one session-scoped cron task (CronCreate,
+// ScheduleWakeup, /loop) that will wake the session later, as reported by
+// [StopHookInput.SessionCrons].
+// Port of TypeScript SDK sdk.d.ts (undocumented in the changelog prose).
+type SessionCronSummary struct {
+	ID string `json:"id"`
+	// Schedule is a cron expression, e.g. "0 9 * * 1-5".
+	Schedule string `json:"schedule"`
+	// Recurring is false for one-shot wakeups whose cron field encodes a
+	// single fire time, true for tasks that re-fire on every match.
+	Recurring bool `json:"recurring"`
+	// Prompt is the text submitted when the cron fires, capped at 1000
+	// chars; clipped values append an in-string "… [+N chars]" marker.
+	Prompt string `json:"prompt"`
+}
+
 // StopHookInput is the typed input for Stop hook events.
 type StopHookInput struct {
 	BaseHookInput
 	StopHookActive bool `json:"stop_hook_active"`
+	// LastAssistantMessage is the text content of the last assistant message
+	// before stopping, avoiding the need to read and parse the transcript
+	// file.
+	LastAssistantMessage string `json:"last_assistant_message,omitempty"`
+	// BackgroundTasks lists in-flight background work (running/pending +
+	// backgrounded) registered in this session, letting hooks distinguish
+	// "session is done" from "session is paused waiting for background work
+	// to wake it". Empty when nothing is in flight.
+	BackgroundTasks []BackgroundTaskSummary `json:"background_tasks,omitempty"`
+	// SessionCrons lists session-scoped cron tasks (CronCreate,
+	// ScheduleWakeup, /loop) that will wake this session later. Empty when
+	// none are scheduled.
+	SessionCrons []SessionCronSummary `json:"session_crons,omitempty"`
 }
 
 func (*StopHookInput) hookInputMarker() {}
@@ -189,10 +253,10 @@ func (*StopHookInput) hookInputMarker() {}
 // SubagentStopHookInput is the typed input for SubagentStop hook events.
 type SubagentStopHookInput struct {
 	BaseHookInput
-	StopHookActive       bool   `json:"stop_hook_active"`
-	AgentID              string `json:"agent_id"`
-	AgentTranscriptPath  string `json:"agent_transcript_path"`
-	AgentType            string `json:"agent_type"`
+	StopHookActive      bool   `json:"stop_hook_active"`
+	AgentID             string `json:"agent_id"`
+	AgentTranscriptPath string `json:"agent_transcript_path"`
+	AgentType           string `json:"agent_type"`
 }
 
 func (*SubagentStopHookInput) hookInputMarker() {}
@@ -440,6 +504,13 @@ func (*SessionEndHookInput) hookInputMarker() {}
 // Fires when the Stop hook itself encounters an error.
 type StopFailureHookInput struct {
 	BaseHookInput
+	// Error is the machine-readable reason the Stop hook failed.
+	Error AssistantMessageError `json:"error"`
+	// ErrorDetails is optional human-readable detail about the failure.
+	ErrorDetails string `json:"error_details,omitempty"`
+	// LastAssistantMessage is the text content of the last assistant message
+	// before stopping.
+	LastAssistantMessage string `json:"last_assistant_message,omitempty"`
 }
 
 func (*StopFailureHookInput) hookInputMarker() {}
@@ -540,6 +611,19 @@ type FileChangedHookInput struct {
 }
 
 func (*FileChangedHookInput) hookInputMarker() {}
+
+// DirectoryAddedHookInput is the typed input for DirectoryAdded hook events.
+// Fires when a new working directory is registered mid-session.
+type DirectoryAddedHookInput struct {
+	BaseHookInput
+	// Directory is the absolute path of the directory that was added.
+	Directory string `json:"directory"`
+	// Source describes how the directory was added: "slash_command" for
+	// /add-dir, or "register_repo_root" for the SDK control request.
+	Source string `json:"source"`
+}
+
+func (*DirectoryAddedHookInput) hookInputMarker() {}
 
 // WorktreeCreateHookInput is the typed input for WorktreeCreate hook events.
 // Fires when the CLI is about to create a git worktree for a parallel agent

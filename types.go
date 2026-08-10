@@ -179,13 +179,16 @@ type ToolResultMeta struct {
 type AssistantMessageError string
 
 const (
-	AssistantMessageErrorAuthFailed     AssistantMessageError = "authentication_failed"
-	AssistantMessageErrorBilling        AssistantMessageError = "billing_error"
-	AssistantMessageErrorRateLimit      AssistantMessageError = "rate_limit"
-	AssistantMessageErrorInvalidRequest AssistantMessageError = "invalid_request"
-	AssistantMessageErrorServer         AssistantMessageError = "server_error"
-	AssistantMessageErrorUnknown        AssistantMessageError = "unknown"
-	AssistantMessageErrorModelNotFound  AssistantMessageError = "model_not_found"
+	AssistantMessageErrorAuthFailed         AssistantMessageError = "authentication_failed"
+	AssistantMessageErrorOAuthOrgNotAllowed AssistantMessageError = "oauth_org_not_allowed"
+	AssistantMessageErrorBilling            AssistantMessageError = "billing_error"
+	AssistantMessageErrorRateLimit          AssistantMessageError = "rate_limit"
+	AssistantMessageErrorOverloaded         AssistantMessageError = "overloaded"
+	AssistantMessageErrorInvalidRequest     AssistantMessageError = "invalid_request"
+	AssistantMessageErrorModelNotFound      AssistantMessageError = "model_not_found"
+	AssistantMessageErrorServer             AssistantMessageError = "server_error"
+	AssistantMessageErrorUnknown            AssistantMessageError = "unknown"
+	AssistantMessageErrorMaxOutputTokens    AssistantMessageError = "max_output_tokens"
 )
 
 // ToolUseMetaEntry holds display-friendly metadata for a single tool call.
@@ -555,6 +558,22 @@ type ProposeSkillsOutput struct {
 	ProposalCount int `json:"proposalCount"`
 }
 
+// SkillToolOutput is the result returned by the Skill tool.
+// Accessible from [PostToolUseHookInput].ToolResponse when ToolName is "Skill"
+// (decode the map[string]any with json.Marshal/Unmarshal, as with [NotebookEditResult]).
+// Port of TypeScript SDK v0.3.218 — unlike most other TS-only wire types in
+// this file, this struct does not appear in the published
+// @anthropic-ai/claude-agent-sdk@0.3.220 npm package's bundled sdk-tools.d.ts
+// (checked, no "Skill" occurrence at all); modeled directly from the upstream
+// changelog's prose description only, so the field is a best-effort
+// interpretation and may need revision once a typed source is available,
+// consistent with how issue #530 (ToolResultMeta) handled the same situation.
+type SkillToolOutput struct {
+	// Background is true when the skill was dispatched as a detached
+	// background agent (a "forked" skill) rather than run inline.
+	Background bool `json:"background,omitempty"`
+}
+
 // BashToolOutput is the result returned by the Bash tool.
 // Accessible from [PostToolUseHookInput].ToolResponse when ToolName is "Bash"
 // (decode the map[string]any with json.Marshal/Unmarshal, as with [NotebookEditResult]).
@@ -797,6 +816,47 @@ const (
 	ModelFallbackTriggerLastResort ModelFallbackTrigger = "last_resort"
 )
 
+// FastModeState describes whether fast inference mode is currently active for
+// the session. Port of TypeScript SDK v0.3.219.
+type FastModeState string
+
+const (
+	// FastModeStateOff means fast mode is not active.
+	FastModeStateOff FastModeState = "off"
+	// FastModeStateCooldown means fast mode is temporarily unavailable after
+	// recent use and will become available again after a cooldown period.
+	FastModeStateCooldown FastModeState = "cooldown"
+	// FastModeStateOn means fast mode is active.
+	FastModeStateOn FastModeState = "on"
+)
+
+// FastModeDisabledReason explains why fast mode is unavailable when
+// FastModeState is not FastModeStateOn. Port of TypeScript SDK v0.3.219.
+type FastModeDisabledReason string
+
+const (
+	// FastModeDisabledReasonFree is set when the account's plan doesn't include fast mode.
+	FastModeDisabledReasonFree FastModeDisabledReason = "free"
+	// FastModeDisabledReasonPreference is set when the user has turned fast mode off.
+	FastModeDisabledReasonPreference FastModeDisabledReason = "preference"
+	// FastModeDisabledReasonExtraUsageDisabled is set when fast mode would incur extra usage that is disabled.
+	FastModeDisabledReasonExtraUsageDisabled FastModeDisabledReason = "extra_usage_disabled"
+	// FastModeDisabledReasonNetworkError is set when a network error prevented enabling fast mode.
+	FastModeDisabledReasonNetworkError FastModeDisabledReason = "network_error"
+	// FastModeDisabledReasonUnknown is set when the CLI could not determine a specific reason.
+	FastModeDisabledReasonUnknown FastModeDisabledReason = "unknown"
+	// FastModeDisabledReasonNotFirstParty is set when the current provider isn't Anthropic's first-party API.
+	FastModeDisabledReasonNotFirstParty FastModeDisabledReason = "not_first_party"
+	// FastModeDisabledReasonDisabledByEnv is set when an environment variable disables fast mode.
+	FastModeDisabledReasonDisabledByEnv FastModeDisabledReason = "disabled_by_env"
+	// FastModeDisabledReasonModelNotAllowed is set when the current model doesn't support fast mode.
+	FastModeDisabledReasonModelNotAllowed FastModeDisabledReason = "model_not_allowed"
+	// FastModeDisabledReasonSDKOptInRequired is set when the SDK host must opt in via Options.FastMode.
+	FastModeDisabledReasonSDKOptInRequired FastModeDisabledReason = "sdk_opt_in_required"
+	// FastModeDisabledReasonPending is set while the CLI is still determining fast mode eligibility.
+	FastModeDisabledReasonPending FastModeDisabledReason = "pending"
+)
+
 // ModelFallbackMessage is emitted when the CLI falls back to a different model.
 // Received for all fallback triggers: model_not_found, permission_denied,
 // overloaded, server_error, and last_resort. Port of TypeScript SDK v0.3.174.
@@ -923,6 +983,26 @@ type PermissionDeniedAdvisoryMessage struct {
 	DenialReason PermissionDeniedAdvisoryReason `json:"denial_reason,omitempty"`
 }
 
+// PermissionDeniedMessage is emitted for the system/permission_denied subtype:
+// bare headless (`-p` / SDK query() without CanUseTool) auto-denying a tool
+// call. Distinct from PermissionDeniedAdvisoryMessage (permission_denied_advisory),
+// which only carries ToolName/DenialReason; this subtype carries the full
+// denied-call details, matching PermissionDeniedHookInput's shape. Port of
+// TypeScript SDK v0.3.223. ([#562])
+//
+// [#562]: https://github.com/Flohs/claude-agent-sdk-go/issues/562
+type PermissionDeniedMessage struct {
+	SystemMessage
+	// ToolName is the name of the tool that was denied.
+	ToolName string `json:"tool_name,omitempty"`
+	// ToolInput is the input the tool call was made with.
+	ToolInput any `json:"tool_input,omitempty"`
+	// ToolUseID is the tool-use ID of the denied call.
+	ToolUseID string `json:"tool_use_id,omitempty"`
+	// Reason is a human-readable explanation for the denial.
+	Reason string `json:"reason,omitempty"`
+}
+
 // HookDecision represents a hook's permission decision value.
 type HookDecision string
 
@@ -963,8 +1043,10 @@ const (
 	// From, Name, SenderTaskID, and Body may be populated.
 	MessageOriginKindPeer MessageOriginKind = "peer"
 	// MessageOriginKindTaskNotification is a message delivered as the result
-	// of a completed task. Subkind is "scheduled-trigger" when the delivery
-	// is the fired prompt of a scheduled task/routine.
+	// of a completed task. Subkind is MessageOriginSubkindScheduledTrigger
+	// when the delivery is the fired prompt of a scheduled task/routine, or
+	// MessageOriginSubkindPeerSendMessage when it's a cross-session
+	// SendMessage delivery from another of the same user's sessions.
 	MessageOriginKindTaskNotification MessageOriginKind = "task-notification"
 	// MessageOriginKindCoordinator is a message sent by the coordinator.
 	MessageOriginKindCoordinator MessageOriginKind = "coordinator"
@@ -977,6 +1059,24 @@ const (
 	// MessageOriginKindObserverActivity is a message reporting observer
 	// activity.
 	MessageOriginKindObserverActivity MessageOriginKind = "observer-activity"
+)
+
+// MessageOriginSubkind values further classify
+// MessageOriginKindTaskNotification, populated in MessageOrigin.Subkind.
+// Port of TypeScript SDK v0.3.224.
+const (
+	// MessageOriginSubkindScheduledTrigger marks a delivery that is the
+	// fired stored prompt of a scheduled task/routine (server-asserted
+	// provenance; the schedule attests storage, not authorship). The harness
+	// frames this delivery as the session's assigned task instead of the
+	// generic background-notification frame.
+	MessageOriginSubkindScheduledTrigger = "scheduled-trigger"
+	// MessageOriginSubkindPeerSendMessage marks a coordinator co-member
+	// SendMessage delivery: model-authored text from another of the same
+	// user's sessions, verified by server-stamped receiver co-membership.
+	// Distinguishable from a plain task-notification so the receive-side
+	// crossSessionInbound setting can apply to it.
+	MessageOriginSubkindPeerSendMessage = "peer-send-message"
 )
 
 // MessageOrigin identifies what triggered a message (e.g. distinguishing a
@@ -999,8 +1099,10 @@ type MessageOrigin struct {
 	// Body is the raw relayed message body. Populated for
 	// MessageOriginKindPeer.
 	Body string `json:"body,omitempty"`
-	// Subkind further classifies MessageOriginKindTaskNotification.
-	// Currently only "scheduled-trigger" is emitted by the CLI.
+	// Subkind further classifies MessageOriginKindTaskNotification: either
+	// MessageOriginSubkindScheduledTrigger or
+	// MessageOriginSubkindPeerSendMessage. Absent on webhook, PR-steward,
+	// plugin, and background-event deliveries.
 	Subkind string `json:"subkind,omitempty"`
 }
 
@@ -1021,6 +1123,14 @@ type ResultMessage struct {
 	// "aborted_tools", "max_turns", "blocking_limit"). Empty when not
 	// provided by the CLI.
 	TerminalReason string `json:"terminal_reason,omitempty"`
+	// FastModeState reports whether fast inference mode was active for this
+	// turn. Empty when not provided by the CLI. Port of TypeScript SDK
+	// v0.3.219.
+	FastModeState FastModeState `json:"fast_mode_state,omitempty"`
+	// FastModeDisabledReason explains why FastModeState isn't
+	// FastModeStateOn. Empty when fast mode is on or the CLI didn't report a
+	// reason. Port of TypeScript SDK v0.3.219.
+	FastModeDisabledReason FastModeDisabledReason `json:"fast_mode_disabled_reason,omitempty"`
 	// APIErrorStatus is the HTTP status code (e.g. 429, 500, 529) from a
 	// failing API call when IsError is true. Zero when not provided by the
 	// CLI (requires CLI >= v2.1.110).
@@ -1031,11 +1141,27 @@ type ResultMessage struct {
 	// results).
 	Origin *MessageOrigin `json:"origin,omitempty"`
 	// RequestID is the API request identifier for the final API call.
-	RequestID        string         `json:"request_id,omitempty"`
-	TotalCostUSD     *float64       `json:"total_cost_usd,omitempty"`
-	Usage            map[string]any `json:"usage,omitempty"`
-	Result           string         `json:"result,omitempty"`
-	StructuredOutput any            `json:"structured_output,omitempty"`
+	RequestID    string   `json:"request_id,omitempty"`
+	TotalCostUSD *float64 `json:"total_cost_usd,omitempty"`
+	// Usage is the raw main-loop usage blob for this turn only — it does not
+	// include tokens consumed by subagents, background tasks, or other
+	// query-pipeline calls outside the main loop. For cumulative,
+	// cost-accounting-authoritative usage across the whole query pipeline,
+	// use ModelUsage instead. Documented distinction per TypeScript SDK
+	// v0.3.223. ([#563])
+	//
+	// [#563]: https://github.com/Flohs/claude-agent-sdk-go/issues/563
+	Usage map[string]any `json:"usage,omitempty"`
+	// ModelUsage contains a per-model token usage and cost breakdown, keyed
+	// by the raw model string reported by the CLI. Nil when not provided.
+	// Unlike Usage, this is cumulative across every call in the query
+	// pipeline (main loop, subagents, background tasks), not just the main
+	// loop, and is the field to use for cost accounting. Port of TypeScript
+	// SDK v0.3.218 / Python SDK v0.2.126; cumulative-vs-per-turn distinction
+	// documented in TypeScript SDK v0.3.223. ([#563])
+	ModelUsage       map[string]ModelUsage `json:"model_usage,omitempty"`
+	Result           string                `json:"result,omitempty"`
+	StructuredOutput any                   `json:"structured_output,omitempty"`
 	// DeferredToolUse is populated when a PreToolUse hook returned
 	// {"decision": "defer"}, surfacing the pending tool call so the caller
 	// can prompt the user and resume. Nil when no deferral occurred.
@@ -1229,6 +1355,31 @@ type ModelScopedUsage struct {
 	CacheReadInputTokens int `json:"cache_read_input_tokens,omitempty"`
 }
 
+// ModelUsage holds the per-model token usage and cost breakdown reported on
+// ResultMessage.ModelUsage. Field names mirror the TypeScript SDK's
+// ModelUsage shape verbatim, since the CLI's raw modelUsage entries are
+// passed through as-is. Port of TypeScript SDK v0.3.218 / Python SDK
+// v0.2.126.
+type ModelUsage struct {
+	InputTokens              int     `json:"inputTokens"`
+	OutputTokens             int     `json:"outputTokens"`
+	CacheReadInputTokens     int     `json:"cacheReadInputTokens"`
+	CacheCreationInputTokens int     `json:"cacheCreationInputTokens"`
+	WebSearchRequests        int     `json:"webSearchRequests"`
+	CostUSD                  float64 `json:"costUSD"`
+	ContextWindow            int     `json:"contextWindow"`
+	MaxOutputTokens          int     `json:"maxOutputTokens"`
+	// CanonicalModel is the canonical model id used for the pricing lookup
+	// (e.g. "claude-opus-4-8"), which may differ from the raw model string
+	// this entry is keyed by (provider-specific ids, aliases). Empty when
+	// not provided by the CLI.
+	CanonicalModel string `json:"canonicalModel,omitempty"`
+	// Provider is the API provider that served this model ("firstParty",
+	// "bedrock", "vertex", "foundry", "anthropicAws", "anthropicGoogleCloud",
+	// "mantle", "gateway"). Empty when not provided by the CLI.
+	Provider string `json:"provider,omitempty"`
+}
+
 // UsageDataExperimental contains session cost, plan rate-limit, and local
 // usage data returned by Client.GetUsageExperimental.
 //
@@ -1286,6 +1437,13 @@ type InterruptReceipt struct {
 	// auto-resume continuations) — treat unknown uuids as informational
 	// rather than an error.
 	StillQueued []string
+	// Cancelled lists uuids of main-thread commands cancelled by this
+	// interrupt. Populated only by [Client.InterruptCancelQueued] on CLIs
+	// advertising the "interrupt_cancel_queued_v1" protocol capability (see
+	// [ServerCapabilities.Capabilities]); nil for [Client.Interrupt] and on
+	// older CLIs, in which case StillQueued reports the same commands
+	// instead. Port of TypeScript SDK v0.3.219.
+	Cancelled []string
 }
 
 // RewindFilesResult is the result of a [Client.RewindFiles] operation.
@@ -1331,6 +1489,15 @@ type ServerCapabilities struct {
 	// SupportsFastMode is true when the current model supports fast mode
 	// (e.g. Opus fast mode). Port of TypeScript SDK v0.2.69.
 	SupportsFastMode bool `json:"supportsFastMode"`
+	// FastModeState reports whether fast inference mode is currently active
+	// for the session, distinct from SupportsFastMode's static per-model
+	// capability bit. Empty on CLIs that predate this field. Port of
+	// TypeScript SDK v0.3.219.
+	FastModeState FastModeState `json:"fast_mode_state,omitempty"`
+	// FastModeDisabledReason explains why FastModeState isn't
+	// FastModeStateOn. Empty when fast mode is on or the CLI didn't report a
+	// reason. Port of TypeScript SDK v0.3.219.
+	FastModeDisabledReason FastModeDisabledReason `json:"fast_mode_disabled_reason,omitempty"`
 	// MemoryPaths is the list of memory file paths loaded at session initialization.
 	// Empty when no memory files are configured.
 	MemoryPaths []string `json:"memoryPaths,omitempty"`
@@ -1339,8 +1506,10 @@ type ServerCapabilities struct {
 	// set: ignore unknown values and check only for the specific values you
 	// use. Known values include "interrupt_receipt_v1" (the interrupt
 	// control response's success payload carries a still_queued list of
-	// uuids). Empty on CLIs that predate this field. Port of TypeScript SDK
-	// v0.3.205.
+	// uuids) and "interrupt_cancel_queued_v1" ([Client.InterruptCancelQueued]
+	// is honored; cancelled commands are listed under the response's
+	// cancelled field). Empty on CLIs that predate this field. Port of
+	// TypeScript SDK v0.3.205 / v0.3.219.
 	Capabilities []string `json:"capabilities,omitempty"`
 }
 

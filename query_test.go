@@ -288,6 +288,116 @@ func TestWaitForResultAndEndInput_BackgroundAgentResultDoesNotTriggerEndInput(t 
 	}
 }
 
+// mainResultChClosed reports whether q.mainResultCh has been closed, without blocking.
+func mainResultChClosed(q *query) bool {
+	select {
+	case <-q.mainResultCh:
+		return true
+	default:
+		return false
+	}
+}
+
+// TestReadMessages_InFlightTaskDelaysMainResultClose drains a background
+// task lifecycle (task_started for a deferring task_type, then
+// task_notification) through readMessages and verifies mainResultCh only
+// closes on the main-session result that arrives once the task is no longer
+// in flight — reproducing the fix for Python SDK #1088/#1103 (a background
+// task still needing stdin for hook/SDK-MCP control responses past the
+// first result frame).
+func TestReadMessages_InFlightTaskDelaysMainResultClose(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	out := q.receiveMessages()
+	drain := func(n int) {
+		for i := 0; i < n; i++ {
+			select {
+			case <-out:
+			case <-time.After(time.Second):
+				t.Fatalf("timed out draining message %d/%d", i+1, n)
+			}
+		}
+	}
+
+	mt.messages <- map[string]any{
+		"type": "system", "subtype": "task_started",
+		"task_id": "t1", "task_type": "local_agent",
+	}
+	mt.messages <- map[string]any{"type": "result", "subtype": "success"}
+	drain(2)
+
+	time.Sleep(50 * time.Millisecond)
+	if mainResultChClosed(q) {
+		t.Fatal("mainResultCh must not close while task t1 is in flight")
+	}
+
+	mt.messages <- map[string]any{
+		"type": "system", "subtype": "task_notification",
+		"task_id": "t1", "status": "completed",
+	}
+	mt.messages <- map[string]any{"type": "result", "subtype": "success"}
+	drain(2)
+
+	deadline := time.After(time.Second)
+	for !mainResultChClosed(q) {
+		select {
+		case <-deadline:
+			t.Fatal("mainResultCh did not close after task t1 completed and a follow-up main-session result arrived")
+		case <-time.After(time.Millisecond):
+		}
+	}
+}
+
+// TestReadMessages_InFlightTaskViaTaskUpdatedDelaysMainResultClose is the
+// same as TestReadMessages_InFlightTaskDelaysMainResultClose, but clears the
+// in-flight task via a terminal task_updated patch instead of
+// task_notification (background tasks may reach a terminal state via either
+// message).
+func TestReadMessages_InFlightTaskViaTaskUpdatedDelaysMainResultClose(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	out := q.receiveMessages()
+	drain := func(n int) {
+		for i := 0; i < n; i++ {
+			select {
+			case <-out:
+			case <-time.After(time.Second):
+				t.Fatalf("timed out draining message %d/%d", i+1, n)
+			}
+		}
+	}
+
+	mt.messages <- map[string]any{
+		"type": "system", "subtype": "task_started",
+		"task_id": "t1", "task_type": "local_workflow",
+	}
+	mt.messages <- map[string]any{"type": "result", "subtype": "success"}
+	drain(2)
+
+	time.Sleep(50 * time.Millisecond)
+	if mainResultChClosed(q) {
+		t.Fatal("mainResultCh must not close while task t1 is in flight")
+	}
+
+	mt.messages <- map[string]any{
+		"type": "system", "subtype": "task_updated",
+		"task_id": "t1", "patch": map[string]any{"status": "completed"},
+	}
+	mt.messages <- map[string]any{"type": "result", "subtype": "success"}
+	drain(2)
+
+	deadline := time.After(time.Second)
+	for !mainResultChClosed(q) {
+		select {
+		case <-deadline:
+			t.Fatal("mainResultCh did not close after task t1 completed and a follow-up main-session result arrived")
+		case <-time.After(time.Millisecond):
+		}
+	}
+}
+
 // autoRespondTransport extends mockTransport to automatically respond to control requests.
 // It overrides ReadMessages to respect context cancellation, so query.close() doesn't deadlock.
 type autoRespondTransport struct {
@@ -1043,7 +1153,7 @@ func TestInterrupt_PopulatesStillQueued(t *testing.T) {
 	q.start()
 	defer func() { _ = q.close() }()
 
-	receipt, err := q.interrupt(context.Background())
+	receipt, err := q.interrupt(context.Background(), false)
 	if err != nil {
 		t.Fatalf("interrupt failed: %v", err)
 	}
@@ -1070,7 +1180,7 @@ func TestInterrupt_OlderCLIOmitsStillQueued(t *testing.T) {
 	q.start()
 	defer func() { _ = q.close() }()
 
-	receipt, err := q.interrupt(context.Background())
+	receipt, err := q.interrupt(context.Background(), false)
 	if err != nil {
 		t.Fatalf("interrupt failed: %v", err)
 	}
@@ -1079,6 +1189,51 @@ func TestInterrupt_OlderCLIOmitsStillQueued(t *testing.T) {
 	}
 	if receipt.StillQueued != nil {
 		t.Fatalf("StillQueued = %v, want nil", receipt.StillQueued)
+	}
+}
+
+// TestInterrupt_CancelQueuedSendsFlagAndPopulatesCancelled verifies that
+// query.interrupt(ctx, true) sends "cancel_queued": true on the wire and
+// surfaces the response's "cancelled" uuids on InterruptReceipt.Cancelled.
+// Port of TypeScript SDK v0.3.219.
+func TestInterrupt_CancelQueuedSendsFlagAndPopulatesCancelled(t *testing.T) {
+	mt := newInterruptRespondTransport(map[string]any{
+		"still_queued": []any{},
+		"cancelled":    []any{"uuid-3", "uuid-4"},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	receipt, err := q.interrupt(context.Background(), true)
+	if err != nil {
+		t.Fatalf("interrupt failed: %v", err)
+	}
+	if receipt == nil {
+		t.Fatal("expected non-nil receipt")
+	}
+	want := []string{"uuid-3", "uuid-4"}
+	if len(receipt.Cancelled) != len(want) {
+		t.Fatalf("Cancelled = %v, want %v", receipt.Cancelled, want)
+	}
+	for i, s := range want {
+		if receipt.Cancelled[i] != s {
+			t.Fatalf("Cancelled[%d] = %q, want %q", i, receipt.Cancelled[i], s)
+		}
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"cancel_queued":true`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written control_request containing cancel_queued:true, got %v", written)
 	}
 }
 

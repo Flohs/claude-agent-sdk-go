@@ -94,7 +94,7 @@ func init() {
 const (
 	defaultMaxBufferSize     = 1024 * 1024 // 1MB
 	minimumClaudeCodeVersion = "2.1.90"
-	sdkVersion               = "2.3.0"
+	sdkVersion               = "3.0.0"
 
 	// stderrMaxBytes caps the rolling stderr buffer at ~8 KB.
 	stderrMaxBytes = 8 * 1024
@@ -152,6 +152,10 @@ func NewSubprocessTransport(opts *Options) (*SubprocessTransport, error) {
 	}
 
 	if err := validatePermissionMode(opts.PermissionMode); err != nil {
+		return nil, err
+	}
+
+	if err := validateSkills(opts.Skills); err != nil {
 		return nil, err
 	}
 
@@ -723,6 +727,14 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = appendFlagValue(cmd, "resume", opts.Resume)
 	}
 
+	if opts.ResumeSessionAt != "" {
+		cmd = appendFlagValue(cmd, "resume-session-at", opts.ResumeSessionAt)
+	}
+
+	if opts.ResumeDropsTurn != "" {
+		cmd = appendFlagValue(cmd, "resume-drops-turn", opts.ResumeDropsTurn)
+	}
+
 	if opts.SessionID != "" {
 		cmd = appendFlagValue(cmd, "session-id", opts.SessionID)
 	}
@@ -939,12 +951,13 @@ func normaliseDisallowedTools(tools []string) []string {
 func (t *SubprocessTransport) buildSettingsValue() string {
 	hasSettings := t.options.Settings != ""
 	hasSandbox := t.options.Sandbox != nil
+	hasWorkflowSizeGuideline := t.options.WorkflowSizeGuideline != ""
 
-	if !hasSettings && !hasSandbox {
+	if !hasSettings && !hasSandbox && !hasWorkflowSizeGuideline {
 		return ""
 	}
 
-	if hasSettings && !hasSandbox {
+	if hasSettings && !hasSandbox && !hasWorkflowSizeGuideline {
 		return t.options.Settings
 	}
 
@@ -964,6 +977,10 @@ func (t *SubprocessTransport) buildSettingsValue() string {
 
 	if hasSandbox {
 		settingsObj["sandbox"] = t.options.Sandbox
+	}
+
+	if hasWorkflowSizeGuideline {
+		settingsObj["workflowSizeGuideline"] = t.options.WorkflowSizeGuideline
 	}
 
 	data, _ := json.Marshal(settingsObj)

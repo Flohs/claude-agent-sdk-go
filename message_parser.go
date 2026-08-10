@@ -378,6 +378,15 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			DenialReason:  PermissionDeniedAdvisoryReason(stringField(data, "denial_reason")),
 		}, nil
 
+	case "permission_denied":
+		return &PermissionDeniedMessage{
+			SystemMessage: base,
+			ToolName:      stringField(data, "tool_name"),
+			ToolInput:     data["tool_input"],
+			ToolUseID:     stringField(data, "tool_use_id"),
+			Reason:        stringField(data, "reason"),
+		}, nil
+
 	default:
 		return &base, nil
 	}
@@ -385,14 +394,18 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 
 func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 	msg := &ResultMessage{
-		Subtype:         stringField(data, "subtype"),
-		DurationMs:      intField(data, "duration_ms"),
-		DurationAPIMs:   intField(data, "duration_api_ms"),
-		IsError:         boolField(data, "is_error"),
-		NumTurns:        intField(data, "num_turns"),
-		SessionID:       stringField(data, "session_id"),
-		StopReason:      stringField(data, "stop_reason"),
-		TerminalReason:  stringField(data, "terminal_reason"),
+		Subtype:        stringField(data, "subtype"),
+		DurationMs:     intField(data, "duration_ms"),
+		DurationAPIMs:  intField(data, "duration_api_ms"),
+		IsError:        boolField(data, "is_error"),
+		NumTurns:       intField(data, "num_turns"),
+		SessionID:      stringField(data, "session_id"),
+		StopReason:     stringField(data, "stop_reason"),
+		TerminalReason: stringField(data, "terminal_reason"),
+		FastModeState:  FastModeState(stringField(data, "fast_mode_state")),
+		FastModeDisabledReason: FastModeDisabledReason(
+			stringField(data, "fast_mode_disabled_reason"),
+		),
 		Origin:          parseMessageOrigin(data),
 		RequestID:       stringField(data, "request_id"),
 		Result:          stringField(data, "result"),
@@ -426,6 +439,9 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 	if usage, ok := data["usage"].(map[string]any); ok {
 		msg.Usage = usage
 	}
+	if mu, ok := data["modelUsage"].(map[string]any); ok {
+		msg.ModelUsage = parseModelUsage(mu)
+	}
 	msg.StructuredOutput = data["structured_output"]
 
 	if dtu, ok := data["deferred_tool_use"].(map[string]any); ok {
@@ -439,6 +455,31 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 	msg.RawData = data
 
 	return msg, nil
+}
+
+// parseModelUsage converts the CLI's raw modelUsage map (model name ->
+// per-model usage/cost fields) into typed ModelUsage entries.
+func parseModelUsage(raw map[string]any) map[string]ModelUsage {
+	result := make(map[string]ModelUsage, len(raw))
+	for model, v := range raw {
+		m, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		result[model] = ModelUsage{
+			InputTokens:              intField(m, "inputTokens"),
+			OutputTokens:             intField(m, "outputTokens"),
+			CacheReadInputTokens:     intField(m, "cacheReadInputTokens"),
+			CacheCreationInputTokens: intField(m, "cacheCreationInputTokens"),
+			WebSearchRequests:        intField(m, "webSearchRequests"),
+			CostUSD:                  float64FromAny(m["costUSD"]),
+			ContextWindow:            intField(m, "contextWindow"),
+			MaxOutputTokens:          intField(m, "maxOutputTokens"),
+			CanonicalModel:           stringField(m, "canonicalModel"),
+			Provider:                 stringField(m, "provider"),
+		}
+	}
+	return result
 }
 
 func parseStreamEvent(data map[string]any) (*StreamEvent, error) {
@@ -670,6 +711,19 @@ func int64FromAny(v any) int64 {
 		return int64(n)
 	case int64:
 		return n
+	default:
+		return 0
+	}
+}
+
+func float64FromAny(v any) float64 {
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int:
+		return float64(n)
+	case int64:
+		return float64(n)
 	default:
 		return 0
 	}

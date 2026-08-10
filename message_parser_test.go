@@ -578,6 +578,72 @@ func TestParseMessage_ResultMessage_TerminalReason(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_FastMode(t *testing.T) {
+	data := map[string]any{
+		"type":                      "result",
+		"subtype":                   "success",
+		"duration_ms":               1000,
+		"duration_api_ms":           900,
+		"is_error":                  false,
+		"num_turns":                 1,
+		"session_id":                "s",
+		"fast_mode_state":           "cooldown",
+		"fast_mode_disabled_reason": "extra_usage_disabled",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := msg.(*ResultMessage)
+	if result.FastModeState != FastModeStateCooldown {
+		t.Errorf("FastModeState = %q, want %q", result.FastModeState, FastModeStateCooldown)
+	}
+	if result.FastModeDisabledReason != FastModeDisabledReasonExtraUsageDisabled {
+		t.Errorf("FastModeDisabledReason = %q, want %q", result.FastModeDisabledReason, FastModeDisabledReasonExtraUsageDisabled)
+	}
+}
+
+func TestParseMessage_ResultMessage_ModelUsage(t *testing.T) {
+	data := map[string]any{
+		"type":            "result",
+		"subtype":         "success",
+		"duration_ms":     1000,
+		"duration_api_ms": 900,
+		"is_error":        false,
+		"num_turns":       1,
+		"session_id":      "s",
+		"modelUsage": map[string]any{
+			"claude-opus-4-8": map[string]any{
+				"inputTokens":              float64(100),
+				"outputTokens":             float64(50),
+				"cacheReadInputTokens":     float64(10),
+				"cacheCreationInputTokens": float64(5),
+				"webSearchRequests":        float64(2),
+				"costUSD":                  0.25,
+				"contextWindow":            float64(200000),
+				"maxOutputTokens":          float64(8192),
+				"canonicalModel":           "claude-opus-4-7",
+				"provider":                 "firstParty",
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := msg.(*ResultMessage)
+	u, ok := result.ModelUsage["claude-opus-4-8"]
+	if !ok {
+		t.Fatalf("expected model usage entry for claude-opus-4-8, got %v", result.ModelUsage)
+	}
+	if u.InputTokens != 100 || u.OutputTokens != 50 || u.CacheReadInputTokens != 10 ||
+		u.CacheCreationInputTokens != 5 || u.WebSearchRequests != 2 || u.CostUSD != 0.25 ||
+		u.ContextWindow != 200000 || u.MaxOutputTokens != 8192 ||
+		u.CanonicalModel != "claude-opus-4-7" || u.Provider != "firstParty" {
+		t.Errorf("unexpected ModelUsage entry: %+v", u)
+	}
+}
+
 func TestParseMessage_ResultMessage_StopReasonPresent(t *testing.T) {
 	data := map[string]any{
 		"type":        "result",
@@ -1180,8 +1246,35 @@ func TestParseMessage_ResultMessage_Origin(t *testing.T) {
 	if r.Origin.Kind != MessageOriginKindTaskNotification {
 		t.Errorf("Origin.Kind = %q, want %q", r.Origin.Kind, MessageOriginKindTaskNotification)
 	}
-	if r.Origin.Subkind != "scheduled-trigger" {
-		t.Errorf("Origin.Subkind = %q, want scheduled-trigger", r.Origin.Subkind)
+	if r.Origin.Subkind != MessageOriginSubkindScheduledTrigger {
+		t.Errorf("Origin.Subkind = %q, want %q", r.Origin.Subkind, MessageOriginSubkindScheduledTrigger)
+	}
+}
+
+func TestParseMessage_ResultMessage_Origin_PeerSendMessage(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+		"origin": map[string]any{
+			"kind":    "task-notification",
+			"subkind": "peer-send-message",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.Origin == nil {
+		t.Fatal("Origin = nil, want non-nil")
+	}
+	if r.Origin.Kind != MessageOriginKindTaskNotification {
+		t.Errorf("Origin.Kind = %q, want %q", r.Origin.Kind, MessageOriginKindTaskNotification)
+	}
+	if r.Origin.Subkind != MessageOriginSubkindPeerSendMessage {
+		t.Errorf("Origin.Subkind = %q, want %q", r.Origin.Subkind, MessageOriginSubkindPeerSendMessage)
 	}
 }
 
@@ -1650,6 +1743,68 @@ func TestParsePermissionDeniedAdvisoryMessage_Minimal(t *testing.T) {
 	}
 	if m.DenialReason != "" {
 		t.Errorf("DenialReason should be empty, got %q", m.DenialReason)
+	}
+}
+
+func TestParsePermissionDeniedMessage(t *testing.T) {
+	data := map[string]any{
+		"type":        "system",
+		"subtype":     "permission_denied",
+		"tool_name":   "Bash",
+		"tool_input":  map[string]any{"command": "rm -rf /"},
+		"tool_use_id": "toolu_123",
+		"reason":      "auto-denied in bare headless mode",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*PermissionDeniedMessage)
+	if !ok {
+		t.Fatalf("expected *PermissionDeniedMessage, got %T", msg)
+	}
+	if m.ToolName != "Bash" {
+		t.Errorf("ToolName = %q, want %q", m.ToolName, "Bash")
+	}
+	if m.ToolUseID != "toolu_123" {
+		t.Errorf("ToolUseID = %q, want %q", m.ToolUseID, "toolu_123")
+	}
+	if m.Reason != "auto-denied in bare headless mode" {
+		t.Errorf("Reason = %q, want %q", m.Reason, "auto-denied in bare headless mode")
+	}
+	toolInput, ok := m.ToolInput.(map[string]any)
+	if !ok {
+		t.Fatalf("expected ToolInput to be map[string]any, got %T", m.ToolInput)
+	}
+	if toolInput["command"] != "rm -rf /" {
+		t.Errorf("ToolInput[command] = %v, want %q", toolInput["command"], "rm -rf /")
+	}
+}
+
+func TestParsePermissionDeniedMessage_Minimal(t *testing.T) {
+	data := map[string]any{
+		"type":    "system",
+		"subtype": "permission_denied",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := msg.(*PermissionDeniedMessage)
+	if !ok {
+		t.Fatalf("expected *PermissionDeniedMessage, got %T", msg)
+	}
+	if m.ToolName != "" {
+		t.Errorf("ToolName should be empty, got %q", m.ToolName)
+	}
+	if m.ToolInput != nil {
+		t.Errorf("ToolInput should be nil, got %v", m.ToolInput)
+	}
+	if m.ToolUseID != "" {
+		t.Errorf("ToolUseID should be empty, got %q", m.ToolUseID)
+	}
+	if m.Reason != "" {
+		t.Errorf("Reason should be empty, got %q", m.Reason)
 	}
 }
 

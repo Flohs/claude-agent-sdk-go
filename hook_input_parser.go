@@ -44,10 +44,10 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 
 	case HookEventPermissionRequest:
 		return &PermissionRequestHookInput{
-			BaseHookInput:   base,
-			SubagentContext: parseSubagentContext(input),
-			ToolName:        stringField(input, "tool_name"),
-			ToolInput:       mapField(input, "tool_input"),
+			BaseHookInput:         base,
+			SubagentContext:       parseSubagentContext(input),
+			ToolName:              stringField(input, "tool_name"),
+			ToolInput:             mapField(input, "tool_input"),
 			PermissionSuggestions: mapSliceField(input, "permission_suggestions"),
 		}, nil
 
@@ -59,8 +59,11 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 
 	case HookEventStop:
 		return &StopHookInput{
-			BaseHookInput:  base,
-			StopHookActive: boolField(input, "stop_hook_active"),
+			BaseHookInput:        base,
+			StopHookActive:       boolField(input, "stop_hook_active"),
+			LastAssistantMessage: stringField(input, "last_assistant_message"),
+			BackgroundTasks:      parseBackgroundTaskSummaries(input, "background_tasks"),
+			SessionCrons:         parseSessionCronSummaries(input, "session_crons"),
 		}, nil
 
 	case HookEventSubagentStop:
@@ -147,7 +150,12 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 		return &SessionEndHookInput{BaseHookInput: base}, nil
 
 	case HookEventStopFailure:
-		return &StopFailureHookInput{BaseHookInput: base}, nil
+		return &StopFailureHookInput{
+			BaseHookInput:        base,
+			Error:                AssistantMessageError(stringField(input, "error")),
+			ErrorDetails:         stringField(input, "error_details"),
+			LastAssistantMessage: stringField(input, "last_assistant_message"),
+		}, nil
 
 	case HookEventPostCompact:
 		return &PostCompactHookInput{
@@ -219,6 +227,13 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			BaseHookInput: base,
 			FilePath:      stringField(input, "file_path"),
 			ChangeType:    stringField(input, "change_type"),
+		}, nil
+
+	case HookEventDirectoryAdded:
+		return &DirectoryAddedHookInput{
+			BaseHookInput: base,
+			Directory:     stringField(input, "directory"),
+			Source:        stringField(input, "source"),
 		}, nil
 
 	case HookEventWorktreeCreate:
@@ -311,6 +326,53 @@ func mapSliceField(m map[string]any, key string) []map[string]any {
 		if entry, ok := item.(map[string]any); ok {
 			result = append(result, entry)
 		}
+	}
+	return result
+}
+
+func parseBackgroundTaskSummaries(m map[string]any, key string) []BackgroundTaskSummary {
+	raw, _ := m[key].([]any)
+	if raw == nil {
+		return nil
+	}
+	result := make([]BackgroundTaskSummary, 0, len(raw))
+	for _, item := range raw {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		result = append(result, BackgroundTaskSummary{
+			ID:          stringField(entry, "id"),
+			Type:        stringField(entry, "type"),
+			Status:      stringField(entry, "status"),
+			Description: stringField(entry, "description"),
+			Command:     stringField(entry, "command"),
+			AgentType:   stringField(entry, "agent_type"),
+			Server:      stringField(entry, "server"),
+			Tool:        stringField(entry, "tool"),
+			Name:        stringField(entry, "name"),
+		})
+	}
+	return result
+}
+
+func parseSessionCronSummaries(m map[string]any, key string) []SessionCronSummary {
+	raw, _ := m[key].([]any)
+	if raw == nil {
+		return nil
+	}
+	result := make([]SessionCronSummary, 0, len(raw))
+	for _, item := range raw {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		result = append(result, SessionCronSummary{
+			ID:        stringField(entry, "id"),
+			Schedule:  stringField(entry, "schedule"),
+			Recurring: boolField(entry, "recurring"),
+			Prompt:    stringField(entry, "prompt"),
+		})
 	}
 	return result
 }

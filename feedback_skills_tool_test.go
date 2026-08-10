@@ -90,3 +90,27 @@ func TestProposeSkillsOutput_DecodesFromToolResponse(t *testing.T) {
 		t.Errorf("ProposalCount = %d, want 2", out.ProposalCount)
 	}
 }
+
+func TestSkillToolOutput_DecodesFromToolResponse_Background(t *testing.T) {
+	toolResponse := map[string]any{
+		"background": true,
+	}
+
+	var out SkillToolOutput
+	decodeToolUseResult(t, toolResponse, &out)
+
+	if !out.Background {
+		t.Error("Background = false, want true")
+	}
+}
+
+func TestSkillToolOutput_DecodesFromToolResponse_Inline(t *testing.T) {
+	toolResponse := map[string]any{}
+
+	var out SkillToolOutput
+	decodeToolUseResult(t, toolResponse, &out)
+
+	if out.Background {
+		t.Error("Background = true, want false when the key is absent (inline skill run)")
+	}
+}

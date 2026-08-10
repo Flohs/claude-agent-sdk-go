@@ -43,6 +43,17 @@ type query struct {
 	inFlightMu              sync.Mutex
 	inFlightControlRequests map[string]struct{}
 
+	// inFlightTasks tracks background task IDs (task_started with a
+	// deferring task_type) that have not yet reached a terminal state via
+	// task_notification or a terminated task_updated patch. A main-session
+	// result frame ends one turn, not necessarily the run — a background
+	// task keeps running past it and still needs stdin for hook/SDK-MCP
+	// control responses — so waitForResultAndEndInput must not end input
+	// while this set is non-empty. Only ever touched from the readMessages
+	// goroutine, so no locking is required. Port of Python SDK commit
+	// e6e07f1 (#1103, fixing #1088).
+	inFlightTasks map[string]struct{}
+
 	// Message channel
 	messageCh chan map[string]any
 
@@ -140,6 +151,7 @@ func newQuery(cfg queryConfig) *query {
 		pendingEvents:           make(map[string]chan struct{}),
 		pendingResults:          make(map[string]any),
 		inFlightControlRequests: make(map[string]struct{}),
+		inFlightTasks:           make(map[string]struct{}),
 		messageCh:               make(chan map[string]any, 100),
 		initTimeout:             initTimeout,
 		firstResultCh:           make(chan struct{}),
@@ -306,6 +318,43 @@ func newMirrorErrorUUID() string {
 	return generateUUID()
 }
 
+// deferringTaskTypes are task_started task_type values whose lifetime must
+// be tracked before ending input on a main-session result: these task types
+// keep running, and needing the control channel, past the main session's
+// own turn-ending result. Mirrors the Python SDK's DEFERRING_TASK_TYPES.
+var deferringTaskTypes = map[string]bool{
+	"local_agent":    true,
+	"local_workflow": true,
+}
+
+// trackTaskLifecycle updates q.inFlightTasks from a raw system message, so
+// waitForResultAndEndInput can tell whether a background task is still
+// running when a main-session result arrives. Mirrors the Python SDK's
+// _track_task_lifecycle. Must only be called from the readMessages
+// goroutine (no locking; see inFlightTasks doc comment).
+func (q *query) trackTaskLifecycle(msg map[string]any) {
+	taskID, _ := msg["task_id"].(string)
+	if taskID == "" {
+		return
+	}
+
+	switch subtype, _ := msg["subtype"].(string); subtype {
+	case "task_started":
+		taskType, _ := msg["task_type"].(string)
+		if deferringTaskTypes[taskType] {
+			q.inFlightTasks[taskID] = struct{}{}
+		}
+	case "task_notification":
+		delete(q.inFlightTasks, taskID)
+	case "task_updated":
+		if patch, ok := msg["patch"].(map[string]any); ok {
+			if status, ok := patch["status"].(string); ok && TerminalTaskStatuses[TaskUpdatedStatus(status)] {
+				delete(q.inFlightTasks, taskID)
+			}
+		}
+	}
+}
+
 func (q *query) readMessages() {
 	defer q.wg.Done()
 	defer func() {
@@ -388,6 +437,13 @@ func (q *query) readMessages() {
 			continue
 		}
 
+		// Track background-task lifecycle from system messages so a
+		// main-session result arriving while a task is still in flight
+		// doesn't prematurely close stdin (see inFlightTasks doc comment).
+		if msgType == "system" {
+			q.trackTaskLifecycle(msg)
+		}
+
 		// Flush the batcher before yielding each result message so any
 		// entries emitted during the turn land in the store before the
 		// caller observes the result. Runs in a goroutine with a bounded
@@ -412,10 +468,19 @@ func (q *query) readMessages() {
 		// hooks) is already accessible to consumers.
 		if msgType == "result" {
 			q.firstResultOnce.Do(func() { close(q.firstResultCh) })
-			// Close mainResultCh only for the main-session result (no origin).
-			// Background-agent results carry a structured origin object and
-			// must not trigger stdin close, as the main turn is still running.
-			if parseMessageOrigin(msg) == nil {
+			// Close mainResultCh only for a run-ending main-session result:
+			// one with no origin (background-agent results carry a
+			// structured origin object and must not trigger stdin close, as
+			// the main turn is still running) AND no background tasks still
+			// in flight (a result frame ends one turn, not necessarily the
+			// run — a background task keeps running past it and still needs
+			// stdin for hook/SDK-MCP control responses). If tasks are still
+			// in flight, this result is skipped and a later main-session
+			// result (every task completion wakes the parent for a
+			// follow-up turn, which ends in such a result) will close it
+			// instead. Port of Python SDK commit e6e07f1 (#1103, fixing
+			// #1088).
+			if parseMessageOrigin(msg) == nil && len(q.inFlightTasks) == 0 {
 				q.mainResultOnce.Do(func() { close(q.mainResultCh) })
 			}
 		}
@@ -886,7 +951,7 @@ func (q *query) receiveMessages() <-chan map[string]any {
 	return out
 }
 
-func (q *query) interrupt(ctx context.Context) (*InterruptReceipt, error) {
+func (q *query) interrupt(ctx context.Context, cancelQueued bool) (*InterruptReceipt, error) {
 	// Run sendControlRequest in a goroutine so we can select on ctx.Done()
 	// for both deadline expiry and explicit cancellation. The underlying
 	// request still runs to completion (best-effort signal to the subprocess),
@@ -895,9 +960,13 @@ func (q *query) interrupt(ctx context.Context) (*InterruptReceipt, error) {
 		resp map[string]any
 		err  error
 	}
+	req := map[string]any{"subtype": "interrupt"}
+	if cancelQueued {
+		req["cancel_queued"] = true
+	}
 	ch := make(chan result, 1)
 	go func() {
-		resp, err := q.sendControlRequest(map[string]any{"subtype": "interrupt"}, 30*time.Second)
+		resp, err := q.sendControlRequest(req, 30*time.Second)
 		ch <- result{resp, err}
 	}()
 	select {
@@ -910,6 +979,13 @@ func (q *query) interrupt(ctx context.Context) (*InterruptReceipt, error) {
 			for _, v := range stillQueued {
 				if s, ok := v.(string); ok {
 					receipt.StillQueued = append(receipt.StillQueued, s)
+				}
+			}
+		}
+		if cancelled, ok := r.resp["cancelled"].([]any); ok {
+			for _, v := range cancelled {
+				if s, ok := v.(string); ok {
+					receipt.Cancelled = append(receipt.Cancelled, s)
 				}
 			}
 		}
@@ -1231,9 +1307,15 @@ func (q *query) streamInput(inputCh <-chan map[string]any) {
 	q.waitForResultAndEndInput()
 }
 
-// waitForResultAndEndInput waits for the first result before closing stdin
-// when SDK MCP servers or hooks are configured. This prevents closing stdin
-// before the CLI completes the MCP initialization handshake.
+// waitForResultAndEndInput waits for a run-ending result — a main-session
+// result with no background tasks in flight — before closing stdin, when
+// SDK MCP servers or hooks are configured. This prevents closing stdin
+// before the CLI completes the MCP initialization handshake, and prevents
+// closing it while a background task still needs the control channel for
+// hook/SDK-MCP responses (mainResultCh is only closed under that
+// condition; see its gating in readMessages). Bounded by streamCloseTimeout
+// and ctx cancellation so a run that never satisfies this condition can't
+// hang forever.
 func (q *query) waitForResultAndEndInput() {
 	hasHooks := len(q.hooks) > 0
 	hasMcpServers := len(q.mcpRouter.servers) > 0

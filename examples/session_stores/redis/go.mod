@@ -3,8 +3,8 @@ module github.com/Flohs/claude-agent-sdk-go/examples/session_stores/redis
 go 1.26.1
 
 require (
-	github.com/Flohs/claude-agent-sdk-go/v2 v2.0.0-00010101000000-000000000000
+	github.com/Flohs/claude-agent-sdk-go/v3 v3.0.0-00010101000000-000000000000
 	github.com/redis/go-redis/v9 v9.7.3
 )
 
-replace github.com/Flohs/claude-agent-sdk-go/v2 => ../../../
+replace github.com/Flohs/claude-agent-sdk-go/v3 => ../../../

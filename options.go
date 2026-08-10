@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Model string constants for use with Options.Model.
@@ -77,6 +79,100 @@ func validatePermissionMode(mode PermissionMode) error {
 		"invalid PermissionMode %q: must be one of %s",
 		string(mode), strings.Join(valid, ", "),
 	)}
+}
+
+// validateSkills rejects an Options.Skills value that isn't nil, "all", or
+// []string, and validates every name in a []string. Names are formatted by
+// applySkillsDefaults into "Skill(name)" rules joined into the CLI's
+// --allowedTools argument, which is tokenized on commas and spaces outside
+// parentheses with no escape sequences — a name carrying one of those
+// delimiters cannot be passed through reliably. Names that tokenize cleanly
+// but can never match the listed skill (surrounding whitespace, a leading
+// "/", a wildcard suffix) are rejected too, so a dead rule fails loudly here
+// instead of silently granting nothing. Port of Python SDK PR
+// anthropics/claude-agent-sdk-python#1145, mirrored in TypeScript SDK
+// v0.3.221. ([#557](https://github.com/Flohs/claude-agent-sdk-go/issues/557))
+func validateSkills(skills any) error {
+	if skills == nil {
+		return nil
+	}
+	switch s := skills.(type) {
+	case string:
+		if s == "all" {
+			return nil
+		}
+		return &SDKError{Message: fmt.Sprintf(
+			`Options.Skills must be []string or "all", got %q. Did you mean []string{%q}?`,
+			s, s,
+		)}
+	case []string:
+		for _, name := range s {
+			if err := validateSkillName(name); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		return &SDKError{Message: fmt.Sprintf(
+			`Options.Skills must be []string or "all", got %T`, skills,
+		)}
+	}
+}
+
+// validateSkillName rejects a single skill name unsafe for or unable to
+// match through a "Skill(name)" --allowedTools rule. See validateSkills.
+func validateSkillName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return &SDKError{Message: "skill names must be non-empty strings"}
+	}
+	if !utf8.ValidString(name) {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: not valid UTF-8, which can never match a skill the CLI discovered",
+			name,
+		)}
+	}
+	if strings.TrimSpace(name) != name {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: leading or trailing whitespace can never match — the Skill tool trims the invoked name",
+			name,
+		)}
+	}
+	for _, r := range name {
+		if r == '(' || r == ')' || r == ',' || r == '\ufeff' || unicode.IsControl(r) {
+			return &SDKError{Message: fmt.Sprintf(
+				"invalid skill name %q: parentheses, commas, control characters, and byte-order marks are not allowed. Names match the skill's directory name, or \"plugin:skill\" for plugin-qualified skills",
+				name,
+			)}
+		}
+	}
+	if name == "*" {
+		return &SDKError{Message: `invalid skill name "*": use Skills: "all" to enable every skill`}
+	}
+	if strings.HasSuffix(name, ":*") || strings.HasSuffix(name, " *") {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: wildcard-suffix names are not allowed; list each skill by its exact name",
+			name,
+		)}
+	}
+	if strings.HasPrefix(name, "/") {
+		return &SDKError{Message: fmt.Sprintf(
+			`invalid skill name %q: skill names may not start with "/". The Skills option takes the canonical name, not the slash-command form`,
+			name,
+		)}
+	}
+	if strings.Contains(name, `\\`) {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: consecutive backslashes are not allowed — the per-rule parser collapses them, so the rule would name a different skill",
+			name,
+		)}
+	}
+	if strings.HasSuffix(name, `\`) {
+		return &SDKError{Message: fmt.Sprintf(
+			"invalid skill name %q: names may not end with an unpaired backslash",
+			name,
+		)}
+	}
+	return nil
 }
 
 // SdkBeta represents beta feature flags.
@@ -256,6 +352,23 @@ type SdkPluginConfig struct {
 	SkipMcpDiscovery bool `json:"skipMcpDiscovery,omitempty"`
 }
 
+// WorkflowSizeGuideline is an advisory size guideline for the dynamic
+// workflows Claude writes, set via Options.WorkflowSizeGuideline. Port of
+// TypeScript SDK v0.3.219.
+type WorkflowSizeGuideline string
+
+const (
+	// WorkflowSizeGuidelineUnrestricted sends no size guideline.
+	WorkflowSizeGuidelineUnrestricted WorkflowSizeGuideline = "unrestricted"
+	// WorkflowSizeGuidelineSmall aims for fewer than 5 agents.
+	WorkflowSizeGuidelineSmall WorkflowSizeGuideline = "small"
+	// WorkflowSizeGuidelineMedium aims for fewer than 15 agents. This is the
+	// CLI's default when no guideline is set.
+	WorkflowSizeGuidelineMedium WorkflowSizeGuideline = "medium"
+	// WorkflowSizeGuidelineLarge aims for fewer than 50 agents.
+	WorkflowSizeGuidelineLarge WorkflowSizeGuideline = "large"
+)
+
 // SandboxNetworkConfig contains network configuration for sandbox.
 type SandboxNetworkConfig struct {
 	AllowUnixSockets    []string `json:"allowUnixSockets,omitempty"`
@@ -267,6 +380,14 @@ type SandboxNetworkConfig struct {
 	AllowedDomains []string `json:"allowedDomains,omitempty"`
 	// DeniedDomains blocks outbound connections to the listed hostnames.
 	DeniedDomains []string `json:"deniedDomains,omitempty"`
+	// StrictAllowlist, when true, makes the sandbox runtime deterministically
+	// deny hosts not in AllowedDomains instead of prompting. Enforced for
+	// sandboxed commands only — in-process tools such as WebFetch are not
+	// gated by this setting. Only honored from user, managed/policy, or CLI
+	// (--settings) settings; project settings (.claude/settings.json and
+	// .claude/settings.local.json) are ignored. Port of TypeScript SDK
+	// v0.3.219.
+	StrictAllowlist *bool `json:"strictAllowlist,omitempty"`
 	// AllowManagedDomainsOnly restricts traffic to organization-managed domains.
 	AllowManagedDomainsOnly *bool `json:"allowManagedDomainsOnly,omitempty"`
 	// AllowMachLookup permits mach port lookup (macOS only).
@@ -293,11 +414,57 @@ type SandboxFilesystemConfig struct {
 	AllowManagedReadPathsOnly *bool `json:"allowManagedReadPathsOnly,omitempty"`
 }
 
-// SandboxCredentialFileEntry declares a single file or directory path whose reads
-// are denied inside sandboxed commands. Mode is always "deny".
+// SandboxCredentialFileEntry declares a single file or directory path to
+// protect inside sandboxed commands. Mode "deny" blocks reads inside the
+// sandbox. Mode "mask" substitutes a sentinel (whole-file, or only the spans
+// captured by Extract) and the host proxy swaps sentinel for the real value
+// on egress to InjectHosts; on macOS and Windows, "mask" currently degrades
+// to "deny".
 type SandboxCredentialFileEntry struct {
 	Path string `json:"path"`
 	Mode string `json:"mode"`
+	// Extract is an optional regex for structured masking when Mode is
+	// "mask". Applied globally to the file; capture group 1 of each match is
+	// a credential value, and only those captured spans are replaced with
+	// sentinels — the rest of the file is preserved so a tool that parses it
+	// (.netrc, JSON, YAML) still succeeds. Without Extract, the entire file
+	// content is replaced with one sentinel (whole-file masking, suited to
+	// single-secret files). Accepted but ignored for "deny". Port of
+	// TypeScript SDK v0.3.224.
+	Extract string `json:"extract,omitempty"`
+	// OnExtractNoMatch controls behavior when Extract matches nothing in the
+	// file — or, with Decode, when no candidate survives verification.
+	// "warn" (default) emits a stderr warning and leaves the file readable
+	// as-is (fail-open); "deny" degrades the entry to Mode "deny"
+	// (fail-closed); "error" aborts at sandbox setup. Only meaningful when
+	// Mode is "mask" and Extract or Decode is set; accepted but ignored
+	// otherwise. Port of TypeScript SDK v0.3.224.
+	OnExtractNoMatch string `json:"onExtractNoMatch,omitempty"`
+	// Decode is an optional encoded-credential format for Mode "mask". "jwt":
+	// candidates are located with a built-in JWT regex (or Extract, if set),
+	// verified to actually be JWTs, and replaced with a structurally valid
+	// fake JWT so client-side token parsing inside the sandbox keeps
+	// working. Accepted but ignored for "deny". Port of TypeScript SDK
+	// v0.3.224.
+	Decode string `json:"decode,omitempty"`
+	// MaskClaims names top-level JWT payload claims to mask inside each
+	// decoded value, instead of replacing the whole token; all other claims
+	// are preserved. Requires Decode. Only meaningful when Mode is "mask";
+	// accepted but ignored for "deny". Port of TypeScript SDK v0.3.224.
+	MaskClaims []string `json:"maskClaims,omitempty"`
+	// MaskDuplicates, when true, also replaces verbatim occurrences of each
+	// captured credential value outside the regex-matched spans (e.g. a
+	// secret repeated where the regex does not reach). Matches raw
+	// substrings, so short or common values may corrupt unrelated content;
+	// intended for long, high-entropy secrets. Only meaningful when Mode is
+	// "mask" and Extract or Decode is set; accepted but ignored otherwise.
+	// Port of TypeScript SDK v0.3.224.
+	MaskDuplicates *bool `json:"maskDuplicates,omitempty"`
+	// InjectHosts optionally narrows where the proxy substitutes this
+	// credential. Only meaningful when Mode is "mask"; accepted but ignored
+	// for "deny". If unset, defaults to the sandbox's allowed network
+	// domains. Port of TypeScript SDK v0.3.224.
+	InjectHosts []string `json:"injectHosts,omitempty"`
 }
 
 // SandboxCredentialEnvVarEntry declares a single environment variable to protect
@@ -312,13 +479,71 @@ type SandboxCredentialEnvVarEntry struct {
 	Name        string   `json:"name"`
 	Mode        string   `json:"mode"`
 	InjectHosts []string `json:"injectHosts,omitempty"`
+	// Extract is an optional regex for structured masking when Mode is
+	// "mask". Applied globally to the value; capture group 1 of each match
+	// is a credential value, and only those captured spans are replaced with
+	// sentinels — the rest of the value is preserved so a tool that parses
+	// it (e.g. a DATABASE_URL connection string) still succeeds. Without
+	// Extract, the entire value is replaced with one sentinel. Cannot be
+	// combined with Decode. Accepted but ignored for "deny". Port of
+	// TypeScript SDK v0.3.224.
+	Extract string `json:"extract,omitempty"`
+	// OnExtractNoMatch controls behavior when Extract matches nothing in the
+	// value. "warn" (default) lets the variable pass through unmasked
+	// (fail-open); "deny" unsets the variable (fail-closed); "error" aborts
+	// at sandbox setup. Only meaningful when Mode is "mask" and Extract is
+	// set without Decode. Port of TypeScript SDK v0.3.224.
+	OnExtractNoMatch string `json:"onExtractNoMatch,omitempty"`
+	// Decode is an optional encoded-credential format for Mode "mask". "jwt":
+	// the variable's whole value is verified to actually be a JWT and
+	// replaced with a structurally valid fake JWT. Cannot be combined with
+	// Extract. Accepted but ignored for "deny". Port of TypeScript SDK
+	// v0.3.224.
+	Decode string `json:"decode,omitempty"`
+	// MaskClaims names top-level JWT payload claims to mask inside the
+	// decoded value, instead of replacing the whole token. Requires Decode.
+	// Only meaningful when Mode is "mask"; accepted but ignored for "deny".
+	// Port of TypeScript SDK v0.3.224.
+	MaskClaims []string `json:"maskClaims,omitempty"`
+}
+
+// SandboxAwsCredentialPair explicitly groups masked env vars into an AWS
+// credential pair for SigV4 re-signing, for non-standard variable names. The
+// conventional AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
+// trio is paired automatically when masked. Only honored from user,
+// managed/policy, or CLI (--settings) settings — project settings are
+// ignored. Port of TypeScript SDK v0.3.224.
+type SandboxAwsCredentialPair struct {
+	AccessKeyIDVar     string `json:"accessKeyIdVar"`
+	SecretAccessKeyVar string `json:"secretAccessKeyVar"`
+	// SessionTokenVar optionally names the masked env var holding the AWS
+	// session token (temporary credentials).
+	SessionTokenVar string `json:"sessionTokenVar,omitempty"`
+}
+
+// SandboxSigv4Policy sets policies for AWS SigV4 request shapes the sandbox
+// proxy cannot re-sign (streaming, presigned, sigv4a) when they reference a
+// masked credential pair. Each field is "deny" (default) or "passthrough".
+// Only honored from user, managed/policy, or CLI (--settings) settings —
+// project settings are ignored. Port of TypeScript SDK v0.3.224.
+type SandboxSigv4Policy struct {
+	// Streaming policies aws-chunked streaming uploads, whose per-chunk
+	// signatures chain off a seed signature that can't be recomputed without
+	// rewriting the body.
+	Streaming string `json:"streaming,omitempty"`
+	// Presigned policies presigned URLs, where the signature lives in the
+	// query string itself.
+	Presigned string `json:"presigned,omitempty"`
+	// Sigv4a policies SigV4A (AWS4-ECDSA-P256-SHA256) asymmetric signatures,
+	// which have no shared-key HMAC to recompute.
+	Sigv4a string `json:"sigv4a,omitempty"`
 }
 
 // SandboxCredentialsConfig declares credential sources to protect in sandboxed commands.
-// Files listed in Files are denied for reads (Mode is always "deny" for file
-// entries). Variables in EnvVars are unset ("deny") or masked with a
-// sentinel value ("mask"); see SandboxCredentialEnvVarEntry. Only explicitly
-// listed entries are restricted — there is no built-in deny list.
+// Files listed in Files and variables listed in EnvVars are unset ("deny")
+// or masked with a sentinel value ("mask"); see SandboxCredentialFileEntry
+// and SandboxCredentialEnvVarEntry. Only explicitly listed entries are
+// restricted — there is no built-in deny list.
 type SandboxCredentialsConfig struct {
 	Files   []SandboxCredentialFileEntry   `json:"files,omitempty"`
 	EnvVars []SandboxCredentialEnvVarEntry `json:"envVars,omitempty"`
@@ -329,17 +554,25 @@ type SandboxCredentialsConfig struct {
 	// fixtures. Only honored from user, managed/policy, or CLI settings —
 	// project settings are ignored. Port of TypeScript SDK v0.3.199.
 	AllowPlaintextInject *bool `json:"allowPlaintextInject,omitempty"`
+	// AwsPairs explicitly groups masked env vars into AWS credential pairs
+	// for SigV4 re-signing, for non-standard variable names. Port of
+	// TypeScript SDK v0.3.224.
+	AwsPairs []SandboxAwsCredentialPair `json:"awsPairs,omitempty"`
+	// Sigv4 sets policies for AWS SigV4 request shapes the proxy cannot
+	// re-sign when they reference a masked credential pair. Port of
+	// TypeScript SDK v0.3.224.
+	Sigv4 *SandboxSigv4Policy `json:"sigv4,omitempty"`
 }
 
 // SandboxSettings controls bash command sandboxing.
 type SandboxSettings struct {
-	Enabled                    *bool                    `json:"enabled,omitempty"`
-	AutoAllowBashIfSandboxed   *bool                    `json:"autoAllowBashIfSandboxed,omitempty"`
-	ExcludedCommands           []string                 `json:"excludedCommands,omitempty"`
-	AllowUnsandboxedCommands   *bool                    `json:"allowUnsandboxedCommands,omitempty"`
-	Network                    *SandboxNetworkConfig    `json:"network,omitempty"`
-	IgnoreViolations           *SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
-	EnableWeakerNestedSandbox  *bool                    `json:"enableWeakerNestedSandbox,omitempty"`
+	Enabled                   *bool                    `json:"enabled,omitempty"`
+	AutoAllowBashIfSandboxed  *bool                    `json:"autoAllowBashIfSandboxed,omitempty"`
+	ExcludedCommands          []string                 `json:"excludedCommands,omitempty"`
+	AllowUnsandboxedCommands  *bool                    `json:"allowUnsandboxedCommands,omitempty"`
+	Network                   *SandboxNetworkConfig    `json:"network,omitempty"`
+	IgnoreViolations          *SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
+	EnableWeakerNestedSandbox *bool                    `json:"enableWeakerNestedSandbox,omitempty"`
 	// FailIfUnavailable controls behavior when sandboxing is requested but the
 	// platform's sandbox mechanism is unavailable (no bwrap on Linux, no
 	// Seatbelt on macOS, etc). When true (the CLI default when Enabled is
@@ -384,6 +617,28 @@ type Options struct {
 	ContinueConversation bool
 	// Resume resumes a specific session by ID.
 	Resume string
+	// ResumeSessionAt truncates a Resume'd session to a specific chain-entry
+	// UUID instead of loading the full transcript — only messages up to and
+	// including this UUID are resumed. Use together with Resume. Accepts any
+	// chain-entry UUID, typically an AssistantMessage's UUID. Print/headless
+	// lane only: interactive `--resume` and background-job worker boots
+	// ignore this option and load the full chain unmodified. Port of
+	// TypeScript SDK v0.3.212. ([#561])
+	//
+	// [#561]: https://github.com/Flohs/claude-agent-sdk-go/issues/561
+	ResumeSessionAt string
+	// ResumeDropsTurn declares, together with ResumeSessionAt, the prompt
+	// UUID of the turn a truncating resume intends to discard. The CLI
+	// validates at fork time that every entry past ResumeSessionAt is
+	// attributable to that turn and refuses the resume — an
+	// error_during_execution result whose message starts with "Resume
+	// rejected by --resume-drops-turn:" — if the discarded range contains
+	// anything else (e.g. a queued user message the caller hadn't yet
+	// observed). The refusal is deterministic: map it to a rewind-recovery
+	// path rather than retrying the same fork request. Print/headless lane
+	// only, same as ResumeSessionAt. Port of TypeScript SDK v0.3.223.
+	// ([#561])
+	ResumeDropsTurn string
 	// SessionID specifies a custom session ID for the conversation.
 	SessionID string
 	// Title sets the session title and skips auto-generation.
@@ -426,6 +681,12 @@ type Options struct {
 	//
 	// Note: unlike the TypeScript SDK (where options.env replaces the subprocess
 	// environment), the Go SDK merges Env on top of the inherited environment.
+	//
+	// The CLI also honors two subagent-limiting env vars (set here, not via a
+	// typed Options field, since the TS SDK exposes no corresponding schema
+	// change either): CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH (default 1) caps
+	// subagent nesting depth, and CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS (default
+	// 20) caps concurrently-running subagents.
 	Env map[string]string
 	// InheritEnv controls whether the CLI subprocess inherits the parent process
 	// environment. Defaults to true when nil. When set to false, the subprocess
@@ -479,11 +740,23 @@ type Options struct {
 	// the string "all" for every discovered skill, or leave nil to disable.
 	// When set, the SDK automatically injects Skill tool entries into
 	// AllowedTools and defaults SettingSources to [user, project] if unset.
+	// Any other value, and any []string name containing delimiters
+	// (parentheses, commas, control characters), a leading "/", a wildcard
+	// suffix, surrounding whitespace, or invalid UTF-8, is rejected with an
+	// error at connect time.
 	Skills any // []string | "all" | nil
 	// SettingSources specifies which setting sources to load.
 	SettingSources []SettingSource
 	// Sandbox configures bash command isolation.
 	Sandbox *SandboxSettings
+	// WorkflowSizeGuideline sets an advisory size guideline for the dynamic
+	// workflows Claude writes: WorkflowSizeGuidelineSmall aims for fewer than
+	// 5 agents, WorkflowSizeGuidelineMedium (the CLI default) fewer than 15,
+	// WorkflowSizeGuidelineLarge fewer than 50, and WorkflowSizeGuidelineUnrestricted
+	// sends no guideline. This is a guideline, not an enforced limit. Empty
+	// leaves the CLI/managed-settings default in place. Port of TypeScript
+	// SDK v0.3.219.
+	WorkflowSizeGuideline WorkflowSizeGuideline
 	// Plugins configures custom plugins.
 	Plugins []SdkPluginConfig
 	// MaxThinkingTokens limits thinking block tokens. Deprecated: use Thinking instead.

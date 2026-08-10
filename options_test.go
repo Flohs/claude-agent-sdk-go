@@ -231,6 +231,95 @@ func TestSandboxCredentialsConfig_JSONMarshal_OmitEmpty(t *testing.T) {
 	}
 }
 
+// TestSandboxCredentialsConfig_JSONMarshal_JwtDecodeAndAws verifies the
+// v0.3.224 credential-masking fields (extract/onExtractNoMatch/decode/
+// maskClaims/maskDuplicates on file and env var entries, awsPairs/sigv4 on
+// the top-level config) round-trip through JSON with the upstream field
+// names.
+func TestSandboxCredentialsConfig_JSONMarshal_JwtDecodeAndAws(t *testing.T) {
+	maskDup := true
+	cfg := SandboxCredentialsConfig{
+		Files: []SandboxCredentialFileEntry{
+			{
+				Path:             "~/.config/gh/hosts.yml",
+				Mode:             "mask",
+				Extract:          `token:\s*(\S+)`,
+				OnExtractNoMatch: "deny",
+				MaskDuplicates:   &maskDup,
+			},
+		},
+		EnvVars: []SandboxCredentialEnvVarEntry{
+			{
+				Name:       "AUTH0_TOKEN",
+				Mode:       "mask",
+				Decode:     "jwt",
+				MaskClaims: []string{"sub", "email"},
+			},
+		},
+		AwsPairs: []SandboxAwsCredentialPair{
+			{
+				AccessKeyIDVar:     "MY_AWS_KEY_ID",
+				SecretAccessKeyVar: "MY_AWS_SECRET",
+				SessionTokenVar:    "MY_AWS_TOKEN",
+			},
+		},
+		Sigv4: &SandboxSigv4Policy{
+			Streaming: "passthrough",
+			Presigned: "deny",
+			Sigv4a:    "deny",
+		},
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	files, ok := result["files"].([]any)
+	if !ok || len(files) != 1 {
+		t.Fatalf("expected 1 file entry, got %v", result["files"])
+	}
+	file, ok := files[0].(map[string]any)
+	if !ok || file["extract"] != `token:\s*(\S+)` || file["onExtractNoMatch"] != "deny" || file["maskDuplicates"] != true {
+		t.Errorf("unexpected file entry: %v", file)
+	}
+	if _, ok := file["decode"]; ok {
+		t.Errorf("expected decode to be omitted when unset, got %v", file["decode"])
+	}
+
+	envVars, ok := result["envVars"].([]any)
+	if !ok || len(envVars) != 1 {
+		t.Fatalf("expected 1 envVar entry, got %v", result["envVars"])
+	}
+	envVar, ok := envVars[0].(map[string]any)
+	if !ok || envVar["decode"] != "jwt" {
+		t.Errorf("expected envVar decode 'jwt', got %v", envVar)
+	}
+	claims, ok := envVar["maskClaims"].([]any)
+	if !ok || len(claims) != 2 || claims[0] != "sub" || claims[1] != "email" {
+		t.Errorf("expected maskClaims [sub, email], got %v", envVar["maskClaims"])
+	}
+
+	awsPairs, ok := result["awsPairs"].([]any)
+	if !ok || len(awsPairs) != 1 {
+		t.Fatalf("expected 1 awsPairs entry, got %v", result["awsPairs"])
+	}
+	pair, ok := awsPairs[0].(map[string]any)
+	if !ok || pair["accessKeyIdVar"] != "MY_AWS_KEY_ID" || pair["secretAccessKeyVar"] != "MY_AWS_SECRET" || pair["sessionTokenVar"] != "MY_AWS_TOKEN" {
+		t.Errorf("unexpected awsPairs entry: %v", pair)
+	}
+
+	sigv4, ok := result["sigv4"].(map[string]any)
+	if !ok || sigv4["streaming"] != "passthrough" || sigv4["presigned"] != "deny" || sigv4["sigv4a"] != "deny" {
+		t.Errorf("unexpected sigv4 policy: %v", sigv4)
+	}
+}
+
 // TestValidatePermissionMode_ValidValues verifies that every known
 // PermissionMode constant (including the "manual" alias) and the empty
 // string (unset — CLI default applies) are accepted.
@@ -264,5 +353,105 @@ func TestValidatePermissionMode_InvalidValue(t *testing.T) {
 	}
 	if _, ok := err.(*SDKError); !ok {
 		t.Errorf("expected error to be a *SDKError, got %T", err)
+	}
+}
+
+// TestValidateSkills_Accepted verifies that nil, "all", and ordinary
+// []string names (including plugin-qualified names, interior spaces, single
+// backslashes, and non-ASCII) build without error.
+func TestValidateSkills_Accepted(t *testing.T) {
+	accepted := []any{
+		nil,
+		"all",
+		[]string{},
+		[]string{"pdf-tools"},
+		[]string{"plugin:skill"},
+		[]string{"my skill"},
+		[]string{"a\\b"},
+		[]string{"日本語スキル"},
+	}
+	for _, skills := range accepted {
+		if err := validateSkills(skills); err != nil {
+			t.Errorf("validateSkills(%#v) = %v, want nil", skills, err)
+		}
+	}
+}
+
+// TestValidateSkills_RejectedShape verifies that an Options.Skills value
+// other than nil, "all", or []string is rejected instead of silently
+// no-op'd.
+func TestValidateSkills_RejectedShape(t *testing.T) {
+	rejected := []any{"named", 42, []int{1, 2}}
+	for _, skills := range rejected {
+		if err := validateSkills(skills); err == nil {
+			t.Errorf("validateSkills(%#v) = nil, want error", skills)
+		} else if _, ok := err.(*SDKError); !ok {
+			t.Errorf("validateSkills(%#v) error type = %T, want *SDKError", skills, err)
+		}
+	}
+}
+
+// TestValidateSkillName_Rejected verifies every documented rejection case:
+// delimiters that the --allowedTools tokenizer can't carry safely, and
+// shapes that tokenize cleanly but can never match a real skill.
+func TestValidateSkillName_Rejected(t *testing.T) {
+	cases := []struct {
+		name string
+	}{
+		{""},
+		{"   "},
+		{" name"},
+		{"name "},
+		{"a(b"},
+		{"a)b"},
+		{"a,b"},
+		{"a\x01b"},
+		{"a\x7fb"},
+		{"a\ufeffb"},
+		{"*"},
+		{"plugin:*"},
+		{"name *"},
+		{"/name"},
+		{"a\\\\b"},
+		{"name\\"},
+	}
+	for _, c := range cases {
+		if err := validateSkillName(c.name); err == nil {
+			t.Errorf("validateSkillName(%q) = nil, want error", c.name)
+		} else if _, ok := err.(*SDKError); !ok {
+			t.Errorf("validateSkillName(%q) error type = %T, want *SDKError", c.name, err)
+		}
+	}
+}
+
+// TestValidateSkillName_Accepted verifies names that must keep working
+// identically: plugin-qualified names, interior spaces, a single backslash,
+// and non-ASCII.
+func TestValidateSkillName_Accepted(t *testing.T) {
+	accepted := []string{
+		"pdf-tools",
+		"plugin:skill",
+		"my skill",
+		"a\\b",
+		"日本語スキル",
+		"name:not-a-wildcard",
+	}
+	for _, name := range accepted {
+		if err := validateSkillName(name); err != nil {
+			t.Errorf("validateSkillName(%q) = %v, want nil", name, err)
+		}
+	}
+}
+
+// TestNewSubprocessTransport_RejectsInvalidSkills verifies that an invalid
+// Options.Skills value fails at construction, before any CLI process is
+// spawned.
+func TestNewSubprocessTransport_RejectsInvalidSkills(t *testing.T) {
+	_, err := NewSubprocessTransport(&Options{Skills: []string{"bad,name"}})
+	if err == nil {
+		t.Fatal("expected error for invalid skill name, got nil")
+	}
+	if !strings.Contains(err.Error(), "bad,name") {
+		t.Errorf("error message = %q, want it to contain %q", err.Error(), "bad,name")
 	}
 }
