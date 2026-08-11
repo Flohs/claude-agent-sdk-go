@@ -577,12 +577,17 @@ type SkillToolOutput struct {
 // BashToolOutput is the result returned by the Bash tool.
 // Accessible from [PostToolUseHookInput].ToolResponse when ToolName is "Bash"
 // (decode the map[string]any with json.Marshal/Unmarshal, as with [NotebookEditResult]).
-// Port of TypeScript SDK v0.3.210.
+// Port of TypeScript SDK v0.3.210 and v0.3.227.
 type BashToolOutput struct {
 	// TimedOutAfterMs is set when the command was auto-backgrounded after
 	// exceeding its timeout, giving the elapsed time in milliseconds at the
 	// point of backgrounding. Nil when the command completed normally.
 	TimedOutAfterMs *int `json:"timedOutAfterMs,omitempty"`
+	// BackgroundEndsWithFinalResponse is true when this backgrounded command
+	// is owned by a synchronous subagent and is therefore terminated when
+	// that agent gives its final response. Nil when the command survives the
+	// call that started it (main loop, async subagents).
+	BackgroundEndsWithFinalResponse *bool `json:"backgroundEndsWithFinalResponse,omitempty"`
 }
 
 // TaskCreateInput is the input schema for the TaskCreate tool.
