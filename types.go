@@ -558,6 +558,35 @@ type ProposeSkillsOutput struct {
 	ProposalCount int `json:"proposalCount"`
 }
 
+// ProposeGoalInput is the typed input for the ProposeGoal tool. Accessible
+// from [PreToolUseHookInput].ToolInput when ToolName is "ProposeGoal". Port of
+// TypeScript SDK v0.3.227.
+type ProposeGoalInput struct {
+	// Condition is the completion condition to propose, written so a
+	// separate evaluator can verify it from the conversation (e.g. "all
+	// tests in test/auth pass (bun test exits 0)"). At most 500 characters.
+	Condition string `json:"condition"`
+	// AskUser controls whether the user is asked for approval before the
+	// goal is set. Upstream defaults this to true (an approval dialog is
+	// shown) when omitted; false sets the goal directly, with a visible
+	// notice in the transcript, and is only used when the user's own words
+	// in the conversation stated the outcome directly.
+	AskUser bool `json:"ask_user,omitempty"`
+}
+
+// ProposeGoalOutput is the result returned by the ProposeGoal tool.
+// Accessible from [PostToolUseHookInput].ToolResponse when ToolName is
+// "ProposeGoal" (decode the map[string]any with json.Marshal/Unmarshal, as
+// with [NotebookEditResult]). Port of TypeScript SDK v0.3.227.
+type ProposeGoalOutput struct {
+	// Condition is the condition shown to the user for approval, or set
+	// directly when AskUser was false.
+	Condition string `json:"condition"`
+	// AskUser is true when the user was asked for approval, false when the
+	// goal was set directly.
+	AskUser bool `json:"askUser"`
+}
+
 // SkillToolOutput is the result returned by the Skill tool.
 // Accessible from [PostToolUseHookInput].ToolResponse when ToolName is "Skill"
 // (decode the map[string]any with json.Marshal/Unmarshal, as with [NotebookEditResult]).
