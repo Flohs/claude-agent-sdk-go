@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `BashToolOutput.BackgroundEndsWithFinalResponse *bool` field, set when a backgrounded command is owned by a synchronous subagent and is therefore terminated when that agent gives its final response; nil when the command survives the call that started it (main loop, async subagents). Port of TypeScript SDK v0.3.227. ([#576](https://github.com/Flohs/claude-agent-sdk-go/issues/576))
+
 ## [3.1.0] - 2026-08-10
 
 ### Changed
