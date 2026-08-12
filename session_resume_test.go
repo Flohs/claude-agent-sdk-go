@@ -540,6 +540,132 @@ func TestMaterializeResumeSession_AuthFilesCopied(t *testing.T) {
 	}
 }
 
+func TestMaterializeResumeSession_SettingsStrippedAndCoworkSettingsCopied(t *testing.T) {
+	fakeHome := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", fakeHome)
+
+	settingsPath := filepath.Join(fakeHome, "settings.json")
+	settingsContent := `{"apiKeyHelper":"/bin/helper","enabledPlugins":{"foo":true},"extraKnownMarketplaces":{"bar":{}},"env":{"CLAUDE_CONFIG_DIR":"/should/be/removed","OTHER":"keep-me"}}`
+	if err := os.WriteFile(settingsPath, []byte(settingsContent), 0o600); err != nil {
+		t.Fatalf("write settings.json: %v", err)
+	}
+	coworkPath := filepath.Join(fakeHome, "cowork_settings.json")
+	if err := os.WriteFile(coworkPath, []byte(`{"someCoworkKey":"value"}`), 0o600); err != nil {
+		t.Fatalf("write cowork_settings.json: %v", err)
+	}
+
+	ctx := context.Background()
+	store := NewInMemorySessionStore()
+	cwd := t.TempDir()
+	projectKey := ProjectKeyForDirectory(cwd)
+	_ = store.Append(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionA}, []SessionStoreEntry{
+		entry(map[string]any{"type": "user"}),
+	})
+
+	opts := &Options{SessionStore: store, Resume: sessionA, Cwd: cwd}
+	mr, err := materializeResumeSession(ctx, opts)
+	if err != nil {
+		t.Fatalf("materializeResumeSession: %v", err)
+	}
+	defer mr.cleanup()
+
+	settingsOut, err := os.ReadFile(filepath.Join(mr.configDir, "settings.json"))
+	if err != nil {
+		t.Fatalf("read copied settings.json: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(settingsOut, &got); err != nil {
+		t.Fatalf("parse copied settings.json: %v", err)
+	}
+	if _, present := got["enabledPlugins"]; present {
+		t.Errorf("enabledPlugins should be stripped, got %+v", got)
+	}
+	if _, present := got["extraKnownMarketplaces"]; present {
+		t.Errorf("extraKnownMarketplaces should be stripped, got %+v", got)
+	}
+	env, _ := got["env"].(map[string]any)
+	if _, present := env["CLAUDE_CONFIG_DIR"]; present {
+		t.Errorf("env.CLAUDE_CONFIG_DIR should be stripped, got %+v", env)
+	}
+	if env["OTHER"] != "keep-me" {
+		t.Errorf("other env keys should survive stripping, got %+v", env)
+	}
+	if got["apiKeyHelper"] != "/bin/helper" {
+		t.Errorf("apiKeyHelper should survive stripping, got %v", got["apiKeyHelper"])
+	}
+
+	coworkOut, err := os.ReadFile(filepath.Join(mr.configDir, "cowork_settings.json"))
+	if err != nil {
+		t.Fatalf("read copied cowork_settings.json: %v", err)
+	}
+	if string(coworkOut) != `{"someCoworkKey":"value"}` {
+		t.Errorf("cowork_settings.json not copied verbatim, got %q", string(coworkOut))
+	}
+}
+
+func TestStripSettingsForResume(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "strips enabledPlugins and extraKnownMarketplaces and env.CLAUDE_CONFIG_DIR",
+			input: `{"apiKeyHelper":"/bin/helper","enabledPlugins":{"foo":true},"extraKnownMarketplaces":{"bar":{}},"env":{"CLAUDE_CONFIG_DIR":"/x","OTHER":"y"}}`,
+			want:  `{"apiKeyHelper":"/bin/helper","env":{"OTHER":"y"}}`,
+		},
+		{
+			name:  "no-op when none of the keys are present",
+			input: `{"apiKeyHelper":"/bin/helper"}`,
+			want:  `{"apiKeyHelper":"/bin/helper"}`,
+		},
+		{
+			name:  "strips UTF-8 BOM",
+			input: "\xEF\xBB\xBF" + `{"apiKeyHelper":"/bin/helper"}`,
+			want:  `{"apiKeyHelper":"/bin/helper"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripSettingsForResume([]byte(tt.input))
+
+			var gotParsed, wantParsed map[string]any
+			if err := json.Unmarshal(got, &gotParsed); err != nil {
+				t.Fatalf("output is not valid JSON: %v (%q)", err, got)
+			}
+			if err := json.Unmarshal([]byte(tt.want), &wantParsed); err != nil {
+				t.Fatalf("bad test want: %v", err)
+			}
+			gotJSON, _ := json.Marshal(gotParsed)
+			wantJSON, _ := json.Marshal(wantParsed)
+			if string(gotJSON) != string(wantJSON) {
+				t.Errorf("stripSettingsForResume(%q) = %q, want %q", tt.input, got, wantJSON)
+			}
+		})
+	}
+}
+
+func TestStripSettingsForResume_MalformedPassesThroughUnmodified(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{name: "invalid JSON", input: `{not valid json`},
+		{name: "non-object top level", input: `["a","b"]`},
+		{name: "empty", input: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripSettingsForResume([]byte(tt.input))
+			if string(got) != tt.input {
+				t.Errorf("stripSettingsForResume(%q) = %q, want unmodified passthrough", tt.input, got)
+			}
+		})
+	}
+}
+
 func TestMaterializeResumeSession_AuthFilesMissingIsOK(t *testing.T) {
 	// Fresh install: no .credentials.json, no .claude.json, no
 	// settings.json. Must not error.
@@ -567,6 +693,9 @@ func TestMaterializeResumeSession_AuthFilesMissingIsOK(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(mr.configDir, "settings.json")); !os.IsNotExist(err) {
 		t.Errorf("settings.json should not exist when source is missing, stat err: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(mr.configDir, "cowork_settings.json")); !os.IsNotExist(err) {
+		t.Errorf("cowork_settings.json should not exist when source is missing, stat err: %v", err)
 	}
 }
 
