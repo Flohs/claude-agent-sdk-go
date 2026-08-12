@@ -1084,6 +1084,9 @@ const (
 	MessageOriginKindTaskNotification MessageOriginKind = "task-notification"
 	// MessageOriginKindCoordinator is a message sent by the coordinator.
 	MessageOriginKindCoordinator MessageOriginKind = "coordinator"
+	// MessageOriginKindUnclassified is a message whose origin the CLI could
+	// not classify into one of the other kinds.
+	MessageOriginKindUnclassified MessageOriginKind = "unclassified"
 	// MessageOriginKindObserver is a message sent by an observer agent.
 	// From and SenderTaskID are populated.
 	MessageOriginKindObserver MessageOriginKind = "observer"
