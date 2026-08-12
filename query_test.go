@@ -687,6 +687,69 @@ done:
 	_ = q.close()
 }
 
+// TestPendingControlRequest_FailsFastWithActionableTextOnStartupError mirrors
+// the Python SDK's test_pending_initialize_gets_result_error_text (commit
+// be2d0df, anthropics/claude-agent-sdk-python#1198): an error result
+// (e.g. a resume refused by --resume-drops-turn) followed by the subprocess
+// exiting must resolve a still-pending initialize() immediately with the
+// CLI's actionable error text, not leave it to time out.
+func TestPendingControlRequest_FailsFastWithActionableTextOnStartupError(t *testing.T) {
+	mt := newMockTransport()
+	// Small but non-zero initTimeout: long enough that a passing test can't
+	// accidentally pass via the timeout path, short enough to fail fast if
+	// the fix regresses.
+	q := newQuery(queryConfig{transport: mt, initTimeout: 5})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	// Drain messageCh concurrently so readMessages's forwarding send never
+	// blocks (nothing else in this test consumes it).
+	out := q.receiveMessages()
+	go func() {
+		for range out {
+		}
+	}()
+
+	type initResult struct {
+		err error
+	}
+	resultCh := make(chan initResult, 1)
+	go func() {
+		_, err := q.initialize()
+		resultCh <- initResult{err: err}
+	}()
+
+	// Give initialize() time to register its pending control request before
+	// the frames arrive.
+	time.Sleep(20 * time.Millisecond)
+
+	mt.messages <- map[string]any{
+		"type":       "result",
+		"subtype":    "error_during_execution",
+		"is_error":   true,
+		"session_id": "s",
+		"errors":     []any{"Resume rejected by --resume-drops-turn: nope"},
+	}
+	mt.messages <- map[string]any{"type": "error", "error": "exec failed: exit status 1"}
+	_ = mt.Close()
+
+	select {
+	case r := <-resultCh:
+		if r.err == nil {
+			t.Fatal("expected initialize() to fail, got nil error")
+		}
+		if strings.Contains(r.err.Error(), "control request timeout") {
+			t.Errorf("initialize() timed out instead of failing fast: %v", r.err)
+		}
+		wantSubstr := "Resume rejected by --resume-drops-turn: nope"
+		if !strings.Contains(r.err.Error(), wantSubstr) {
+			t.Errorf("initialize() error = %q, want it to contain %q", r.err.Error(), wantSubstr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("initialize() did not return within 2s; pending control request was not resolved")
+	}
+}
+
 func TestReadMessages_ProcessErrorSurfacedWhenNoIsErrorResult(t *testing.T) {
 	mt := newMockTransport()
 	q := newQuery(queryConfig{transport: mt})
