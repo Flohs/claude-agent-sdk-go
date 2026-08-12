@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -648,13 +649,14 @@ func isSafeSubpath(subpath, sessionDir string) bool {
 }
 
 // copyAuthFiles copies ~/.credentials.json (with refreshToken redacted),
-// ~/.claude.json, and settings.json from the caller's effective config dir
+// ~/.claude.json, and settings.json/cowork_settings.json (settings.json with
+// resume-incompatible keys stripped) from the caller's effective config dir
 // into tempDir so the spawned CLI can reuse existing credentials and
 // settings.
 //
 // Resolution mirrors the CLI:
-//   - .credentials.json and settings.json live under the config dir
-//     (default ~/.claude/)
+//   - .credentials.json, settings.json, and cowork_settings.json live under
+//     the config dir (default ~/.claude/)
 //   - .claude.json lives at $CLAUDE_CONFIG_DIR/.claude.json when set,
 //     else ~/.claude.json (NOT ~/.claude/.claude.json)
 //
@@ -685,7 +687,10 @@ func copyAuthFiles(tempDir string, optEnv map[string]string) {
 	writeRedactedCredentials(credsJSON, filepath.Join(tempDir, ".credentials.json"))
 
 	settingsSrc := filepath.Join(sourceConfigDir, "settings.json")
-	copyIfPresent(settingsSrc, filepath.Join(tempDir, "settings.json"))
+	copyIfPresentTransform(settingsSrc, filepath.Join(tempDir, "settings.json"), stripSettingsForResume)
+
+	coworkSettingsSrc := filepath.Join(sourceConfigDir, "cowork_settings.json")
+	copyIfPresent(coworkSettingsSrc, filepath.Join(tempDir, "cowork_settings.json"))
 
 	var claudeJSONSrc string
 	if callerConfigDir != "" {
@@ -739,6 +744,60 @@ func copyIfPresent(src, dst string) {
 	}
 	defer func() { _ = out.Close() }()
 	_, _ = io.Copy(out, in)
+}
+
+// copyIfPresentTransform copies src to dst when src exists, running its
+// content through transform before writing. Missing src is not an error;
+// all other errors are swallowed (best-effort), matching copyIfPresent.
+func copyIfPresentTransform(src, dst string, transform func([]byte) []byte) {
+	content, err := os.ReadFile(src)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(dst, transform(content), 0o600)
+}
+
+// utf8BOM is the UTF-8 byte-order mark some tools (notably PowerShell)
+// prepend to written JSON files.
+var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
+
+// resumeSettingsStrippedKeys are removed outright from a copied
+// settings.json before the resumed subprocess sees it.
+var resumeSettingsStrippedKeys = []string{"enabledPlugins", "extraKnownMarketplaces"}
+
+// stripSettingsForResume removes settings.json keys that misbehave under the
+// resumed subprocess's redirected CLAUDE_CONFIG_DIR:
+//   - enabledPlugins / extraKnownMarketplaces would reconcile against the
+//     empty temp plugin cache.
+//   - env.CLAUDE_CONFIG_DIR would redirect the subprocess's own config reads
+//     away from the temp dir being built for it, defeating the point of this
+//     copy.
+//
+// Malformed JSON or a non-object top level is returned unmodified so the
+// subprocess still sees the original content rather than aborting the
+// resume. A leading UTF-8 BOM (as PowerShell writes) is tolerated on
+// decode and dropped from the output. Port of Python SDK commit b4d65f5
+// (anthropics/claude-agent-sdk-python#1197).
+func stripSettingsForResume(content []byte) []byte {
+	trimmed := bytes.TrimPrefix(content, utf8BOM)
+
+	var parsed map[string]any
+	if err := json.Unmarshal(trimmed, &parsed); err != nil {
+		return content
+	}
+
+	for _, key := range resumeSettingsStrippedKeys {
+		delete(parsed, key)
+	}
+	if env, ok := parsed["env"].(map[string]any); ok {
+		delete(env, "CLAUDE_CONFIG_DIR")
+	}
+
+	out, err := json.Marshal(parsed)
+	if err != nil {
+		return content
+	}
+	return out
 }
 
 // sanitizeToolUseID ensures a tool use ID conforms to toolu_[a-zA-Z0-9_-]+.
