@@ -64,12 +64,35 @@ func TestAgentToolCompletedOutput_DecodesFromToolUseResult(t *testing.T) {
 	if out.Usage.InputTokens != 100 || out.Usage.OutputTokens != 50 {
 		t.Errorf("Usage = %+v, want input=100 output=50", out.Usage)
 	}
+	if out.Usage.OutputTokensDetails != nil {
+		t.Errorf("OutputTokensDetails = %+v, want nil when absent from payload", out.Usage.OutputTokensDetails)
+	}
 	if out.ToolStats == nil || out.ToolStats.ReadCount != 3 || out.ToolStats.BashCount != 1 {
 		t.Errorf("ToolStats = %+v, want readCount=3 bashCount=1", out.ToolStats)
 	}
 	wantModelsUsed := []string{"claude-haiku-4-5", "claude-sonnet-5"}
 	if len(out.ModelsUsed) != len(wantModelsUsed) || out.ModelsUsed[0] != wantModelsUsed[0] || out.ModelsUsed[1] != wantModelsUsed[1] {
 		t.Errorf("ModelsUsed = %v, want %v", out.ModelsUsed, wantModelsUsed)
+	}
+}
+
+func TestAgentToolUsage_OutputTokensDetailsDecodes(t *testing.T) {
+	result := map[string]any{
+		"input_tokens":  float64(100),
+		"output_tokens": float64(50),
+		"output_tokens_details": map[string]any{
+			"thinking_tokens": float64(30),
+		},
+	}
+
+	var out AgentToolUsage
+	decodeToolUseResult(t, result, &out)
+
+	if out.OutputTokensDetails == nil {
+		t.Fatalf("OutputTokensDetails = nil, want non-nil")
+	}
+	if out.OutputTokensDetails.ThinkingTokens == nil || *out.OutputTokensDetails.ThinkingTokens != 30 {
+		t.Errorf("OutputTokensDetails.ThinkingTokens = %v, want 30", out.OutputTokensDetails.ThinkingTokens)
 	}
 }
 
