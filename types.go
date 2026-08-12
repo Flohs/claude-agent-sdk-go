@@ -739,6 +739,11 @@ type AgentToolUsage struct {
 	} `json:"cache_creation"`
 	InferenceGeo *string `json:"inference_geo,omitempty"`
 	Speed        *string `json:"speed,omitempty"`
+	// OutputTokensDetails breaks down OutputTokens by category (currently
+	// just thinking tokens). Port of TypeScript SDK v0.3.228.
+	OutputTokensDetails *struct {
+		ThinkingTokens *int `json:"thinking_tokens,omitempty"`
+	} `json:"output_tokens_details,omitempty"`
 }
 
 // AgentToolStats mirrors the optional per-run tool-usage counters embedded
