@@ -1279,6 +1279,32 @@ type RateLimitEvent struct {
 
 func (RateLimitEvent) messageMarker() {}
 
+// ConversationResetMessage is emitted when the session's conversation is
+// replaced without ending the connection — e.g. after "/clear", or any other
+// flow that discards the transcript mid-session.
+//
+// In streaming input mode a single connection can carry many user turns, and
+// a reset clears the conversation history *and* zeroes the running totals
+// reported on subsequent [ResultMessage] values (e.g. TotalCostUSD). If a
+// caller accumulates those totals across a long-lived session, it should
+// snapshot them when this message arrives.
+//
+// Port of Python SDK commit 54dd3b4 (anthropics/claude-agent-sdk-python#1196).
+type ConversationResetMessage struct {
+	// NewConversationID is an opaque identifier for the fresh conversation,
+	// for UIs to key an empty transcript on (and discard any cached session
+	// title). This is NOT the SessionID of subsequent messages — read that
+	// from the next message.
+	NewConversationID string `json:"new_conversation_id"`
+	// UUID is the unique ID of this message.
+	UUID string `json:"uuid"`
+	// SessionID is the ID of the session that was reset (the outgoing
+	// session; messages after the reset carry a new session ID).
+	SessionID string `json:"session_id"`
+}
+
+func (ConversationResetMessage) messageMarker() {}
+
 // SubagentRetryInfo carries retry-attempt bookkeeping for a subagent that is
 // being retried after a failure. Populated on ToolProgressMessage.SubagentRetry
 // when the CLI is currently retrying a subagent launch.
