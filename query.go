@@ -72,6 +72,13 @@ type query struct {
 	// has been delivered to messageCh. It suppresses ProcessError generation
 	// for subsequent subprocess exit failures so callers don't see both.
 	lastIsErrorResultDelivered bool
+	// lastErrorResultText holds the most recently seen is_error result's
+	// error text (joined "errors", falling back to "subtype"), cleared on
+	// the next non-error result. Used to enrich the error handed to any
+	// still-pending control request (e.g. an in-flight initialize()) when
+	// the subprocess subsequently exits, instead of leaving it to time out.
+	// Port of Python SDK commit be2d0df (anthropics/claude-agent-sdk-python#1198).
+	lastErrorResultText string
 	// processError is set when the subprocess exits with a non-zero code and
 	// no is_error result was delivered. Callers (e.g. Query) surface it after
 	// the message loop ends.
@@ -429,8 +436,20 @@ func (q *query) readMessages() {
 		// delivered so callers don't see both. Otherwise record it so the
 		// caller (e.g. Query) can surface a ProcessError after the loop ends.
 		if msgType == "error" {
+			errStr, _ := msg["error"].(string)
+
+			// Resolve any still-pending control request (e.g. an in-flight
+			// initialize()) with the most actionable text available, instead
+			// of leaving it to time out. Unconditional: whether an is_error
+			// result was already forwarded to messageCh is irrelevant here —
+			// a pending control request has no visibility into messageCh.
+			pendingErrText := errStr
+			if q.lastErrorResultText != "" {
+				pendingErrText = fmt.Sprintf("Claude Code returned an error result: %s", q.lastErrorResultText)
+			}
+			q.failPendingControlRequests(fmt.Errorf("%s", pendingErrText))
+
 			if !q.lastIsErrorResultDelivered {
-				errStr, _ := msg["error"].(string)
 				q.processError = &ProcessError{SDKError: SDKError{Message: errStr}}
 			}
 			// Don't forward to messageCh; the deferred "end" frame handles close.
@@ -452,6 +471,9 @@ func (q *query) readMessages() {
 			q.flushBeforeResult()
 			if isErr, _ := msg["is_error"].(bool); isErr {
 				q.lastIsErrorResultDelivered = true
+				q.lastErrorResultText = resultErrorText(msg)
+			} else {
+				q.lastErrorResultText = ""
 			}
 		}
 
@@ -847,6 +869,47 @@ func (q *query) initialize() (map[string]any, error) {
 	q.initialized = true
 	q.initializationResult = response
 	return response, nil
+}
+
+// resultErrorText extracts actionable error text from an is_error result
+// message: its "errors" list joined with "; ", falling back to "subtype",
+// then to "unknown error". Mirrors the Python SDK's
+// _last_error_result_text construction (commit be2d0df).
+func resultErrorText(msg map[string]any) string {
+	if rawErrors, ok := msg["errors"].([]any); ok {
+		parts := make([]string, 0, len(rawErrors))
+		for _, e := range rawErrors {
+			if s, ok := e.(string); ok && s != "" {
+				parts = append(parts, s)
+			}
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, "; ")
+		}
+	}
+	if subtype, _ := msg["subtype"].(string); subtype != "" {
+		return subtype
+	}
+	return "unknown error"
+}
+
+// failPendingControlRequests resolves every still-outstanding control
+// request (one with no result recorded yet) with err and wakes its waiter,
+// instead of leaving it to its own timeout. Called when the subprocess
+// exits/errors during the read loop so a startup failure (e.g. a resume
+// refused by --resume-drops-turn) surfaces immediately with the CLI's
+// actual error text rather than a generic timeout. Port of Python SDK
+// commit be2d0df (anthropics/claude-agent-sdk-python#1198).
+func (q *query) failPendingControlRequests(err error) {
+	q.pendingMu.Lock()
+	defer q.pendingMu.Unlock()
+	for requestID, ch := range q.pendingEvents {
+		if _, already := q.pendingResults[requestID]; already {
+			continue
+		}
+		q.pendingResults[requestID] = err
+		close(ch)
+	}
 }
 
 func (q *query) sendControlRequest(request map[string]any, timeout time.Duration) (map[string]any, error) {
