@@ -32,6 +32,8 @@ func ParseMessage(data map[string]any) (Message, error) {
 		return parseRateLimitEvent(data)
 	case "tool_progress":
 		return parseToolProgressMessage(data)
+	case "conversation_reset":
+		return parseConversationResetMessage(data)
 
 	default:
 		// Forward-compatible: skip unrecognized message types
@@ -489,6 +491,23 @@ func parseStreamEvent(data map[string]any) (*StreamEvent, error) {
 		SessionID:       stringField(data, "session_id"),
 		Event:           event,
 		ParentToolUseID: stringField(data, "parent_tool_use_id"),
+	}, nil
+}
+
+func parseConversationResetMessage(data map[string]any) (*ConversationResetMessage, error) {
+	for _, field := range []string{"new_conversation_id", "uuid", "session_id"} {
+		if _, ok := data[field].(string); !ok {
+			return nil, &MessageParseError{
+				SDKError: SDKError{Message: fmt.Sprintf("Missing required field in conversation_reset message: %q", field)},
+				Data:     data,
+			}
+		}
+	}
+
+	return &ConversationResetMessage{
+		NewConversationID: stringField(data, "new_conversation_id"),
+		UUID:              stringField(data, "uuid"),
+		SessionID:         stringField(data, "session_id"),
 	}, nil
 }
 

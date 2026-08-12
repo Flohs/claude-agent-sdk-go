@@ -709,6 +709,71 @@ func TestParseMessage_ResultMessage_StopReasonAbsent(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ConversationReset(t *testing.T) {
+	data := map[string]any{
+		"type":                "conversation_reset",
+		"new_conversation_id": "d2f4a573-ca99-42a2-bb7a-905b40c908e8",
+		"uuid":                "msg-1",
+		"session_id":          "66694129-ce74-4ee1-9b0f-994155ac97ba",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	event, ok := msg.(*ConversationResetMessage)
+	if !ok {
+		t.Fatalf("expected *ConversationResetMessage, got %T", msg)
+	}
+	if event.NewConversationID != "d2f4a573-ca99-42a2-bb7a-905b40c908e8" {
+		t.Errorf("NewConversationID = %q, want %q", event.NewConversationID, "d2f4a573-ca99-42a2-bb7a-905b40c908e8")
+	}
+	if event.UUID != "msg-1" {
+		t.Errorf("UUID = %q, want %q", event.UUID, "msg-1")
+	}
+	if event.SessionID != "66694129-ce74-4ee1-9b0f-994155ac97ba" {
+		t.Errorf("SessionID = %q, want %q", event.SessionID, "66694129-ce74-4ee1-9b0f-994155ac97ba")
+	}
+
+	// Verify it can be used as a Message interface.
+	if Message(msg) == nil {
+		t.Errorf("expected non-nil Message interface")
+	}
+}
+
+func TestParseMessage_ConversationReset_MissingField(t *testing.T) {
+	tests := []struct {
+		name string
+		data map[string]any
+	}{
+		{
+			name: "missing new_conversation_id",
+			data: map[string]any{"type": "conversation_reset", "uuid": "u", "session_id": "s"},
+		},
+		{
+			name: "missing uuid",
+			data: map[string]any{"type": "conversation_reset", "new_conversation_id": "c", "session_id": "s"},
+		},
+		{
+			name: "missing session_id",
+			data: map[string]any{"type": "conversation_reset", "new_conversation_id": "c", "uuid": "u"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseMessage(tt.data)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if _, ok := err.(*MessageParseError); !ok {
+				t.Fatalf("expected *MessageParseError, got %T", err)
+			}
+		})
+	}
+}
+
 func TestParseMessage_RateLimitEvent(t *testing.T) {
 	utilization := float64(0.85)
 	data := map[string]any{
