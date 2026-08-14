@@ -2093,6 +2093,94 @@ func TestParseAssistantMessage_NotAborted(t *testing.T) {
 	}
 }
 
+func TestParseAssistantMessage_ContextUsage(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{},
+		},
+		"context_usage": map[string]any{
+			"model":          "claude-opus-4-8",
+			"total_tokens":   float64(210000),
+			"raw_max_tokens": float64(200000),
+			"percentage":     float64(105),
+			"over_limit": map[string]any{
+				"tokens_over": float64(10000),
+				"kind":        "hard_limit",
+			},
+			"categories": []any{
+				map[string]any{"name": "Messages", "tokens": float64(150000), "kind": "used"},
+				map[string]any{"name": "Free space", "tokens": float64(-10000), "kind": "free"},
+			},
+			"mcp_tools": []any{
+				map[string]any{"name": "mcp__linear__create_issue", "server_name": "linear", "tokens": float64(500)},
+			},
+			"memory_files": []any{
+				map[string]any{"path": "/CLAUDE.md", "type": "Project", "tokens": float64(300)},
+			},
+			"agents": []any{
+				map[string]any{"agent_type": "code-reviewer", "source": "projectSettings", "tokens": float64(200)},
+			},
+			"skills": []any{
+				map[string]any{"name": "pdf", "source": "plugin", "plugin_name": "anthropic-skills", "tokens": float64(100)},
+			},
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	am, ok := msg.(*AssistantMessage)
+	if !ok {
+		t.Fatalf("expected AssistantMessage, got %T", msg)
+	}
+	cu := am.ContextUsage
+	if cu == nil {
+		t.Fatal("expected ContextUsage to be non-nil")
+	}
+	if cu.Model != "claude-opus-4-8" || cu.TotalTokens != 210000 || cu.RawMaxTokens != 200000 || cu.Percentage != 105 {
+		t.Errorf("unexpected scalar fields: %+v", cu)
+	}
+	if cu.OverLimit == nil || cu.OverLimit.TokensOver != 10000 || cu.OverLimit.Kind != "hard_limit" {
+		t.Errorf("unexpected OverLimit: %+v", cu.OverLimit)
+	}
+	if len(cu.Categories) != 2 || cu.Categories[0].Name != "Messages" || cu.Categories[0].Kind != "used" {
+		t.Errorf("unexpected Categories: %+v", cu.Categories)
+	}
+	if len(cu.MCPTools) != 1 || cu.MCPTools[0].Name != "mcp__linear__create_issue" || cu.MCPTools[0].ServerName != "linear" {
+		t.Errorf("unexpected MCPTools: %+v", cu.MCPTools)
+	}
+	if len(cu.MemoryFiles) != 1 || cu.MemoryFiles[0].Path != "/CLAUDE.md" || cu.MemoryFiles[0].Type != "Project" {
+		t.Errorf("unexpected MemoryFiles: %+v", cu.MemoryFiles)
+	}
+	if len(cu.Agents) != 1 || cu.Agents[0].AgentType != "code-reviewer" || cu.Agents[0].Source != "projectSettings" {
+		t.Errorf("unexpected Agents: %+v", cu.Agents)
+	}
+	if len(cu.Skills) != 1 || cu.Skills[0].Name != "pdf" || cu.Skills[0].PluginName != "anthropic-skills" {
+		t.Errorf("unexpected Skills: %+v", cu.Skills)
+	}
+}
+
+func TestParseAssistantMessage_ContextUsage_Absent(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{},
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	am, ok := msg.(*AssistantMessage)
+	if !ok {
+		t.Fatalf("expected AssistantMessage, got %T", msg)
+	}
+	if am.ContextUsage != nil {
+		t.Errorf("expected nil ContextUsage when absent, got %+v", am.ContextUsage)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tests for HookEventMessage (hook_started / hook_response) — issue #328
 // Port of Python SDK PR anthropics/claude-agent-sdk-python#917.

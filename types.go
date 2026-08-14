@@ -241,9 +241,106 @@ type AssistantMessage struct {
 	// icon URLs for each tool call in Content, keyed by tool-use ID. Nil when
 	// not provided by the CLI. Port of TypeScript SDK v0.3.179.
 	ToolUseMeta ToolUseMeta `json:"tool_use_meta,omitempty"`
+	// ContextUsage is a structured twin of the /context report, carried on
+	// the synthetic assistant message that delivers the markdown table. Nil
+	// except on /context results from CLIs new enough to attach it; the
+	// markdown in Content remains the canonical fallback. Distinct from
+	// [Client.GetContextUsage]'s [ContextUsage] return type, which is a
+	// different, on-demand control-request/response shape. Port of
+	// TypeScript SDK v0.3.232.
+	ContextUsage *AssistantContextUsage `json:"context_usage,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
+}
+
+// AssistantContextUsageOverLimit describes how far current usage exceeds the
+// resolved context window, present only when over it.
+type AssistantContextUsageOverLimit struct {
+	TokensOver int `json:"tokens_over"`
+	// Kind is "hard_limit" when the window is the model's believed limit
+	// (the API will refuse past it), or "compaction_window" when it's a
+	// compaction-policy window that may or may not coincide with the
+	// model's hard limit.
+	Kind string `json:"kind"`
+}
+
+// AssistantContextUsageCategory is one row of the /context usage-by-category
+// breakdown.
+type AssistantContextUsageCategory struct {
+	// Name is the display name of the row as the CLI renders it (e.g.
+	// "Messages" or "MCP tools (deferred)"); use Kind, not Name, to classify
+	// the row.
+	Name   string `json:"name"`
+	Tokens int    `json:"tokens"`
+	// Kind is "used" (occupies the window), "free" (remaining window),
+	// "buffer" (compaction reserve), or "deferred" (out-of-window tool
+	// schemas, excluded from usage math).
+	Kind string `json:"kind"`
+}
+
+// AssistantContextUsageMCPTool is one MCP tool's contribution to context
+// usage.
+type AssistantContextUsageMCPTool struct {
+	// Name is the wire tool name, e.g. "mcp__linear__create_issue".
+	Name       string `json:"name"`
+	ServerName string `json:"server_name"`
+	Tokens     int    `json:"tokens"`
+}
+
+// AssistantContextUsageMemoryFile is one memory file's contribution to
+// context usage.
+type AssistantContextUsageMemoryFile struct {
+	Path string `json:"path"`
+	// Type is the display label of the memory-file source, e.g. "Project" or
+	// "User".
+	Type   string `json:"type"`
+	Tokens int    `json:"tokens"`
+}
+
+// AssistantContextUsageAgent is one subagent definition's contribution to
+// context usage.
+type AssistantContextUsageAgent struct {
+	AgentType string `json:"agent_type"`
+	// Source is the raw source identifier, e.g. "projectSettings",
+	// "userSettings", or "plugin". Built-in agents are excluded.
+	Source string `json:"source"`
+	Tokens int    `json:"tokens"`
+}
+
+// AssistantContextUsageSkill is one skill's contribution to context usage.
+type AssistantContextUsageSkill struct {
+	Name string `json:"name"`
+	// Source is the raw source identifier, e.g. "userSettings", "plugin", or
+	// "syncedSkills".
+	Source     string `json:"source"`
+	PluginName string `json:"plugin_name,omitempty"`
+	Tokens     int    `json:"tokens"`
+}
+
+// AssistantContextUsage is a structured twin of the /context report,
+// carried on [AssistantMessage.ContextUsage]. Evolves additively (new
+// optional fields). Port of TypeScript SDK v0.3.232 (SDKContextUsage).
+type AssistantContextUsage struct {
+	// Model is the main-loop model the usage was computed for.
+	Model string `json:"model"`
+	// TotalTokens is the estimated tokens in use, unclamped — may exceed
+	// RawMaxTokens when over limit.
+	TotalTokens int `json:"total_tokens"`
+	// RawMaxTokens is the window usage is measured against: the resolved
+	// autocompact window (the model's believed limit, or a smaller
+	// compaction-policy window).
+	RawMaxTokens int `json:"raw_max_tokens"`
+	// Percentage is the rounded TotalTokens / RawMaxTokens, 0-100+.
+	Percentage int `json:"percentage"`
+	// OverLimit is set when TotalTokens exceeds RawMaxTokens.
+	OverLimit   *AssistantContextUsageOverLimit   `json:"over_limit,omitempty"`
+	Categories  []AssistantContextUsageCategory   `json:"categories"`
+	MCPTools    []AssistantContextUsageMCPTool    `json:"mcp_tools"`
+	MemoryFiles []AssistantContextUsageMemoryFile `json:"memory_files"`
+	Agents      []AssistantContextUsageAgent      `json:"agents"`
+	// Skills is nil when no skills contribute tokens.
+	Skills []AssistantContextUsageSkill `json:"skills,omitempty"`
 }
 
 func (AssistantMessage) messageMarker() {}
