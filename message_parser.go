@@ -150,6 +150,12 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		msg.StopDetails = sd
 	}
 
+	if rawCU, ok := data["context_usage"].(map[string]any); ok {
+		msg.ContextUsage = parseAssistantContextUsage(rawCU)
+	} else if rawCU, ok := message["context_usage"].(map[string]any); ok {
+		msg.ContextUsage = parseAssistantContextUsage(rawCU)
+	}
+
 	if rawMeta, ok := data["tool_use_meta"].(map[string]any); ok {
 		meta := make(ToolUseMeta, len(rawMeta))
 		for id, v := range rawMeta {
@@ -684,6 +690,85 @@ func parseToolResultMeta(data map[string]any) *ToolResultMeta {
 		NonExecutionKind: stringField(meta, "non_execution_kind"),
 		UserFeedback:     stringField(meta, "user_feedback"),
 	}
+}
+
+func parseAssistantContextUsage(m map[string]any) *AssistantContextUsage {
+	cu := &AssistantContextUsage{
+		Model:        stringField(m, "model"),
+		TotalTokens:  intField(m, "total_tokens"),
+		RawMaxTokens: intField(m, "raw_max_tokens"),
+		Percentage:   intField(m, "percentage"),
+	}
+
+	if ol, ok := m["over_limit"].(map[string]any); ok {
+		cu.OverLimit = &AssistantContextUsageOverLimit{
+			TokensOver: intField(ol, "tokens_over"),
+			Kind:       stringField(ol, "kind"),
+		}
+	}
+
+	if rawCategories, ok := m["categories"].([]any); ok {
+		for _, rc := range rawCategories {
+			if c, ok := rc.(map[string]any); ok {
+				cu.Categories = append(cu.Categories, AssistantContextUsageCategory{
+					Name:   stringField(c, "name"),
+					Tokens: intField(c, "tokens"),
+					Kind:   stringField(c, "kind"),
+				})
+			}
+		}
+	}
+
+	if rawTools, ok := m["mcp_tools"].([]any); ok {
+		for _, rt := range rawTools {
+			if t, ok := rt.(map[string]any); ok {
+				cu.MCPTools = append(cu.MCPTools, AssistantContextUsageMCPTool{
+					Name:       stringField(t, "name"),
+					ServerName: stringField(t, "server_name"),
+					Tokens:     intField(t, "tokens"),
+				})
+			}
+		}
+	}
+
+	if rawFiles, ok := m["memory_files"].([]any); ok {
+		for _, rf := range rawFiles {
+			if f, ok := rf.(map[string]any); ok {
+				cu.MemoryFiles = append(cu.MemoryFiles, AssistantContextUsageMemoryFile{
+					Path:   stringField(f, "path"),
+					Type:   stringField(f, "type"),
+					Tokens: intField(f, "tokens"),
+				})
+			}
+		}
+	}
+
+	if rawAgents, ok := m["agents"].([]any); ok {
+		for _, ra := range rawAgents {
+			if a, ok := ra.(map[string]any); ok {
+				cu.Agents = append(cu.Agents, AssistantContextUsageAgent{
+					AgentType: stringField(a, "agent_type"),
+					Source:    stringField(a, "source"),
+					Tokens:    intField(a, "tokens"),
+				})
+			}
+		}
+	}
+
+	if rawSkills, ok := m["skills"].([]any); ok {
+		for _, rs := range rawSkills {
+			if s, ok := rs.(map[string]any); ok {
+				cu.Skills = append(cu.Skills, AssistantContextUsageSkill{
+					Name:       stringField(s, "name"),
+					Source:     stringField(s, "source"),
+					PluginName: stringField(s, "plugin_name"),
+					Tokens:     intField(s, "tokens"),
+				})
+			}
+		}
+	}
+
+	return cu
 }
 
 func parseTaskUsage(v any) TaskUsage {
