@@ -1238,6 +1238,15 @@ type MessageOrigin struct {
 	// Body is the raw relayed message body. Populated for
 	// MessageOriginKindPeer.
 	Body string `json:"body,omitempty"`
+	// FromMode is the sending session's permission class as declared by the
+	// host that injects this message on local stdin: "bypass" for sessions
+	// that run tools without asking, "prompting" otherwise. Lets the
+	// recipient deliver a same-class message immediately while a
+	// cross-class or undeclared sender is still held at a recipient that
+	// runs without asking. Populated for MessageOriginKindPeer. Only
+	// honored from the injecting host on local stdin; empty when the host
+	// doesn't declare it.
+	FromMode string `json:"fromMode,omitempty"`
 	// Subkind further classifies MessageOriginKindTaskNotification: either
 	// MessageOriginSubkindScheduledTrigger or
 	// MessageOriginSubkindPeerSendMessage. Absent on webhook, PR-steward,
