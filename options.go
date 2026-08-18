@@ -729,7 +729,15 @@ type Options struct {
 	// via McpServers, ignoring project, user, and global MCP configurations.
 	// Enables fully deterministic server sets for reproducible deployments.
 	StrictMcpConfig bool
-	// ForwardSubagentText, when true, streams subagent text deltas to SDK consumers.
+	// ForwardSubagentText, when true, asks the CLI to forward subagent text and
+	// thinking blocks as messages in the stream, not just tool_use/tool_result
+	// blocks. By default only tool_use/tool_result blocks from subagents
+	// (spawned via the Agent tool) are emitted as AssistantMessage/UserMessage
+	// values whose ParentToolUseID is the spawning Agent tool_use id — enough
+	// for a progress heartbeat; when true, the subagent's text and thinking
+	// blocks are forwarded the same way, so consumers can render the full
+	// nested transcript. Matches the TypeScript SDK's forwardSubagentText.
+	// Port of Python SDK commit c97420c (anthropics/claude-agent-sdk-python#1206).
 	ForwardSubagentText bool
 	// ForkSession forks resumed sessions to a new session ID.
 	ForkSession bool

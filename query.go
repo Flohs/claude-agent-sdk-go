@@ -68,6 +68,7 @@ type query struct {
 	mainResultOnce         sync.Once
 	streamCloseTimeout     float64
 	excludeDynamicSections bool
+	forwardSubagentText    bool
 	// lastIsErrorResultDelivered is set when a result message with is_error:true
 	// has been delivered to messageCh. It suppresses ProcessError generation
 	// for subsequent subprocess exit failures so callers don't see both.
@@ -112,6 +113,7 @@ type queryConfig struct {
 	initTimeout            float64
 	agents                 map[string]AgentDefinition
 	excludeDynamicSections bool
+	forwardSubagentText    bool
 	// sessionStore, when non-nil, enables transcript mirroring. projectsDir
 	// is the base directory the CLI emits transcript filePath values under
 	// (resolved by [getProjectsDir]). loadTimeoutMs caps the batcher's
@@ -165,6 +167,7 @@ func newQuery(cfg queryConfig) *query {
 		mainResultCh:            make(chan struct{}),
 		streamCloseTimeout:      streamCloseTimeoutMs / 1000.0,
 		excludeDynamicSections:  cfg.excludeDynamicSections,
+		forwardSubagentText:     cfg.forwardSubagentText,
 		flushTimeout:            flushTimeout,
 		stderrCallback:          cfg.stderr,
 		ctx:                     ctx,
@@ -852,6 +855,10 @@ func (q *query) initialize() (map[string]any, error) {
 
 	if q.agents != nil {
 		request["agents"] = q.agents
+	}
+
+	if q.forwardSubagentText {
+		request["forwardSubagentText"] = true
 	}
 
 	response, err := q.sendControlRequest(request, time.Duration(q.initTimeout*float64(time.Second)))
