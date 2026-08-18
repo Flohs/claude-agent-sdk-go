@@ -1359,12 +1359,23 @@ func (q *query) getUsageExperimental() (*UsageDataExperimental, error) {
 }
 
 func (q *query) streamInput(inputCh <-chan map[string]any) {
+	written := false
 	for msg := range inputCh {
 		if q.closed {
 			break
 		}
 		data, _ := json.Marshal(msg)
 		_ = q.transport.Write(string(data) + "\n")
+		written = true
+	}
+
+	// Nothing was ever written, so no result will ever arrive to release a
+	// wait — end input immediately instead of blocking for the full
+	// streamCloseTimeout. Mirrors the TypeScript SDK's messageCount guard
+	// and the Python SDK's written guard.
+	if !written {
+		_ = q.transport.EndInput()
+		return
 	}
 
 	q.waitForResultAndEndInput()
@@ -1372,18 +1383,21 @@ func (q *query) streamInput(inputCh <-chan map[string]any) {
 
 // waitForResultAndEndInput waits for a run-ending result — a main-session
 // result with no background tasks in flight — before closing stdin, when
-// SDK MCP servers or hooks are configured. This prevents closing stdin
-// before the CLI completes the MCP initialization handshake, and prevents
-// closing it while a background task still needs the control channel for
-// hook/SDK-MCP responses (mainResultCh is only closed under that
-// condition; see its gating in readMessages). Bounded by streamCloseTimeout
-// and ctx cancellation so a run that never satisfies this condition can't
-// hang forever.
+// SDK MCP servers, hooks, or a CanUseTool callback are configured. This
+// prevents closing stdin before the CLI completes the MCP initialization
+// handshake, before it can send a can_use_tool control_request and read
+// back the SDK's control_response, and prevents closing it while a
+// background task still needs the control channel for hook/SDK-MCP
+// responses (mainResultCh is only closed under that condition; see its
+// gating in readMessages). Bounded by streamCloseTimeout and ctx
+// cancellation so a run that never satisfies this condition can't hang
+// forever.
 func (q *query) waitForResultAndEndInput() {
 	hasHooks := len(q.hooks) > 0
 	hasMcpServers := len(q.mcpRouter.servers) > 0
+	hasCanUseTool := q.canUseTool != nil
 
-	if hasMcpServers || hasHooks {
+	if hasMcpServers || hasHooks || hasCanUseTool {
 		select {
 		case <-q.mainResultCh:
 		case <-time.After(time.Duration(q.streamCloseTimeout * float64(time.Second))):
