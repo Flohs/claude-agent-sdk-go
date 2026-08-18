@@ -428,6 +428,12 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 					case ch <- map[string]any{
 						"type":  "error",
 						"error": procErr.Error(),
+						// exit_code rides along as a plain int (this map is
+						// constructed directly, never JSON-decoded) so query's
+						// read loop can build a *ProcessError/*ResultError
+						// with a real ExitCode instead of re-parsing it out
+						// of the message string.
+						"exit_code": code,
 					}:
 					case <-ctx.Done():
 					}
