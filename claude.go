@@ -118,6 +118,7 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			mcpServers:             sdkServers,
 			agents:                 configuredOpts.Agents,
 			excludeDynamicSections: excludeDynamic,
+			forwardSubagentText:    configuredOpts.ForwardSubagentText,
 		})
 
 		q.start()
@@ -298,6 +299,7 @@ func Startup(ctx context.Context, opts *Options) (*WarmQuery, error) {
 		mcpServers:             sdkServers,
 		agents:                 configuredOpts.Agents,
 		excludeDynamicSections: excludeDynamic,
+		forwardSubagentText:    configuredOpts.ForwardSubagentText,
 	})
 	q.start()
 

@@ -113,6 +113,7 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		mcpServers:             sdkServers,
 		agents:                 configuredOpts.Agents,
 		excludeDynamicSections: excludeDynamic,
+		forwardSubagentText:    configuredOpts.ForwardSubagentText,
 		sessionStore:           configuredOpts.SessionStore,
 		projectsDir:            projectsDir,
 		loadTimeoutMs:          configuredOpts.LoadTimeoutMs,

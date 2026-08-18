@@ -727,6 +727,81 @@ func TestInitialize_ExcludeDynamicSections(t *testing.T) {
 	})
 }
 
+func TestInitialize_ForwardSubagentText(t *testing.T) {
+	t.Run("sends forwardSubagentText when true", func(t *testing.T) {
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{
+			transport:           mt,
+			forwardSubagentText: true,
+		})
+
+		q.start()
+		_, err := q.initialize()
+		if err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+
+		// Copy written data before close (close acquires mu)
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+
+		_ = q.close()
+
+		found := false
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			req, _ := msg["request"].(map[string]any)
+			if req != nil && req["subtype"] == "initialize" {
+				if val, ok := req["forwardSubagentText"]; ok && val == true {
+					found = true
+				}
+			}
+		}
+		if !found {
+			t.Error("initialize request should contain forwardSubagentText: true")
+		}
+	})
+
+	t.Run("omits forwardSubagentText when false", func(t *testing.T) {
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{
+			transport:           mt,
+			forwardSubagentText: false,
+		})
+
+		q.start()
+		_, err := q.initialize()
+		if err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+
+		_ = q.close()
+
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			req, _ := msg["request"].(map[string]any)
+			if req != nil && req["subtype"] == "initialize" {
+				if _, ok := req["forwardSubagentText"]; ok {
+					t.Error("initialize request should not contain forwardSubagentText when false")
+				}
+			}
+		}
+	})
+}
+
 // ---------------------------------------------------------------------------
 // ProcessError suppression branch (#204 follow-up for #174).
 // query.readMessages must NOT generate a ProcessError when an is_error result
