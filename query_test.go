@@ -162,6 +162,45 @@ func TestWaitForResultAndEndInput_WithHooks_WaitsForResult(t *testing.T) {
 	}
 }
 
+func TestWaitForResultAndEndInput_WithCanUseTool_WaitsForResult(t *testing.T) {
+	// With a CanUseTool callback configured (and no hooks or MCP servers),
+	// EndInput should wait for the main-session result, so stdin stays open
+	// long enough for the CLI to send a can_use_tool control_request and
+	// read back the SDK's control_response.
+	mt := newMockTransport()
+	q := newQuery(queryConfig{
+		transport: mt,
+		canUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+			return PermissionResultAllow{}, nil
+		},
+	})
+
+	done := make(chan struct{})
+	go func() {
+		q.waitForResultAndEndInput()
+		close(done)
+	}()
+
+	// EndInput should NOT have been called yet
+	time.Sleep(50 * time.Millisecond)
+	if mt.getEndInputCalled() {
+		t.Fatal("EndInput should not be called before the main-session result when CanUseTool is configured")
+	}
+
+	// Signal main-session result (empty origin).
+	q.mainResultOnce.Do(func() { close(q.mainResultCh) })
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("waitForResultAndEndInput did not return after main-session result")
+	}
+
+	if !mt.getEndInputCalled() {
+		t.Fatal("expected EndInput to be called after main-session result")
+	}
+}
+
 func TestWaitForResultAndEndInput_ContextCancellation(t *testing.T) {
 	// When context is cancelled, EndInput should still be called.
 	mt := newMockTransport()
@@ -240,6 +279,53 @@ func TestStreamInput_UsesWaitForResultAndEndInput(t *testing.T) {
 	defer mt.mu.Unlock()
 	if len(mt.written) == 0 {
 		t.Fatal("expected at least one message to be written")
+	}
+}
+
+func TestStreamInput_NothingWritten_EndsInputImmediately(t *testing.T) {
+	// When inputCh is closed without any message ever being written, no
+	// result will ever arrive to release waitForResultAndEndInput's wait —
+	// streamInput must end input immediately instead of blocking for the
+	// full streamCloseTimeout. MCP servers are configured here so a real
+	// result-wait would normally apply if anything had been written.
+	mt := newMockTransport()
+	q := newQuery(queryConfig{
+		transport: mt,
+		mcpServers: map[string]*McpSdkServerConfig{
+			"test-server": {Name: "test"},
+		},
+	})
+	// Sanity check: streamCloseTimeout is much longer than the deadline
+	// used below, so a pass here can't be explained by a naturally short
+	// timeout.
+	if q.streamCloseTimeout < 1 {
+		t.Fatalf("expected a streamCloseTimeout of at least 1s, got %v", q.streamCloseTimeout)
+	}
+
+	inputCh := make(chan map[string]any)
+	close(inputCh)
+
+	done := make(chan struct{})
+	go func() {
+		q.streamInput(inputCh)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("streamInput did not return promptly when nothing was written")
+	}
+
+	if !mt.getEndInputCalled() {
+		t.Fatal("expected EndInput to be called")
+	}
+
+	mt.mu.Lock()
+	wroteAnything := len(mt.written) > 0
+	mt.mu.Unlock()
+	if wroteAnything {
+		t.Fatal("expected no messages to have been written")
 	}
 }
 
