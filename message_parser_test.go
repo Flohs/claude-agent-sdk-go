@@ -1370,6 +1370,34 @@ func TestParseMessage_ResultMessage_Origin_Channel(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_Origin_Peer_FromMode(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+		"origin": map[string]any{
+			"kind":     "peer",
+			"from":     "agent-2",
+			"fromMode": "bypass",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.Origin == nil {
+		t.Fatal("Origin = nil, want non-nil")
+	}
+	if r.Origin.Kind != MessageOriginKindPeer {
+		t.Errorf("Origin.Kind = %q, want %q", r.Origin.Kind, MessageOriginKindPeer)
+	}
+	if r.Origin.FromMode != "bypass" {
+		t.Errorf("Origin.FromMode = %q, want bypass", r.Origin.FromMode)
+	}
+}
+
 func TestParseMessage_ResultMessage_Origin_Absent(t *testing.T) {
 	data := map[string]any{
 		"type":       "result",
