@@ -181,6 +181,7 @@ type AssistantMessageError string
 const (
 	AssistantMessageErrorAuthFailed         AssistantMessageError = "authentication_failed"
 	AssistantMessageErrorOAuthOrgNotAllowed AssistantMessageError = "oauth_org_not_allowed"
+	AssistantMessageErrorAccountOnHold      AssistantMessageError = "account_on_hold"
 	AssistantMessageErrorBilling            AssistantMessageError = "billing_error"
 	AssistantMessageErrorRateLimit          AssistantMessageError = "rate_limit"
 	AssistantMessageErrorOverloaded         AssistantMessageError = "overloaded"
