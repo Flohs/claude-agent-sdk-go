@@ -722,7 +722,8 @@ type HookContext struct {
 //   - [HookOutputKeyDecision] — "approve", "block", or "defer".
 //   - [HookOutputKeyReason] — human-readable reason shown to the user on block.
 //
-// PostToolUse hooks may return:
+// PostToolUse hooks may return, nested under a "hookSpecificOutput" object
+// (see [PostToolUseHookOutput] for a typed helper that builds this shape):
 //   - [HookOutputKeyUpdatedToolOutput] — replacement value for the tool's
 //     output before it reaches the model. Works for any tool type (Bash,
 //     Write, MCP tools, …). Supersedes [HookOutputKeyUpdatedMCPToolOutput].
@@ -759,9 +760,12 @@ const (
 //	    claude.HookOutputKeyReason:   "not allowed in this context",
 //	}, nil
 //
-//	// Replace tool output from a PostToolUse hook:
+//	// Replace tool output from a PostToolUse hook (or use [PostToolUseHookOutput]):
 //	return claude.HookJSONOutput{
-//	    claude.HookOutputKeyUpdatedToolOutput: sanitized,
+//	    "hookSpecificOutput": map[string]any{
+//	        "hookEventName":                       "PostToolUse",
+//	        claude.HookOutputKeyUpdatedToolOutput: sanitized,
+//	    },
 //	}, nil
 //
 // See https://code.claude.com/docs/en/hooks#advanced%3A-json-output
@@ -771,7 +775,7 @@ type HookJSONOutput map[string]any
 // Use [PostToolUseHookOutput.ToHookJSONOutput] to convert to the [HookJSONOutput] map
 // that [HookCallback] must return.
 //
-// Port of TypeScript SDK v0.2.121.
+// Port of TypeScript SDK v0.2.121, plus AdditionalContext/ClassifierContext from v0.3.236.
 type PostToolUseHookOutput struct {
 	// UpdatedToolOutput, when non-nil, replaces the tool's output that the model sees.
 	// Applies to all tool types (Bash, Write, MCP tools, etc.). Port of TypeScript SDK v0.2.121.
@@ -781,19 +785,32 @@ type PostToolUseHookOutput struct {
 	//
 	// Deprecated: Use UpdatedToolOutput.
 	UpdatedMCPToolOutput any
+	// AdditionalContext, when non-empty, is injected as extra context for the model
+	// alongside the tool's result. Port of TypeScript SDK v0.3.236.
+	AdditionalContext string
+	// ClassifierContext, when non-empty, is a short host-asserted note about the tool
+	// call's result that the auto-mode permission classifier reads alongside that
+	// result. Honored on synchronous hook responses only. Port of TypeScript SDK v0.3.236.
+	ClassifierContext string
 }
 
 // ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map suitable for
-// returning from a [HookCallback]. Fields with a nil value are omitted.
+// returning from a [HookCallback]. Fields with a nil/empty value are omitted.
 func (o PostToolUseHookOutput) ToHookJSONOutput() HookJSONOutput {
-	out := HookJSONOutput{}
+	specific := map[string]any{"hookEventName": "PostToolUse"}
 	if o.UpdatedToolOutput != nil {
-		out["updatedToolOutput"] = o.UpdatedToolOutput
+		specific["updatedToolOutput"] = o.UpdatedToolOutput
 	}
 	if o.UpdatedMCPToolOutput != nil {
-		out["updatedMCPToolOutput"] = o.UpdatedMCPToolOutput
+		specific["updatedMCPToolOutput"] = o.UpdatedMCPToolOutput
 	}
-	return out
+	if o.AdditionalContext != "" {
+		specific["additionalContext"] = o.AdditionalContext
+	}
+	if o.ClassifierContext != "" {
+		specific["classifierContext"] = o.ClassifierContext
+	}
+	return HookJSONOutput{"hookSpecificOutput": specific}
 }
 
 // HookCallback is the function type for hook callbacks.
