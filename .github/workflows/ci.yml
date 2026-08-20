@@ -43,7 +43,12 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9.3.0
         with:
-          version: latest
+          # Pinned rather than "latest": v2.13.0 started flagging SA1019 on every
+          # AllowedTools usage repo-wide (examples, tests, README), not just the
+          # "Skill" case its Deprecated: doc comment actually targets — a false
+          # positive from a staticcheck/golangci-lint version bump, not a code
+          # regression (v2.12.2 reports 0 issues on this codebase unchanged).
+          version: v2.12.2
 
   vuln:
     runs-on: ubuntu-latest
