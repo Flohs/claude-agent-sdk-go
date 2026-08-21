@@ -384,6 +384,17 @@ type TaskStartedMessage struct {
 	SubagentType string `json:"subagent_type,omitempty"`
 	// TaskDescription is a human-readable description of the task.
 	TaskDescription string `json:"task_description,omitempty"`
+	// IsBackgrounded reports whether the task was registered in the
+	// background (true) or in the foreground with the spawning tool call
+	// blocking on it (false). A resumed subagent is always registered in the
+	// background; a later move to the background arrives as a task_updated
+	// patch, not a change to this field. Set for local_agent and local_bash
+	// tasks. Port of TypeScript SDK v0.3.238.
+	IsBackgrounded *bool `json:"is_backgrounded,omitempty"`
+	// SpawnDepth is the nesting depth of a spawned subagent (local_agent)
+	// task: 1 for a top-level spawn, N+1 when spawned from inside a depth-N
+	// agent. Not set on other tasks. Port of TypeScript SDK v0.3.238.
+	SpawnDepth *int `json:"spawn_depth,omitempty"`
 }
 
 // TaskProgressMessage is emitted while a task is in progress.
