@@ -1618,6 +1618,52 @@ func TestParseMessage_TaskStarted_SubagentTypeAndDescription(t *testing.T) {
 	}
 }
 
+func TestParseMessage_TaskStarted_IsBackgroundedAndSpawnDepth(t *testing.T) {
+	data := map[string]any{
+		"type":            "system",
+		"subtype":         "task_started",
+		"task_id":         "t1",
+		"description":     "Running task",
+		"uuid":            "u1",
+		"session_id":      "s1",
+		"is_backgrounded": true,
+		"spawn_depth":     float64(2),
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	task := msg.(*TaskStartedMessage)
+	if task.IsBackgrounded == nil || !*task.IsBackgrounded {
+		t.Errorf("IsBackgrounded = %v, want true", task.IsBackgrounded)
+	}
+	if task.SpawnDepth == nil || *task.SpawnDepth != 2 {
+		t.Errorf("SpawnDepth = %v, want 2", task.SpawnDepth)
+	}
+}
+
+func TestParseMessage_TaskStarted_IsBackgroundedAndSpawnDepthAbsent(t *testing.T) {
+	data := map[string]any{
+		"type":        "system",
+		"subtype":     "task_started",
+		"task_id":     "t1",
+		"description": "Running task",
+		"uuid":        "u1",
+		"session_id":  "s1",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	task := msg.(*TaskStartedMessage)
+	if task.IsBackgrounded != nil {
+		t.Errorf("IsBackgrounded = %v, want nil when absent", *task.IsBackgrounded)
+	}
+	if task.SpawnDepth != nil {
+		t.Errorf("SpawnDepth = %v, want nil when absent", *task.SpawnDepth)
+	}
+}
+
 func TestParseMessage_TaskProgress_SubagentTypeAndDescription(t *testing.T) {
 	data := map[string]any{
 		"type":             "system",

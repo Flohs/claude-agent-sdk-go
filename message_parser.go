@@ -201,6 +201,8 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			TaskType:        stringField(data, "task_type"),
 			SubagentType:    stringField(data, "subagent_type"),
 			TaskDescription: stringField(data, "task_description"),
+			IsBackgrounded:  optionalBoolField(data, "is_backgrounded"),
+			SpawnDepth:      optionalIntField(data, "spawn_depth"),
 		}, nil
 
 	case "task_progress":
@@ -844,5 +846,21 @@ func optionalStringField(m map[string]any, key string) *string {
 	if !ok {
 		return nil
 	}
+	return &v
+}
+
+func optionalBoolField(m map[string]any, key string) *bool {
+	v, ok := m[key].(bool)
+	if !ok {
+		return nil
+	}
+	return &v
+}
+
+func optionalIntField(m map[string]any, key string) *int {
+	if _, ok := m[key]; !ok {
+		return nil
+	}
+	v := intField(m, key)
 	return &v
 }
