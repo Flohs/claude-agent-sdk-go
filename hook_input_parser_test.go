@@ -1393,6 +1393,27 @@ func TestWorktreeCreateHookOutput_ToHookJSONOutput(t *testing.T) {
 	}
 }
 
+func TestUserPromptExpansionHookOutput_ToHookJSONOutput(t *testing.T) {
+	o := UserPromptExpansionHookOutput{AdditionalContext: "extra context", SuppressOriginalPrompt: true}
+	out := o.ToHookJSONOutput()
+	specific, ok := out["hookSpecificOutput"].(map[string]any)
+	if !ok {
+		t.Fatalf("hookSpecificOutput missing or wrong type: %v", out)
+	}
+	if specific["additionalContext"] != "extra context" {
+		t.Errorf("additionalContext: got %v", specific["additionalContext"])
+	}
+	if specific["suppressOriginalPrompt"] != true {
+		t.Errorf("suppressOriginalPrompt: got %v", specific["suppressOriginalPrompt"])
+	}
+
+	empty := UserPromptExpansionHookOutput{}
+	emptyOut := empty.ToHookJSONOutput()
+	if len(emptyOut) != 0 {
+		t.Errorf("empty output should produce empty map, got %v", emptyOut)
+	}
+}
+
 func TestParseHookInput_WorktreeRemove(t *testing.T) {
 	input := HookInput{
 		"session_id":      "sess-wr",
