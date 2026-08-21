@@ -686,6 +686,34 @@ type UserPromptExpansionHookInput struct {
 
 func (*UserPromptExpansionHookInput) hookInputMarker() {}
 
+// UserPromptExpansionHookOutput is the typed output for
+// [HookEventUserPromptExpansion] callbacks. Port of TypeScript SDK v0.3.238.
+type UserPromptExpansionHookOutput struct {
+	// AdditionalContext, when non-empty, is injected as extra context
+	// alongside the expansion.
+	AdditionalContext string
+	// SuppressOriginalPrompt, when true, omits the original prompt from the
+	// block message shown to the user. Only meaningful combined with a
+	// "block" decision (see [HookOutputKeyDecision]).
+	SuppressOriginalPrompt bool
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map.
+func (o UserPromptExpansionHookOutput) ToHookJSONOutput() HookJSONOutput {
+	out := HookJSONOutput{}
+	specific := map[string]any{}
+	if o.AdditionalContext != "" {
+		specific["additionalContext"] = o.AdditionalContext
+	}
+	if o.SuppressOriginalPrompt {
+		specific["suppressOriginalPrompt"] = true
+	}
+	if len(specific) > 0 {
+		out["hookSpecificOutput"] = specific
+	}
+	return out
+}
+
 // SetupHookInput is the typed input for Setup hook events. Fires during
 // one-time session initialization (--init-only or -p --init/--maintenance).
 // Hook output is written to the debug log only; the hook cannot block setup.
