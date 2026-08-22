@@ -1192,9 +1192,11 @@ const (
 	MessageOriginKindPeer MessageOriginKind = "peer"
 	// MessageOriginKindTaskNotification is a message delivered as the result
 	// of a completed task. Subkind is MessageOriginSubkindScheduledTrigger
-	// when the delivery is the fired prompt of a scheduled task/routine, or
+	// when the delivery is the fired prompt of a scheduled task/routine,
 	// MessageOriginSubkindPeerSendMessage when it's a cross-session
-	// SendMessage delivery from another of the same user's sessions.
+	// SendMessage delivery from another of the same user's sessions, or
+	// MessageOriginSubkindProjectsRelay when it's a Claude Code Projects
+	// delivery relayed from the project's coordinator session.
 	MessageOriginKindTaskNotification MessageOriginKind = "task-notification"
 	// MessageOriginKindCoordinator is a message sent by the coordinator.
 	MessageOriginKindCoordinator MessageOriginKind = "coordinator"
@@ -1228,6 +1230,14 @@ const (
 	// Distinguishable from a plain task-notification so the receive-side
 	// crossSessionInbound setting can apply to it.
 	MessageOriginSubkindPeerSendMessage = "peer-send-message"
+	// MessageOriginSubkindProjectsRelay marks a Claude Code Projects
+	// delivery that Anthropic servers composed for the project's
+	// coordinator session and addressed to one of its thread sessions: the
+	// thread's first message, or a relay carrying project messages,
+	// stamped from server-asserted provenance. A delivery that carries the
+	// server's relay stamps is framed as a message from the coordinator
+	// session instead of the generic background-notification frame.
+	MessageOriginSubkindProjectsRelay = "projects-relay"
 )
 
 // MessageOrigin identifies what triggered a message (e.g. distinguishing a
@@ -1259,9 +1269,10 @@ type MessageOrigin struct {
 	// honored from the injecting host on local stdin; empty when the host
 	// doesn't declare it.
 	FromMode string `json:"fromMode,omitempty"`
-	// Subkind further classifies MessageOriginKindTaskNotification: either
-	// MessageOriginSubkindScheduledTrigger or
-	// MessageOriginSubkindPeerSendMessage. Absent on webhook, PR-steward,
+	// Subkind further classifies MessageOriginKindTaskNotification:
+	// MessageOriginSubkindScheduledTrigger,
+	// MessageOriginSubkindPeerSendMessage, or
+	// MessageOriginSubkindProjectsRelay. Absent on webhook, PR-steward,
 	// plugin, and background-event deliveries.
 	Subkind string `json:"subkind,omitempty"`
 }
