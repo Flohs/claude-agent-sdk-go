@@ -1348,6 +1348,10 @@ type ResultMessage struct {
 	// sent, for cross-host request-latency correlation. Nil when not
 	// provided by the CLI.
 	RequestSentWallMs *int64 `json:"request_sent_wall_ms,omitempty"`
+	// QueuedTurnCount is the number of user sends still queued when this
+	// result was produced. Nil when not provided by the CLI; 0 is a
+	// meaningful value (nothing queued), distinct from absent.
+	QueuedTurnCount *int `json:"queued_turn_count,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`

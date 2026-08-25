@@ -443,6 +443,8 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		}
 	}
 
+	msg.QueuedTurnCount = optionalIntField(data, "queued_turn_count")
+
 	if cost, ok := data["total_cost_usd"].(float64); ok {
 		msg.TotalCostUSD = &cost
 	}

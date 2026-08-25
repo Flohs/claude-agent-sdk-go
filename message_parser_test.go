@@ -1496,6 +1496,44 @@ func TestParseMessage_ResultMessage_APIErrorStatus_Absent(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_QueuedTurnCount(t *testing.T) {
+	data := map[string]any{
+		"type":              "result",
+		"subtype":           "success",
+		"is_error":          false,
+		"session_id":        "s",
+		"queued_turn_count": float64(0),
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.QueuedTurnCount == nil {
+		t.Fatal("QueuedTurnCount is nil, want a present 0 to be distinguishable from absent")
+	}
+	if *r.QueuedTurnCount != 0 {
+		t.Errorf("*QueuedTurnCount = %d, want 0", *r.QueuedTurnCount)
+	}
+}
+
+func TestParseMessage_ResultMessage_QueuedTurnCount_Absent(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.QueuedTurnCount != nil {
+		t.Errorf("QueuedTurnCount = %v, want nil when absent", *r.QueuedTurnCount)
+	}
+}
+
 func TestParseMessage_ResultMessage_DeferredToolUse(t *testing.T) {
 	data := map[string]any{
 		"type":       "result",
