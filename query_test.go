@@ -1172,7 +1172,7 @@ func TestHandleCanUseTool_PopulatesRequestID(t *testing.T) {
 	}
 }
 
-func TestHandleCanUseTool_PopulatesMatchedAskRuleAndSuppressAlwaysAllowRule(t *testing.T) {
+func TestHandleCanUseTool_PopulatesMatchedAskRuleAndSuppressAlwaysAllowRuleAndDefaultToNo(t *testing.T) {
 	mt := newMockTransport()
 	var gotCtx ToolPermissionContext
 	q := newQuery(queryConfig{
@@ -1191,6 +1191,7 @@ func TestHandleCanUseTool_PopulatesMatchedAskRuleAndSuppressAlwaysAllowRule(t *t
 			"tool_use_id":                "tu-3",
 			"input":                      map[string]any{},
 			"suppress_always_allow_rule": true,
+			"default_to_no":              true,
 			"matched_ask_rule": map[string]any{
 				"source":       "/home/user/.claude/settings.json",
 				"tool_name":    "Bash",
@@ -1201,6 +1202,9 @@ func TestHandleCanUseTool_PopulatesMatchedAskRuleAndSuppressAlwaysAllowRule(t *t
 
 	if !gotCtx.SuppressAlwaysAllowRule {
 		t.Error("expected SuppressAlwaysAllowRule to be true")
+	}
+	if !gotCtx.DefaultToNo {
+		t.Error("expected DefaultToNo to be true")
 	}
 	if gotCtx.MatchedAskRule == nil {
 		t.Fatal("expected MatchedAskRule to be non-nil")

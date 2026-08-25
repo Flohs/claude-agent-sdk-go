@@ -152,6 +152,10 @@ type ToolPermissionContext struct {
 	// DecisionReason. Nil when no ask rule matched. Port of TypeScript SDK
 	// v0.3.214.
 	MatchedAskRule *MatchedAskRule
+	// DefaultToNo is true when the terminal prompt for this ask must default
+	// to declining (no digit-shortcut auto-accept). Port of TypeScript SDK
+	// v0.3.242.
+	DefaultToNo bool
 }
 
 // MatchedAskRule describes the user-configured permission ask rule that
