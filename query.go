@@ -691,6 +691,7 @@ func (q *query) handleCanUseTool(request map[string]any, requestID string) (map[
 		DisplayName:             stringField(request, "display_name"),
 		Description:             stringField(request, "description"),
 		SuppressAlwaysAllowRule: boolField(request, "suppress_always_allow_rule"),
+		DefaultToNo:             boolField(request, "default_to_no"),
 	}
 	if suggestions, ok := request["permission_suggestions"].([]any); ok {
 		permCtx.Suggestions = make([]PermissionUpdate, 0, len(suggestions))
