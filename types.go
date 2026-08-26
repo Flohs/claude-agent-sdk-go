@@ -1579,6 +1579,17 @@ type ModelUsage struct {
 	// "bedrock", "vertex", "foundry", "anthropicAws", "anthropicGoogleCloud",
 	// "mantle", "gateway"). Empty when not provided by the CLI.
 	Provider string `json:"provider,omitempty"`
+	// CostBasis is which price table the most recent request for this model
+	// was priced at: "list" (Claude Code's built-in list prices), "managed"
+	// (the organization's managed-settings modelPricing rates or
+	// multiplier), or "unknown" (no pricing row and no built-in price
+	// matched the model ID, so CostUSD is a guess at the default model's
+	// rate). Overwritten per request like CanonicalModel, so a consumer
+	// that differences the cumulative CostUSD per turn gets that turn's
+	// basis. Empty until this process has priced a request for the model
+	// (e.g. right after --resume) and on CLIs that predate the field; treat
+	// as "list". Port of TypeScript SDK v0.3.246.
+	CostBasis string `json:"costBasis,omitempty"`
 }
 
 // UsageDataExperimental contains session cost, plan rate-limit, and local

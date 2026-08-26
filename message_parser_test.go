@@ -624,6 +624,7 @@ func TestParseMessage_ResultMessage_ModelUsage(t *testing.T) {
 				"maxOutputTokens":          float64(8192),
 				"canonicalModel":           "claude-opus-4-7",
 				"provider":                 "firstParty",
+				"costBasis":                "managed",
 			},
 		},
 	}
@@ -639,7 +640,7 @@ func TestParseMessage_ResultMessage_ModelUsage(t *testing.T) {
 	if u.InputTokens != 100 || u.OutputTokens != 50 || u.CacheReadInputTokens != 10 ||
 		u.CacheCreationInputTokens != 5 || u.WebSearchRequests != 2 || u.CostUSD != 0.25 ||
 		u.ContextWindow != 200000 || u.MaxOutputTokens != 8192 ||
-		u.CanonicalModel != "claude-opus-4-7" || u.Provider != "firstParty" {
+		u.CanonicalModel != "claude-opus-4-7" || u.Provider != "firstParty" || u.CostBasis != "managed" {
 		t.Errorf("unexpected ModelUsage entry: %+v", u)
 	}
 }
