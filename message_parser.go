@@ -136,6 +136,7 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		Aborted:         boolField(message, "aborted"),
 		RequestID:       stringField(data, "request_id"),
 		Timestamp:       stringField(data, "timestamp"),
+		UserMessageUUID: stringField(data, "user_message_uuid"),
 	}
 
 	if errStr := stringField(data, "error"); errStr != "" {
@@ -502,6 +503,7 @@ func parseStreamEvent(data map[string]any) (*StreamEvent, error) {
 		SessionID:       stringField(data, "session_id"),
 		Event:           event,
 		ParentToolUseID: stringField(data, "parent_tool_use_id"),
+		UserMessageUUID: stringField(data, "user_message_uuid"),
 	}, nil
 }
 

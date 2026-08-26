@@ -231,9 +231,10 @@ func TestParseMessage_AssistantMessage_ServerToolUseAndResult(t *testing.T) {
 
 func TestParseMessage_AssistantMessage_TypedFields(t *testing.T) {
 	data := map[string]any{
-		"type":       "assistant",
-		"session_id": "sess-123",
-		"uuid":       "msg-uuid-abc",
+		"type":              "assistant",
+		"session_id":        "sess-123",
+		"uuid":              "msg-uuid-abc",
+		"user_message_uuid": "user-msg-uuid-xyz",
 		"message": map[string]any{
 			"id":          "msg_01",
 			"model":       "claude-opus-4-7",
@@ -261,6 +262,9 @@ func TestParseMessage_AssistantMessage_TypedFields(t *testing.T) {
 	}
 	if asst.StopReason != "end_turn" {
 		t.Errorf("StopReason = %q, want end_turn", asst.StopReason)
+	}
+	if asst.UserMessageUUID != "user-msg-uuid-xyz" {
+		t.Errorf("UserMessageUUID = %q, want user-msg-uuid-xyz", asst.UserMessageUUID)
 	}
 }
 
@@ -1033,10 +1037,11 @@ func TestParseMessage_ToolProgress_ImplementsMessage(t *testing.T) {
 
 func TestParseMessage_StreamEvent(t *testing.T) {
 	data := map[string]any{
-		"type":       "stream_event",
-		"uuid":       "u1",
-		"session_id": "s1",
-		"event":      map[string]any{"type": "content_block_delta"},
+		"type":              "stream_event",
+		"uuid":              "u1",
+		"session_id":        "s1",
+		"event":             map[string]any{"type": "content_block_delta"},
+		"user_message_uuid": "user-msg-uuid-xyz",
 	}
 
 	msg, err := ParseMessage(data)
@@ -1050,6 +1055,9 @@ func TestParseMessage_StreamEvent(t *testing.T) {
 	}
 	if event.UUID != "u1" {
 		t.Fatalf("expected uuid 'u1', got %s", event.UUID)
+	}
+	if event.UserMessageUUID != "user-msg-uuid-xyz" {
+		t.Fatalf("expected user_message_uuid 'user-msg-uuid-xyz', got %s", event.UserMessageUUID)
 	}
 }
 
