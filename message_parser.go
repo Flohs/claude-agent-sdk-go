@@ -489,6 +489,7 @@ func parseModelUsage(raw map[string]any) map[string]ModelUsage {
 			MaxOutputTokens:          intField(m, "maxOutputTokens"),
 			CanonicalModel:           stringField(m, "canonicalModel"),
 			Provider:                 stringField(m, "provider"),
+			CostBasis:                stringField(m, "costBasis"),
 		}
 	}
 	return result
