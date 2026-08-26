@@ -250,6 +250,15 @@ type AssistantMessage struct {
 	// different, on-demand control-request/response shape. Port of
 	// TypeScript SDK v0.3.232.
 	ContextUsage *AssistantContextUsage `json:"context_usage,omitempty"`
+	// UserMessageUUID is the client uuid of the user message that triggered
+	// this turn, stamped on the turn's first reply frame only — a turn that
+	// produces no stream events still stamps its first assistant message —
+	// so a consumer can bind the reply to the send it answers without
+	// waiting for the result. Empty on every later frame of the turn, on
+	// subagent frames, on synthetic/scheduled (meta) turns, on turns
+	// without a client uuid, and from older CLIs. Port of TypeScript SDK
+	// v0.3.246.
+	UserMessageUUID string `json:"user_message_uuid,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
@@ -1341,8 +1350,10 @@ type ResultMessage struct {
 	// CLI transcript. Empty when not provided by the CLI.
 	Timestamp string `json:"timestamp,omitempty"`
 	// UserMessageUUID is the uuid of the user message that triggered this
-	// result, for cross-host request-latency correlation. Empty when not
-	// provided by the CLI (e.g. non-success subtypes).
+	// result, for cross-host request-latency correlation. Populated on both
+	// success and error result subtypes as of TypeScript SDK v0.3.246;
+	// empty when the CLI omits it (e.g. synthetic/scheduled turns, turns
+	// without a client uuid, or older CLIs).
 	UserMessageUUID string `json:"user_message_uuid,omitempty"`
 	// RequestSentWallMs is the wall-clock timestamp (ms) when the request was
 	// sent, for cross-host request-latency correlation. Nil when not
@@ -1365,6 +1376,14 @@ type StreamEvent struct {
 	SessionID       string         `json:"session_id"`
 	Event           map[string]any `json:"event"`
 	ParentToolUseID string         `json:"parent_tool_use_id,omitempty"`
+	// UserMessageUUID is the client uuid of the user message that triggered
+	// this turn, stamped on the turn's first non-ping stream event only (the
+	// frame that triggers the turn's initial ack) so a consumer can bind the
+	// reply stream to the send it answers without waiting for the result.
+	// Empty on every later stream event of the turn, on synthetic/scheduled
+	// (meta) turns, on turns without a client uuid, and from older CLIs.
+	// Port of TypeScript SDK v0.3.246.
+	UserMessageUUID string `json:"user_message_uuid,omitempty"`
 }
 
 func (StreamEvent) messageMarker() {}
