@@ -204,6 +204,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			TaskDescription: stringField(data, "task_description"),
 			IsBackgrounded:  optionalBoolField(data, "is_backgrounded"),
 			SpawnDepth:      optionalIntField(data, "spawn_depth"),
+			Ambient:         optionalBoolField(data, "ambient"),
 		}, nil
 
 	case "task_progress":
@@ -279,6 +280,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 					TaskID:      stringField(taskMap, "task_id"),
 					TaskType:    stringField(taskMap, "task_type"),
 					Description: stringField(taskMap, "description"),
+					Ambient:     optionalBoolField(taskMap, "ambient"),
 				})
 			}
 		}
@@ -302,6 +304,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Usage:           usage,
 			SubagentType:    stringField(data, "subagent_type"),
 			TaskDescription: stringField(data, "task_description"),
+			Ambient:         optionalBoolField(data, "ambient"),
 		}, nil
 
 	case "api_retry":

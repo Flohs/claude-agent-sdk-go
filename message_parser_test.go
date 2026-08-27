@@ -1180,6 +1180,35 @@ func TestParseMessage_BackgroundTasksChangedMessage(t *testing.T) {
 	}
 }
 
+func TestParseMessage_BackgroundTasksChangedMessage_Ambient(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "background_tasks_changed",
+		"uuid":       "btc-uuid-3",
+		"session_id": "sess-1",
+		"tasks": []any{
+			map[string]any{
+				"task_id":     "task-1",
+				"task_type":   "skip_transcript",
+				"description": "Watch for live updates",
+				"ambient":     true,
+			},
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	btc := msg.(*BackgroundTasksChangedMessage)
+	if len(btc.Tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(btc.Tasks))
+	}
+	if btc.Tasks[0].Ambient == nil || !*btc.Tasks[0].Ambient {
+		t.Errorf("Ambient = %v, want true", btc.Tasks[0].Ambient)
+	}
+}
+
 func TestParseMessage_BackgroundTasksChangedMessage_EmptyTasks(t *testing.T) {
 	// An empty tasks list is the "no more background work" signal and must
 	// round-trip as an empty (not nil) slice being acceptable either way —
@@ -1711,6 +1740,45 @@ func TestParseMessage_TaskStarted_IsBackgroundedAndSpawnDepthAbsent(t *testing.T
 	}
 }
 
+func TestParseMessage_TaskStarted_Ambient(t *testing.T) {
+	data := map[string]any{
+		"type":        "system",
+		"subtype":     "task_started",
+		"task_id":     "t1",
+		"description": "Running task",
+		"uuid":        "u1",
+		"session_id":  "s1",
+		"ambient":     true,
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	task := msg.(*TaskStartedMessage)
+	if task.Ambient == nil || !*task.Ambient {
+		t.Errorf("Ambient = %v, want true", task.Ambient)
+	}
+}
+
+func TestParseMessage_TaskStarted_AmbientAbsent(t *testing.T) {
+	data := map[string]any{
+		"type":        "system",
+		"subtype":     "task_started",
+		"task_id":     "t1",
+		"description": "Running task",
+		"uuid":        "u1",
+		"session_id":  "s1",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	task := msg.(*TaskStartedMessage)
+	if task.Ambient != nil {
+		t.Errorf("Ambient = %v, want nil when absent", *task.Ambient)
+	}
+}
+
 func TestParseMessage_TaskProgress_SubagentTypeAndDescription(t *testing.T) {
 	data := map[string]any{
 		"type":             "system",
@@ -1831,6 +1899,26 @@ func TestParseMessage_TaskNotification_SubagentTypeAndDescription(t *testing.T) 
 	}
 	if n.TaskDescription != "Plan the migration" {
 		t.Errorf("TaskDescription = %q", n.TaskDescription)
+	}
+}
+
+func TestParseMessage_TaskNotification_Ambient(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "task_notification",
+		"task_id":    "t1",
+		"status":     "completed",
+		"uuid":       "u1",
+		"session_id": "s1",
+		"ambient":    true,
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	n := msg.(*TaskNotificationMessage)
+	if n.Ambient == nil || !*n.Ambient {
+		t.Errorf("Ambient = %v, want true", n.Ambient)
 	}
 }
 
