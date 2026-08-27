@@ -404,6 +404,11 @@ type TaskStartedMessage struct {
 	// task: 1 for a top-level spawn, N+1 when spawned from inside a depth-N
 	// agent. Not set on other tasks. Port of TypeScript SDK v0.3.238.
 	SpawnDepth *int `json:"spawn_depth,omitempty"`
+	// Ambient reports whether this is a housekeeping task the CLI does not
+	// surface as user work (every skip_transcript task, plus auto-started
+	// live-update watchers); hosts should exclude these from activity
+	// indicators. Port of TypeScript SDK v0.3.247.
+	Ambient *bool `json:"ambient,omitempty"`
 }
 
 // TaskProgressMessage is emitted while a task is in progress.
@@ -443,6 +448,11 @@ type TaskNotificationMessage struct {
 	SubagentType string `json:"subagent_type,omitempty"`
 	// TaskDescription is a human-readable description of the completed task.
 	TaskDescription string `json:"task_description,omitempty"`
+	// Ambient reports whether this is a housekeeping task the CLI does not
+	// surface as user work (every skip_transcript task, plus auto-started
+	// live-update watchers); hosts should exclude these from activity
+	// indicators. Port of TypeScript SDK v0.3.247.
+	Ambient *bool `json:"ambient,omitempty"`
 }
 
 // TaskUpdatedStatus represents the lifecycle status reported in a task_updated patch.
@@ -533,11 +543,17 @@ type BackgroundTaskInfo struct {
 	TaskID      string `json:"task_id"`
 	TaskType    string `json:"task_type"`
 	Description string `json:"description"`
+	// Ambient reports whether this is a housekeeping task the CLI does not
+	// surface as user work (every skip_transcript task, plus auto-started
+	// live-update watchers); hosts should exclude these from activity
+	// indicators. Port of TypeScript SDK v0.3.247.
+	Ambient *bool `json:"ambient,omitempty"`
 }
 
 // BackgroundTasksChangedMessage is emitted as a system/background_tasks_changed
-// event whenever background-task membership changes: a start, a completion, a
-// kill, or a foreground agent being backgrounded. Unlike the
+// event whenever background-task membership changes (a start, a completion, a
+// kill, or a foreground agent being backgrounded) or an entry's Ambient flag
+// flips. Unlike the
 // [TaskStartedMessage]/[TaskNotificationMessage] edge bookends, this is a level
 // signal — Tasks is the full set of live background tasks after the change, so
 // consumers tracking "is background work running" should replace their tracked
