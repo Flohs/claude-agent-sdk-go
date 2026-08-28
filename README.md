@@ -178,6 +178,8 @@ client := claude.NewClient(&claude.Options{
 })
 ```
 
+Set `calculator.TimeoutMs` to override the `MCP_TOOL_TIMEOUT` environment variable for this server's tool calls (values below 1000ms are ignored); it applies only when the server is first registered.
+
 ### Hooks
 
 Hooks are Go functions that the Claude Code application invokes at specific points in the agent loop. They provide deterministic processing and automated feedback.

@@ -93,7 +93,15 @@ func (c McpHTTPServerConfig) MarshalJSON() ([]byte, error) {
 
 // McpSdkServerConfig configures an in-process SDK MCP server.
 type McpSdkServerConfig struct {
-	Name            string
+	Name string
+	// TimeoutMs overrides the MCP_TOOL_TIMEOUT environment variable for this
+	// server's tool calls, in milliseconds. A hard wall-clock limit per call;
+	// progress notifications do not extend it. Values below 1000 are ignored
+	// (falls through to MCP_TOOL_TIMEOUT or the default). Applies when the
+	// server is first registered; changing it for an already-registered
+	// server has no effect until it is removed and re-added. Port of
+	// TypeScript SDK v0.3.248.
+	TimeoutMs       int
 	tools           []SdkMcpTool
 	resources       []SdkMcpResource
 	resourceHandler SdkMcpResourceHandler
@@ -103,14 +111,16 @@ type McpSdkServerConfig struct {
 func (McpSdkServerConfig) mcpServerConfigMarker() {}
 
 // MarshalJSON implements custom JSON marshaling for McpSdkServerConfig.
-// Only serializes type and name (not the in-process instance).
+// Only serializes type, name, and timeout (not the in-process instance).
 func (c McpSdkServerConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Type string `json:"type"`
-		Name string `json:"name"`
+		Type    string `json:"type"`
+		Name    string `json:"name"`
+		Timeout int    `json:"timeout,omitempty"`
 	}{
-		Type: "sdk",
-		Name: c.Name,
+		Type:    "sdk",
+		Name:    c.Name,
+		Timeout: c.TimeoutMs,
 	})
 }
 

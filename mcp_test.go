@@ -85,3 +85,40 @@ func TestMcpHTTPServerConfig_RequestTimeoutMs(t *testing.T) {
 		t.Errorf("expected requestTimeoutMs 7500, got %v", result["requestTimeoutMs"])
 	}
 }
+
+func TestMcpSdkServerConfig_TimeoutMs(t *testing.T) {
+	cfg := NewSdkMcpServer("my-sdk-server", "1.0.0", nil)
+	cfg.TimeoutMs = 5000
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if result["timeout"] != float64(5000) {
+		t.Errorf("expected timeout 5000, got %v", result["timeout"])
+	}
+}
+
+func TestMcpSdkServerConfig_TimeoutMs_OmitEmpty(t *testing.T) {
+	cfg := NewSdkMcpServer("my-sdk-server", "1.0.0", nil)
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if _, ok := result["timeout"]; ok {
+		t.Errorf("expected timeout to be omitted when zero, got %v", result["timeout"])
+	}
+}
