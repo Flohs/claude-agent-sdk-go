@@ -441,6 +441,28 @@ type SessionStartHookInput struct {
 	// Source identifies how the session was started (startup, resume, clear,
 	// compact, or fork). Empty when not provided by the CLI.
 	Source SessionStartSource `json:"source,omitempty"`
+	// SecondsSinceLastResponse is the number of seconds since the resumed
+	// transcript's last assistant response. Set only when Source is
+	// [SessionStartSourceResume] or [SessionStartSourceFork]. Port of
+	// TypeScript SDK v0.3.251.
+	SecondsSinceLastResponse *float64 `json:"seconds_since_last_response,omitempty"`
+	// ContextTokens is the resumed transcript's last response input +
+	// cache_read + cache_creation + output tokens (for a server-side tool
+	// loop, its last iteration's window, not the summed totals). Set only
+	// when Source is [SessionStartSourceResume] or [SessionStartSourceFork].
+	// Port of TypeScript SDK v0.3.251.
+	ContextTokens *int `json:"context_tokens,omitempty"`
+	// PromptCacheLikelyExpired reports whether SecondsSinceLastResponse
+	// exceeds the prompt-cache TTL, so the first request re-caches
+	// ContextTokens. Set only when Source is [SessionStartSourceResume] or
+	// [SessionStartSourceFork]. Port of TypeScript SDK v0.3.251.
+	PromptCacheLikelyExpired *bool `json:"prompt_cache_likely_expired,omitempty"`
+	// EstimatedCacheWriteUSD is the estimated cost of re-caching
+	// ContextTokens on the session model — the managed modelPricing when
+	// set, otherwise list price; excludes the response. Set only when
+	// Source is [SessionStartSourceResume] or [SessionStartSourceFork].
+	// Port of TypeScript SDK v0.3.251.
+	EstimatedCacheWriteUSD *float64 `json:"estimated_cache_write_usd,omitempty"`
 }
 
 func (*SessionStartHookInput) hookInputMarker() {}

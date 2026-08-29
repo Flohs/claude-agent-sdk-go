@@ -865,6 +865,14 @@ func optionalBoolField(m map[string]any, key string) *bool {
 	return &v
 }
 
+func optionalFloat64Field(m map[string]any, key string) *float64 {
+	if _, ok := m[key]; !ok {
+		return nil
+	}
+	v := float64FromAny(m[key])
+	return &v
+}
+
 func optionalIntField(m map[string]any, key string) *int {
 	if _, ok := m[key]; !ok {
 		return nil
