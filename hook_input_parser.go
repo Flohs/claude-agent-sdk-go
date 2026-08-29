@@ -273,6 +273,34 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			TaskDescription: stringField(input, "task_description"),
 		}, nil
 
+	case HookEventPreModelSwitch:
+		return &PreModelSwitchHookInput{
+			BaseHookInput:          base,
+			FromModel:              stringField(input, "from_model"),
+			ToModel:                stringField(input, "to_model"),
+			RequestedModel:         stringField(input, "requested_model"),
+			Source:                 ModelSwitchSource(stringField(input, "source")),
+			ContextTokens:          intField(input, "context_tokens"),
+			PromptCacheWarm:        boolField(input, "prompt_cache_warm"),
+			CacheTTL:               stringField(input, "cache_ttl"),
+			EstimatedCacheWriteUSD: float64FromAny(input["estimated_cache_write_usd"]),
+			Pricing:                stringField(input, "pricing"),
+		}, nil
+
+	case HookEventPostModelSwitch:
+		return &PostModelSwitchHookInput{
+			BaseHookInput:          base,
+			FromModel:              stringField(input, "from_model"),
+			ToModel:                stringField(input, "to_model"),
+			RequestedModel:         stringField(input, "requested_model"),
+			Source:                 ModelSwitchSource(stringField(input, "source")),
+			ContextTokens:          intField(input, "context_tokens"),
+			PromptCacheWarm:        boolField(input, "prompt_cache_warm"),
+			CacheTTL:               stringField(input, "cache_ttl"),
+			EstimatedCacheWriteUSD: float64FromAny(input["estimated_cache_write_usd"]),
+			Pricing:                stringField(input, "pricing"),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil

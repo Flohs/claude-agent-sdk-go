@@ -87,6 +87,13 @@ const (
 	// register_repo_root control request. Observability only — output is
 	// not acted on. Port of TypeScript SDK v0.3.219.
 	HookEventDirectoryAdded HookEvent = "DirectoryAdded"
+	// HookEventPreModelSwitch fires before the session's model changes. A
+	// hook can allow, deny, or ask the user to confirm the switch via
+	// [PreModelSwitchHookOutput]. Port of TypeScript SDK v0.3.251.
+	HookEventPreModelSwitch HookEvent = "PreModelSwitch"
+	// HookEventPostModelSwitch fires after the session's model changes.
+	// Port of TypeScript SDK v0.3.251.
+	HookEventPostModelSwitch HookEvent = "PostModelSwitch"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -738,6 +745,140 @@ type TaskCreatedHookInput struct {
 }
 
 func (*TaskCreatedHookInput) hookInputMarker() {}
+
+// ModelSwitchSource identifies what triggered a model switch, for
+// [PreModelSwitchHookInput.Source] and [PostModelSwitchHookInput.Source].
+// Port of TypeScript SDK v0.3.251.
+type ModelSwitchSource string
+
+const (
+	// ModelSwitchSourceCommand is `/model <name>`, the /config Model row, or
+	// enabling fast mode when that promotes the model.
+	ModelSwitchSourceCommand ModelSwitchSource = "command"
+	// ModelSwitchSourcePicker is an interactive model picker.
+	ModelSwitchSourcePicker ModelSwitchSource = "picker"
+	// ModelSwitchSourceSDK is a headless set_model call (SDK, Remote Control, IDE).
+	ModelSwitchSourceSDK ModelSwitchSource = "sdk"
+	// ModelSwitchSourceAuto is automatic fallback or other programmatic
+	// change. PostModelSwitch only.
+	ModelSwitchSourceAuto ModelSwitchSource = "auto"
+	// ModelSwitchSourceResume is the model restored while resuming a
+	// session. PostModelSwitch only.
+	ModelSwitchSourceResume ModelSwitchSource = "resume"
+)
+
+// PreModelSwitchHookInput is the typed input for PreModelSwitch hook events.
+// Fires before the session's model changes, letting a hook allow, deny, or
+// ask the user to confirm the switch. Port of TypeScript SDK v0.3.251.
+type PreModelSwitchHookInput struct {
+	BaseHookInput
+	// FromModel is the resolved model id the session was running before the switch.
+	FromModel string `json:"from_model"`
+	// ToModel is the resolved model id the session runs after the switch.
+	ToModel string `json:"to_model"`
+	// RequestedModel is what was asked for: an alias such as "opus", a full
+	// model id, or empty for "default".
+	RequestedModel string `json:"requested_model,omitempty"`
+	// Source is what triggered the switch: command, picker, or sdk.
+	Source ModelSwitchSource `json:"source,omitempty"`
+	// ContextTokens is the prompt tokens the next request re-sends: the last
+	// main-thread response's input + cache_read + cache_creation + output
+	// tokens (0 before the first response; for a server-side tool loop, its
+	// last iteration's window, not the summed totals).
+	ContextTokens int `json:"context_tokens"`
+	// PromptCacheWarm reports whether the current model's prompt cache is
+	// likely still warm; a switch then forfeits it.
+	PromptCacheWarm bool `json:"prompt_cache_warm"`
+	// CacheTTL is the current model's prompt-cache TTL: "5m" or "1h".
+	CacheTTL string `json:"cache_ttl,omitempty"`
+	// EstimatedCacheWriteUSD is the estimated cost of re-caching
+	// ContextTokens on ToModel at its cache-write rate — the managed
+	// modelPricing when set, otherwise list price; excludes the response.
+	EstimatedCacheWriteUSD float64 `json:"estimated_cache_write_usd"`
+	// Pricing indicates how EstimatedCacheWriteUSD was priced: "configured"
+	// (the managed modelPricing setting), "catalog" (list price), or
+	// "default" (ToModel unknown, the default tier was assumed).
+	Pricing string `json:"pricing,omitempty"`
+}
+
+func (*PreModelSwitchHookInput) hookInputMarker() {}
+
+// PreModelSwitchHookOutput is the typed output for [HookEventPreModelSwitch]
+// callbacks. Port of TypeScript SDK v0.3.251.
+type PreModelSwitchHookOutput struct {
+	// PermissionDecision follows the same contract as PreToolUse: "allow"
+	// proceeds (skipping the interactive cache-miss confirm), "deny" cancels
+	// the switch, "ask" asks the user to confirm (a headless session
+	// refuses instead).
+	PermissionDecision string
+	// PermissionDecisionReason is the human-readable reason for the decision.
+	PermissionDecisionReason string
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map.
+func (o PreModelSwitchHookOutput) ToHookJSONOutput() HookJSONOutput {
+	specific := map[string]any{"hookEventName": "PreModelSwitch"}
+	if o.PermissionDecision != "" {
+		specific["permissionDecision"] = o.PermissionDecision
+	}
+	if o.PermissionDecisionReason != "" {
+		specific["permissionDecisionReason"] = o.PermissionDecisionReason
+	}
+	return HookJSONOutput{"hookSpecificOutput": specific}
+}
+
+// PostModelSwitchHookInput is the typed input for PostModelSwitch hook
+// events. Fires after the session's model changes. Port of TypeScript SDK
+// v0.3.251.
+type PostModelSwitchHookInput struct {
+	BaseHookInput
+	// FromModel is the resolved model id the session was running before the switch.
+	FromModel string `json:"from_model"`
+	// ToModel is the resolved model id the session runs after the switch.
+	ToModel string `json:"to_model"`
+	// RequestedModel is what was asked for: an alias such as "opus", a full
+	// model id, or empty for "default".
+	RequestedModel string `json:"requested_model,omitempty"`
+	// Source is what triggered the switch: command, picker, sdk, auto, or resume.
+	Source ModelSwitchSource `json:"source,omitempty"`
+	// ContextTokens is the prompt tokens the next request re-sends: the last
+	// main-thread response's input + cache_read + cache_creation + output
+	// tokens (0 before the first response; for a server-side tool loop, its
+	// last iteration's window, not the summed totals).
+	ContextTokens int `json:"context_tokens"`
+	// PromptCacheWarm reports whether the current model's prompt cache is
+	// likely still warm; a switch then forfeits it.
+	PromptCacheWarm bool `json:"prompt_cache_warm"`
+	// CacheTTL is the current model's prompt-cache TTL: "5m" or "1h".
+	CacheTTL string `json:"cache_ttl,omitempty"`
+	// EstimatedCacheWriteUSD is the estimated cost of re-caching
+	// ContextTokens on ToModel at its cache-write rate — the managed
+	// modelPricing when set, otherwise list price; excludes the response.
+	EstimatedCacheWriteUSD float64 `json:"estimated_cache_write_usd"`
+	// Pricing indicates how EstimatedCacheWriteUSD was priced: "configured"
+	// (the managed modelPricing setting), "catalog" (list price), or
+	// "default" (ToModel unknown, the default tier was assumed).
+	Pricing string `json:"pricing,omitempty"`
+}
+
+func (*PostModelSwitchHookInput) hookInputMarker() {}
+
+// PostModelSwitchHookOutput is the typed output for
+// [HookEventPostModelSwitch] callbacks. Port of TypeScript SDK v0.3.251.
+type PostModelSwitchHookOutput struct {
+	// AdditionalContext, when non-empty, reaches the model with the next
+	// request the new model serves.
+	AdditionalContext string
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map.
+func (o PostModelSwitchHookOutput) ToHookJSONOutput() HookJSONOutput {
+	specific := map[string]any{"hookEventName": "PostModelSwitch"}
+	if o.AdditionalContext != "" {
+		specific["additionalContext"] = o.AdditionalContext
+	}
+	return HookJSONOutput{"hookSpecificOutput": specific}
+}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {

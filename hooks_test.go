@@ -53,3 +53,57 @@ func TestPostToolUseHookOutput_ToHookJSONOutput_NestedUnderHookSpecificOutput(t 
 		t.Errorf("hookSpecificOutput[updatedToolOutput] = %#v, want %q", specific["updatedToolOutput"], "x")
 	}
 }
+
+func TestPreModelSwitchHookOutput_ToHookJSONOutput_Empty(t *testing.T) {
+	got := PreModelSwitchHookOutput{}.ToHookJSONOutput()
+	want := HookJSONOutput{
+		"hookSpecificOutput": map[string]any{"hookEventName": "PreModelSwitch"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ToHookJSONOutput() = %#v, want %#v", got, want)
+	}
+}
+
+func TestPreModelSwitchHookOutput_ToHookJSONOutput_AllFields(t *testing.T) {
+	got := PreModelSwitchHookOutput{
+		PermissionDecision:       "deny",
+		PermissionDecisionReason: "cache would be forfeited mid-turn",
+	}.ToHookJSONOutput()
+
+	want := HookJSONOutput{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":            "PreModelSwitch",
+			"permissionDecision":       "deny",
+			"permissionDecisionReason": "cache would be forfeited mid-turn",
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ToHookJSONOutput() = %#v, want %#v", got, want)
+	}
+}
+
+func TestPostModelSwitchHookOutput_ToHookJSONOutput_Empty(t *testing.T) {
+	got := PostModelSwitchHookOutput{}.ToHookJSONOutput()
+	want := HookJSONOutput{
+		"hookSpecificOutput": map[string]any{"hookEventName": "PostModelSwitch"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ToHookJSONOutput() = %#v, want %#v", got, want)
+	}
+}
+
+func TestPostModelSwitchHookOutput_ToHookJSONOutput_AllFields(t *testing.T) {
+	got := PostModelSwitchHookOutput{
+		AdditionalContext: "new model has a smaller context window",
+	}.ToHookJSONOutput()
+
+	want := HookJSONOutput{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":     "PostModelSwitch",
+			"additionalContext": "new model has a smaller context window",
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ToHookJSONOutput() = %#v, want %#v", got, want)
+	}
+}

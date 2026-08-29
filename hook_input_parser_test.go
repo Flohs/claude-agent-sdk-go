@@ -1042,6 +1042,82 @@ func TestParseHookInput_PostCompact(t *testing.T) {
 	}
 }
 
+func TestParseHookInput_PreModelSwitch(t *testing.T) {
+	input := merge(base("PreModelSwitch"), HookInput{
+		"from_model":                "claude-sonnet-5",
+		"to_model":                  "claude-opus-5",
+		"requested_model":           "opus",
+		"source":                    "command",
+		"context_tokens":            float64(12000),
+		"prompt_cache_warm":         true,
+		"cache_ttl":                 "5m",
+		"estimated_cache_write_usd": 0.045,
+		"pricing":                   "catalog",
+	})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*PreModelSwitchHookInput)
+	if !ok {
+		t.Fatalf("expected *PreModelSwitchHookInput, got %T", result)
+	}
+	assertBase(t, m.BaseHookInput, "PreModelSwitch")
+	if m.FromModel != "claude-sonnet-5" {
+		t.Errorf("FromModel: got %q", m.FromModel)
+	}
+	if m.ToModel != "claude-opus-5" {
+		t.Errorf("ToModel: got %q", m.ToModel)
+	}
+	if m.RequestedModel != "opus" {
+		t.Errorf("RequestedModel: got %q", m.RequestedModel)
+	}
+	if m.Source != ModelSwitchSourceCommand {
+		t.Errorf("Source: got %q, want %q", m.Source, ModelSwitchSourceCommand)
+	}
+	if m.ContextTokens != 12000 {
+		t.Errorf("ContextTokens: got %d, want 12000", m.ContextTokens)
+	}
+	if !m.PromptCacheWarm {
+		t.Error("PromptCacheWarm: got false, want true")
+	}
+	if m.CacheTTL != "5m" {
+		t.Errorf("CacheTTL: got %q", m.CacheTTL)
+	}
+	if m.EstimatedCacheWriteUSD != 0.045 {
+		t.Errorf("EstimatedCacheWriteUSD: got %v", m.EstimatedCacheWriteUSD)
+	}
+	if m.Pricing != "catalog" {
+		t.Errorf("Pricing: got %q", m.Pricing)
+	}
+}
+
+func TestParseHookInput_PostModelSwitch(t *testing.T) {
+	input := merge(base("PostModelSwitch"), HookInput{
+		"from_model": "claude-sonnet-5",
+		"to_model":   "claude-opus-5",
+		"source":     "resume",
+	})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*PostModelSwitchHookInput)
+	if !ok {
+		t.Fatalf("expected *PostModelSwitchHookInput, got %T", result)
+	}
+	assertBase(t, m.BaseHookInput, "PostModelSwitch")
+	if m.FromModel != "claude-sonnet-5" {
+		t.Errorf("FromModel: got %q", m.FromModel)
+	}
+	if m.ToModel != "claude-opus-5" {
+		t.Errorf("ToModel: got %q", m.ToModel)
+	}
+	if m.Source != ModelSwitchSourceResume {
+		t.Errorf("Source: got %q, want %q", m.Source, ModelSwitchSourceResume)
+	}
+}
+
 func TestParseHookInput_PostToolBatch(t *testing.T) {
 	input := merge(base("PostToolBatch"), HookInput{
 		"tool_calls": []any{
