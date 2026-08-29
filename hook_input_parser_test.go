@@ -939,6 +939,51 @@ func TestParseHookInput_SessionStart_Fork(t *testing.T) {
 	if m.Source != SessionStartSourceFork {
 		t.Errorf("Source: got %q, want %q", m.Source, SessionStartSourceFork)
 	}
+	if m.SecondsSinceLastResponse != nil {
+		t.Errorf("SecondsSinceLastResponse: got %v, want nil when absent", m.SecondsSinceLastResponse)
+	}
+	if m.ContextTokens != nil {
+		t.Errorf("ContextTokens: got %v, want nil when absent", m.ContextTokens)
+	}
+	if m.PromptCacheLikelyExpired != nil {
+		t.Errorf("PromptCacheLikelyExpired: got %v, want nil when absent", m.PromptCacheLikelyExpired)
+	}
+	if m.EstimatedCacheWriteUSD != nil {
+		t.Errorf("EstimatedCacheWriteUSD: got %v, want nil when absent", m.EstimatedCacheWriteUSD)
+	}
+}
+
+func TestParseHookInput_SessionStart_ResumeFields(t *testing.T) {
+	input := merge(base("SessionStart"), HookInput{
+		"source":                      "resume",
+		"seconds_since_last_response": float64(42),
+		"context_tokens":              float64(15000),
+		"prompt_cache_likely_expired": false,
+		"estimated_cache_write_usd":   0.09,
+	})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*SessionStartHookInput)
+	if !ok {
+		t.Fatalf("expected *SessionStartHookInput, got %T", result)
+	}
+	if m.Source != SessionStartSourceResume {
+		t.Errorf("Source: got %q, want %q", m.Source, SessionStartSourceResume)
+	}
+	if m.SecondsSinceLastResponse == nil || *m.SecondsSinceLastResponse != 42 {
+		t.Errorf("SecondsSinceLastResponse: got %v, want 42", m.SecondsSinceLastResponse)
+	}
+	if m.ContextTokens == nil || *m.ContextTokens != 15000 {
+		t.Errorf("ContextTokens: got %v, want 15000", m.ContextTokens)
+	}
+	if m.PromptCacheLikelyExpired == nil || *m.PromptCacheLikelyExpired != false {
+		t.Errorf("PromptCacheLikelyExpired: got %v, want false (non-nil)", m.PromptCacheLikelyExpired)
+	}
+	if m.EstimatedCacheWriteUSD == nil || *m.EstimatedCacheWriteUSD != 0.09 {
+		t.Errorf("EstimatedCacheWriteUSD: got %v, want 0.09", m.EstimatedCacheWriteUSD)
+	}
 }
 
 func TestParseHookInput_SessionEnd(t *testing.T) {

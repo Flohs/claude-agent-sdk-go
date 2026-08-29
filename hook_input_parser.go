@@ -142,8 +142,12 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 
 	case HookEventSessionStart:
 		return &SessionStartHookInput{
-			BaseHookInput: base,
-			Source:        SessionStartSource(stringField(input, "source")),
+			BaseHookInput:            base,
+			Source:                   SessionStartSource(stringField(input, "source")),
+			SecondsSinceLastResponse: optionalFloat64Field(input, "seconds_since_last_response"),
+			ContextTokens:            optionalIntField(input, "context_tokens"),
+			PromptCacheLikelyExpired: optionalBoolField(input, "prompt_cache_likely_expired"),
+			EstimatedCacheWriteUSD:   optionalFloat64Field(input, "estimated_cache_write_usd"),
 		}, nil
 
 	case HookEventSessionEnd:
