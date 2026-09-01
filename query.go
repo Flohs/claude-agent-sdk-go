@@ -69,20 +69,40 @@ type query struct {
 	streamCloseTimeout     float64
 	excludeDynamicSections bool
 	forwardSubagentText    bool
-	// lastIsErrorResultDelivered is set when a result message with is_error:true
-	// has been delivered to messageCh. It suppresses ProcessError generation
-	// for subsequent subprocess exit failures so callers don't see both.
+	// lastIsErrorResultDelivered is set (and never cleared) once a result
+	// message with is_error:true has been delivered to messageCh in this
+	// query's lifetime. Together with lastErrorResultMsg (which does clear,
+	// on the next non-error result) it distinguishes "no is_error result was
+	// ever delivered" from "one was delivered but a later non-error result
+	// superseded it" when the subprocess subsequently exits — the former
+	// still gets a plain ProcessError, the latter gets no processError at
+	// all (the run recovered; an unrelated crash afterwards has nothing to
+	// enrich it with). See processError's doc comment for the full decision.
 	lastIsErrorResultDelivered bool
 	// lastErrorResultText holds the most recently seen is_error result's
-	// error text (joined "errors", falling back to "subtype"), cleared on
-	// the next non-error result. Used to enrich the error handed to any
-	// still-pending control request (e.g. an in-flight initialize()) when
-	// the subprocess subsequently exits, instead of leaving it to time out.
+	// error text (see resultErrorText), cleared on the next non-error
+	// result. Used to enrich the error handed to any still-pending control
+	// request (e.g. an in-flight initialize()) when the subprocess
+	// subsequently exits, instead of leaving it to time out.
 	// Port of Python SDK commit be2d0df (anthropics/claude-agent-sdk-python#1198).
 	lastErrorResultText string
-	// processError is set when the subprocess exits with a non-zero code and
-	// no is_error result was delivered. Callers (e.g. Query) surface it after
-	// the message loop ends.
+	// lastErrorResultMsg holds the raw payload of the most recently seen
+	// is_error result message, cleared on the next non-error result (same
+	// lifetime as lastErrorResultText, kept separately since ResultError
+	// needs the structured fields, not just the derived text). Used to build
+	// a *ResultError carrying that payload when the subprocess subsequently
+	// exits with the CLI's own error result as the last thing it reported.
+	// Port of Python SDK commit 90ab957 (anthropics/claude-agent-sdk-python#1205).
+	lastErrorResultMsg map[string]any
+	// processError is set when the subprocess exits with a non-zero code.
+	// It is a *ResultError carrying the last is_error result's payload when
+	// that result was the most recently delivered message (the CLI's own
+	// "why this run failed" report), a plain *ProcessError when no is_error
+	// result was ever delivered (a genuine crash with no CLI-reported
+	// cause), or left nil when an earlier is_error result was superseded by
+	// a later non-error one (the run actually recovered; a subsequent exit
+	// error in that case is unrelated to it — see lastErrorResultMsg).
+	// Callers (e.g. Query) surface it after the message loop ends.
 	processError error
 
 	// Transcript mirror wiring. batcher is nil when Options.SessionStore is
@@ -435,9 +455,13 @@ func (q *query) readMessages() {
 			continue
 		}
 
-		// Subprocess exit error: suppress it if an is_error result was already
-		// delivered so callers don't see both. Otherwise record it so the
-		// caller (e.g. Query) can surface a ProcessError after the loop ends.
+		// Subprocess exit error: replace it with the CLI's own error result
+		// when the last thing it reported was one (rather than a bare "exit
+		// code 1"), and suppress it entirely when an earlier is_error result
+		// was since superseded by a non-error one (the run recovered, so an
+		// unrelated exit error afterwards has nothing left to enrich it
+		// with). Otherwise record the raw exit error so the caller (e.g.
+		// Query) can surface a ProcessError after the loop ends.
 		if msgType == "error" {
 			errStr, _ := msg["error"].(string)
 
@@ -452,7 +476,15 @@ func (q *query) readMessages() {
 			}
 			q.failPendingControlRequests(fmt.Errorf("%s", pendingErrText))
 
-			if !q.lastIsErrorResultDelivered {
+			var exitCode *int
+			if c, ok := msg["exit_code"].(int); ok {
+				exitCode = &c
+			}
+			switch {
+			case q.lastErrorResultMsg != nil:
+				errText := fmt.Sprintf("Claude Code returned an error result: %s", resultErrorText(q.lastErrorResultMsg))
+				q.processError = newResultError(errText, q.lastErrorResultMsg, exitCode)
+			case !q.lastIsErrorResultDelivered:
 				q.processError = &ProcessError{SDKError: SDKError{Message: errStr}}
 			}
 			// Don't forward to messageCh; the deferred "end" frame handles close.
@@ -475,8 +507,10 @@ func (q *query) readMessages() {
 			if isErr, _ := msg["is_error"].(bool); isErr {
 				q.lastIsErrorResultDelivered = true
 				q.lastErrorResultText = resultErrorText(msg)
+				q.lastErrorResultMsg = msg
 			} else {
 				q.lastErrorResultText = ""
+				q.lastErrorResultMsg = nil
 			}
 		}
 
@@ -879,24 +913,33 @@ func (q *query) initialize() (map[string]any, error) {
 	return response, nil
 }
 
-// resultErrorText extracts actionable error text from an is_error result
-// message: its "errors" list joined with "; ", falling back to "subtype",
-// then to "unknown error". Mirrors the Python SDK's
-// _last_error_result_text construction (commit be2d0df).
+// resultErrorText picks the most informative text from an is_error result
+// message. Terminal errors the CLI raises itself (error_max_turns,
+// error_during_execution, ...) carry their prose in "errors". A run that
+// ends on an API failure instead arrives as subtype "success" with
+// is_error true, an empty "errors" and the "API Error: ..." prose in
+// "result" — falling back to the subtype there produced the
+// self-contradictory "Claude Code returned an error result: success".
+// Prefer "errors", then "result", then a non-"success" "subtype", then the
+// HTTP status, then "unknown error". Mirrors the Python SDK's
+// _error_result_text (commit 90ab957, superseding _last_error_result_text
+// from commit be2d0df).
 func resultErrorText(msg map[string]any) string {
-	if rawErrors, ok := msg["errors"].([]any); ok {
-		parts := make([]string, 0, len(rawErrors))
-		for _, e := range rawErrors {
-			if s, ok := e.(string); ok && s != "" {
-				parts = append(parts, s)
-			}
-		}
-		if len(parts) > 0 {
-			return strings.Join(parts, "; ")
+	if errs := normalizeResultErrors(msg["errors"]); len(errs) > 0 {
+		return strings.Join(errs, "; ")
+	}
+	if result, ok := msg["result"].(string); ok {
+		if trimmed := strings.TrimSpace(result); trimmed != "" {
+			return trimmed
 		}
 	}
-	if subtype, _ := msg["subtype"].(string); subtype != "" {
+	if subtype, _ := msg["subtype"].(string); subtype != "" && subtype != "success" {
 		return subtype
+	}
+	if v, ok := msg["api_error_status"]; ok {
+		if status := intFromAny(v); status != 0 {
+			return fmt.Sprintf("API error (HTTP %d)", status)
+		}
 	}
 	return "unknown error"
 }

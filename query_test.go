@@ -803,22 +803,37 @@ func TestInitialize_ForwardSubagentText(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ProcessError suppression branch (#204 follow-up for #174).
-// query.readMessages must NOT generate a ProcessError when an is_error result
-// was already delivered, but MUST generate one if the subprocess exits with
-// no prior is_error result.
+// ProcessError / ResultError construction on subprocess exit (#204 follow-up
+// for #174, refined by #602). query.readMessages must:
+//   - build a *ResultError carrying the payload when the most recently
+//     delivered result had is_error:true (#602: enriches what #204
+//     originally suppressed outright, since a ResultError is no longer a
+//     redundant "exit code 1" alongside the already-delivered ResultMessage
+//     but carries information a caller watching only the errors channel
+//     would otherwise never see);
+//   - build a plain *ProcessError when no is_error result was ever
+//     delivered;
+//   - build nothing (nil) when an earlier is_error result was since
+//     superseded by a non-error one, i.e. the run actually recovered and a
+//     later exit error is unrelated to it (the original #204 case).
 // ---------------------------------------------------------------------------
 
-func TestReadMessages_ProcessErrorSuppressedAfterIsErrorResult(t *testing.T) {
+func TestReadMessages_ResultErrorBuiltAfterIsErrorResult(t *testing.T) {
 	mt := newMockTransport()
 	q := newQuery(queryConfig{transport: mt})
 	q.start()
 
 	frames := []map[string]any{
-		// is_error result flips the suppression flag.
-		{"type": "result", "subtype": "error", "is_error": true, "session_id": "s"},
-		// Exit-error frame that follows must be suppressed.
-		{"type": "error", "error": "exit 1"},
+		// is_error result is the last thing the CLI reported.
+		{
+			"type":       "result",
+			"subtype":    "error_max_turns",
+			"is_error":   true,
+			"session_id": "s-123",
+			"errors":     []any{"Max turns (5) reached"},
+		},
+		// Exit-error frame that follows must be replaced with a *ResultError.
+		{"type": "error", "error": "exit 1", "exit_code": 1},
 	}
 	go func() {
 		for _, f := range frames {
@@ -842,8 +857,68 @@ func TestReadMessages_ProcessErrorSuppressedAfterIsErrorResult(t *testing.T) {
 	}
 done:
 
+	resErr, ok := q.processError.(*ResultError)
+	if !ok {
+		t.Fatalf("processError should be *ResultError, got %T (%v)", q.processError, q.processError)
+	}
+	if resErr.Subtype != "error_max_turns" {
+		t.Errorf("Subtype = %q, want %q", resErr.Subtype, "error_max_turns")
+	}
+	if len(resErr.Errors) != 1 || resErr.Errors[0] != "Max turns (5) reached" {
+		t.Errorf("Errors = %v, want [%q]", resErr.Errors, "Max turns (5) reached")
+	}
+	if resErr.SessionID != "s-123" {
+		t.Errorf("SessionID = %q, want %q", resErr.SessionID, "s-123")
+	}
+	if resErr.ExitCode == nil || *resErr.ExitCode != 1 {
+		t.Errorf("ExitCode = %v, want 1", resErr.ExitCode)
+	}
+	if !strings.Contains(resErr.Error(), "Max turns (5) reached") {
+		t.Errorf("Error() = %q, want it to include the errors text", resErr.Error())
+	}
+	if resErr.Data == nil {
+		t.Error("Data should hold the raw result payload")
+	}
+	_ = q.close()
+}
+
+func TestReadMessages_ProcessErrorSuppressedAfterRecoveredIsErrorResult(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+
+	frames := []map[string]any{
+		// An earlier is_error result...
+		{"type": "result", "subtype": "error", "is_error": true, "session_id": "s"},
+		// ...superseded by a later successful one: the run recovered.
+		{"type": "result", "subtype": "success", "is_error": false, "session_id": "s"},
+		// A subsequent exit error is unrelated to the earlier is_error result
+		// and must not be turned into a stale ResultError.
+		{"type": "error", "error": "exit 1"},
+	}
+	go func() {
+		for _, f := range frames {
+			mt.messages <- f
+		}
+		_ = mt.Close()
+	}()
+
+	out := q.receiveMessages()
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case _, ok := <-out:
+			if !ok {
+				goto done
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for message channel to close")
+		}
+	}
+done:
+
 	if q.processError != nil {
-		t.Errorf("processError should be suppressed after is_error result, got: %v", q.processError)
+		t.Errorf("processError should be suppressed after a recovered is_error result, got: %v", q.processError)
 	}
 	_ = q.close()
 }

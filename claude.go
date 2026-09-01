@@ -161,8 +161,10 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			}
 		}
 
-		// Surface a subprocess error only when no is_error result was already
-		// delivered, so callers don't see both the error result and a ProcessError.
+		// Surface q.processError, which is nil unless the subprocess exited
+		// with a non-zero code (see its doc comment on *query for the three
+		// cases: *ResultError, *ProcessError, or nil when an earlier
+		// is_error result was since superseded by a non-error one).
 		if q.processError != nil {
 			errs <- q.processError
 		}

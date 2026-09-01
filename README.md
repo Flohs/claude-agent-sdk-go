@@ -313,6 +313,12 @@ for err := range errs {
     switch e := err.(type) {
     case *claude.NotFoundError:
         fmt.Println("Install Claude Code: npm install -g @anthropic-ai/claude-code")
+    case *claude.ResultError:
+        // The CLI ended the run by reporting a terminal error result (e.g.
+        // max turns, an API failure) and then exited non-zero. ResultError
+        // embeds ProcessError and carries the result's own payload, so you
+        // can branch on why the run failed instead of string-matching.
+        fmt.Printf("Run failed (%s): %v\n", e.Subtype, e.Errors)
     case *claude.ProcessError:
         fmt.Printf("Process failed (exit code %d): %s\n", *e.ExitCode, e.Stderr)
     case *claude.ConnectionError:
