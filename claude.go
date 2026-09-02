@@ -104,10 +104,15 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 		// Extract SDK MCP servers
 		sdkServers := extractSdkMcpServers(configuredOpts.McpServers)
 
-		// Extract excludeDynamicSections from PresetPrompt if set
-		var excludeDynamic bool
-		if pp, ok := configuredOpts.SystemPrompt.(PresetPrompt); ok {
-			excludeDynamic = pp.ExcludeDynamicSections
+		// Extract excludeDynamicSections and systemPromptSnapshot from
+		// PresetPrompt/CustomPrompt if set
+		var excludeDynamic, snapshot bool
+		switch sp := configuredOpts.SystemPrompt.(type) {
+		case PresetPrompt:
+			excludeDynamic = sp.ExcludeDynamicSections
+			snapshot = sp.Snapshot
+		case CustomPrompt:
+			snapshot = sp.Snapshot
 		}
 
 		// Create query handler
@@ -118,6 +123,7 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			mcpServers:             sdkServers,
 			agents:                 configuredOpts.Agents,
 			excludeDynamicSections: excludeDynamic,
+			systemPromptSnapshot:   snapshot,
 			forwardSubagentText:    configuredOpts.ForwardSubagentText,
 		})
 
@@ -289,9 +295,13 @@ func Startup(ctx context.Context, opts *Options) (*WarmQuery, error) {
 
 	sdkServers := extractSdkMcpServers(configuredOpts.McpServers)
 
-	var excludeDynamic bool
-	if pp, ok := configuredOpts.SystemPrompt.(PresetPrompt); ok {
-		excludeDynamic = pp.ExcludeDynamicSections
+	var excludeDynamic, snapshot bool
+	switch sp := configuredOpts.SystemPrompt.(type) {
+	case PresetPrompt:
+		excludeDynamic = sp.ExcludeDynamicSections
+		snapshot = sp.Snapshot
+	case CustomPrompt:
+		snapshot = sp.Snapshot
 	}
 
 	q := newQuery(queryConfig{
@@ -301,6 +311,7 @@ func Startup(ctx context.Context, opts *Options) (*WarmQuery, error) {
 		mcpServers:             sdkServers,
 		agents:                 configuredOpts.Agents,
 		excludeDynamicSections: excludeDynamic,
+		systemPromptSnapshot:   snapshot,
 		forwardSubagentText:    configuredOpts.ForwardSubagentText,
 	})
 	q.start()
