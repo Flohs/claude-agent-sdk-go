@@ -1207,6 +1207,15 @@ func (q *query) getSettings() (map[string]any, error) {
 	return resp, nil
 }
 
+func (q *query) updateSettings(source string, settings map[string]any) error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype":  "update_settings",
+		"source":   source,
+		"settings": settings,
+	}, 30*time.Second)
+	return err
+}
+
 func (q *query) reloadPlugins() (map[string]any, error) {
 	resp, err := q.sendControlRequest(map[string]any{
 		"subtype": "reload_plugins",

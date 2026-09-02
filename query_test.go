@@ -1852,6 +1852,56 @@ func TestGetUsageExperimental_SkipBehaviorsSendsSkipBehaviorsKey(t *testing.T) {
 	}
 }
 
+// TestUpdateSettings_SendsSubtypeSourceAndSettings verifies that
+// query.updateSettings sends a control request with subtype
+// "update_settings" carrying the given source and settings map on the wire.
+// Port of TypeScript SDK v0.3.257.
+func TestUpdateSettings_SendsSubtypeSourceAndSettings(t *testing.T) {
+	mt := newAutoRespondTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	settings := map[string]any{"outputStyle": "concise"}
+	if err := q.updateSettings("localSettings", settings); err != nil {
+		t.Fatalf("updateSettings failed: %v", err)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+
+	var found map[string]any
+	for _, w := range written {
+		var msg map[string]any
+		if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+			continue
+		}
+		if msg["type"] != "control_request" {
+			continue
+		}
+		req, ok := msg["request"].(map[string]any)
+		if !ok || req["subtype"] != "update_settings" {
+			continue
+		}
+		found = req
+		break
+	}
+	if found == nil {
+		t.Fatalf("expected a written control_request with subtype update_settings, got %v", written)
+	}
+	if found["source"] != "localSettings" {
+		t.Fatalf("source = %v, want %q", found["source"], "localSettings")
+	}
+	gotSettings, ok := found["settings"].(map[string]any)
+	if !ok {
+		t.Fatalf("settings field missing or wrong type: %v", found["settings"])
+	}
+	if gotSettings["outputStyle"] != "concise" {
+		t.Fatalf("settings[outputStyle] = %v, want %q", gotSettings["outputStyle"], "concise")
+	}
+}
+
 // TestHandleHookCallback_TimesOutHungCallback verifies that a hook callback
 // which never returns is bounded by its configured per-callback timeout
 // instead of wedging the control request forever.
