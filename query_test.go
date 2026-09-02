@@ -1540,6 +1540,66 @@ func TestInterrupt_CancelQueuedSendsFlagAndPopulatesCancelled(t *testing.T) {
 	}
 }
 
+// TestGetContextUsage_OmitsDetailByDefault verifies that query.getContextUsage("")
+// (the path used by Client.GetContextUsage) sends a get_context_usage
+// control request with no "detail" key, letting the CLI fall back to its
+// default 'full' behavior.
+func TestGetContextUsage_OmitsDetailByDefault(t *testing.T) {
+	mt := newAutoRespondTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	if _, err := q.getContextUsage(""); err != nil {
+		t.Fatalf("getContextUsage failed: %v", err)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"get_context_usage"`) {
+			found = true
+			if strings.Contains(w, `"detail"`) {
+				t.Fatalf("expected no detail key in request, got %v", w)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written get_context_usage control_request, got %v", written)
+	}
+}
+
+// TestGetContextUsage_DetailSummarySendsDetailKey verifies that
+// query.getContextUsage("summary") (the path used by
+// Client.GetContextUsageDetail) sends "detail":"summary" on the wire.
+// Port of TypeScript SDK v0.3.257.
+func TestGetContextUsage_DetailSummarySendsDetailKey(t *testing.T) {
+	mt := newAutoRespondTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	if _, err := q.getContextUsage("summary"); err != nil {
+		t.Fatalf("getContextUsage failed: %v", err)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"detail":"summary"`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written control_request containing detail:summary, got %v", written)
+	}
+}
+
 // TestHandleHookCallback_TimesOutHungCallback verifies that a hook callback
 // which never returns is bounded by its configured per-callback timeout
 // instead of wedging the control request forever.

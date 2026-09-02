@@ -1153,8 +1153,12 @@ func (q *query) getMcpStatus() (*McpStatusResponse, error) {
 	return &status, nil
 }
 
-func (q *query) getContextUsage() (*ContextUsage, error) {
-	resp, err := q.sendControlRequest(map[string]any{"subtype": "get_context_usage"}, 60*time.Second)
+func (q *query) getContextUsage(detail string) (*ContextUsage, error) {
+	req := map[string]any{"subtype": "get_context_usage"}
+	if detail != "" {
+		req["detail"] = detail
+	}
+	resp, err := q.sendControlRequest(req, 60*time.Second)
 	if err != nil {
 		return nil, err
 	}
