@@ -305,6 +305,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			SubagentType:    stringField(data, "subagent_type"),
 			TaskDescription: stringField(data, "task_description"),
 			Ambient:         optionalBoolField(data, "ambient"),
+			ResourceLinks:   parseMcpResourceLinks(data["resource_links"]),
 		}, nil
 
 	case "api_retry":
@@ -793,6 +794,36 @@ func parseTaskUsage(v any) TaskUsage {
 		ToolUses:    intFromAny(m["tool_uses"]),
 		DurationMs:  intFromAny(m["duration_ms"]),
 	}
+}
+
+// parseMcpResourceLinks parses a raw resource_links array (as found on a
+// task_notification message) into [McpResourceLink] values. Returns nil when
+// v is not a non-empty array, matching the field's omitempty/absent contract.
+func parseMcpResourceLinks(v any) []McpResourceLink {
+	raw, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	var links []McpResourceLink
+	for _, rl := range raw {
+		l, ok := rl.(map[string]any)
+		if !ok {
+			continue
+		}
+		link := McpResourceLink{
+			URI:         stringField(l, "uri"),
+			Name:        stringField(l, "name"),
+			Title:       stringField(l, "title"),
+			Description: stringField(l, "description"),
+			MimeType:    stringField(l, "mimeType"),
+			Size:        optionalIntField(l, "size"),
+		}
+		if ann, ok := l["annotations"].(map[string]any); ok {
+			link.Annotations = ann
+		}
+		links = append(links, link)
+	}
+	return links
 }
 
 // Helper functions for extracting typed fields from maps.
