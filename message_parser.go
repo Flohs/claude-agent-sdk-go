@@ -485,6 +485,7 @@ func parseModelUsage(raw map[string]any) map[string]ModelUsage {
 		result[model] = ModelUsage{
 			InputTokens:              intField(m, "inputTokens"),
 			OutputTokens:             intField(m, "outputTokens"),
+			ThinkingTokens:           optionalIntField(m, "thinkingTokens"),
 			CacheReadInputTokens:     intField(m, "cacheReadInputTokens"),
 			CacheCreationInputTokens: intField(m, "cacheCreationInputTokens"),
 			WebSearchRequests:        intField(m, "webSearchRequests"),
