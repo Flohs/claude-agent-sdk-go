@@ -1597,8 +1597,14 @@ type ModelScopedUsage struct {
 // passed through as-is. Port of TypeScript SDK v0.3.218 / Python SDK
 // v0.2.126.
 type ModelUsage struct {
-	InputTokens              int     `json:"inputTokens"`
-	OutputTokens             int     `json:"outputTokens"`
+	InputTokens  int `json:"inputTokens"`
+	OutputTokens int `json:"outputTokens"`
+	// ThinkingTokens is the number of thinking tokens, already counted
+	// inside OutputTokens. Populated only on turns run on CLI versions that
+	// record this field: nil when none did, and a partial count for a
+	// resumed session that began on an older version. Port of TypeScript
+	// SDK v0.3.257.
+	ThinkingTokens           *int    `json:"thinkingTokens,omitempty"`
 	CacheReadInputTokens     int     `json:"cacheReadInputTokens"`
 	CacheCreationInputTokens int     `json:"cacheCreationInputTokens"`
 	WebSearchRequests        int     `json:"webSearchRequests"`

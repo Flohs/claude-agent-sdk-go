@@ -620,6 +620,7 @@ func TestParseMessage_ResultMessage_ModelUsage(t *testing.T) {
 			"claude-opus-4-8": map[string]any{
 				"inputTokens":              float64(100),
 				"outputTokens":             float64(50),
+				"thinkingTokens":           float64(30),
 				"cacheReadInputTokens":     float64(10),
 				"cacheCreationInputTokens": float64(5),
 				"webSearchRequests":        float64(2),
@@ -646,6 +647,42 @@ func TestParseMessage_ResultMessage_ModelUsage(t *testing.T) {
 		u.ContextWindow != 200000 || u.MaxOutputTokens != 8192 ||
 		u.CanonicalModel != "claude-opus-4-7" || u.Provider != "firstParty" || u.CostBasis != "managed" {
 		t.Errorf("unexpected ModelUsage entry: %+v", u)
+	}
+	if u.ThinkingTokens == nil {
+		t.Fatal("ThinkingTokens is nil, want 30")
+	}
+	if *u.ThinkingTokens != 30 {
+		t.Errorf("*ThinkingTokens = %d, want 30", *u.ThinkingTokens)
+	}
+}
+
+func TestParseMessage_ResultMessage_ModelUsage_ThinkingTokensAbsent(t *testing.T) {
+	data := map[string]any{
+		"type":            "result",
+		"subtype":         "success",
+		"duration_ms":     1000,
+		"duration_api_ms": 900,
+		"is_error":        false,
+		"num_turns":       1,
+		"session_id":      "s",
+		"modelUsage": map[string]any{
+			"claude-opus-4-8": map[string]any{
+				"inputTokens":  float64(100),
+				"outputTokens": float64(50),
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := msg.(*ResultMessage)
+	u, ok := result.ModelUsage["claude-opus-4-8"]
+	if !ok {
+		t.Fatalf("expected model usage entry for claude-opus-4-8, got %v", result.ModelUsage)
+	}
+	if u.ThinkingTokens != nil {
+		t.Errorf("ThinkingTokens = %v, want nil when absent", *u.ThinkingTokens)
 	}
 }
 
