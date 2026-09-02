@@ -379,12 +379,29 @@ func (c *Client) GetMcpStatus(ctx context.Context) (*McpStatusResponse, error) {
 	return c.q.getMcpStatus()
 }
 
-// GetContextUsage returns the current context window usage breakdown.
+// GetContextUsage returns the current context window usage breakdown, with
+// the CLI's default 'full' detail level: it counts each category via the
+// token-count API, which is more accurate but more expensive. Use
+// [Client.GetContextUsageDetail] to request the cheaper 'summary' level
+// instead.
 func (c *Client) GetContextUsage(ctx context.Context) (*ContextUsage, error) {
 	if c.q == nil {
 		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
-	return c.q.getContextUsage()
+	return c.q.getContextUsage("")
+}
+
+// GetContextUsageDetail is like [Client.GetContextUsage], but lets the
+// caller pick the detail level explicitly: detail must be "full" (counts
+// each category via the token-count API — more accurate, more expensive) or
+// "summary" (answers from the last response's usage and local estimates
+// without the per-category token-count calls — cheaper). Port of TypeScript
+// SDK v0.3.257.
+func (c *Client) GetContextUsageDetail(ctx context.Context, detail string) (*ContextUsage, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getContextUsage(detail)
 }
 
 // GetSettings returns the effective merged settings for the running session,
