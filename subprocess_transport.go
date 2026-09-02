@@ -625,6 +625,8 @@ func (t *SubprocessTransport) buildCommand() []string {
 		switch sp := opts.SystemPrompt.(type) {
 		case StringPrompt:
 			cmd = append(cmd, "--system-prompt", string(sp))
+		case CustomPrompt:
+			cmd = append(cmd, "--system-prompt", sp.Prompt)
 		case PresetPrompt:
 			if sp.Append != "" {
 				cmd = append(cmd, "--append-system-prompt", sp.Append)

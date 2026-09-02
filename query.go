@@ -68,6 +68,7 @@ type query struct {
 	mainResultOnce         sync.Once
 	streamCloseTimeout     float64
 	excludeDynamicSections bool
+	systemPromptSnapshot   bool
 	forwardSubagentText    bool
 	// lastIsErrorResultDelivered is set (and never cleared) once a result
 	// message with is_error:true has been delivered to messageCh in this
@@ -133,6 +134,7 @@ type queryConfig struct {
 	initTimeout            float64
 	agents                 map[string]AgentDefinition
 	excludeDynamicSections bool
+	systemPromptSnapshot   bool
 	forwardSubagentText    bool
 	// sessionStore, when non-nil, enables transcript mirroring. projectsDir
 	// is the base directory the CLI emits transcript filePath values under
@@ -187,6 +189,7 @@ func newQuery(cfg queryConfig) *query {
 		mainResultCh:            make(chan struct{}),
 		streamCloseTimeout:      streamCloseTimeoutMs / 1000.0,
 		excludeDynamicSections:  cfg.excludeDynamicSections,
+		systemPromptSnapshot:    cfg.systemPromptSnapshot,
 		forwardSubagentText:     cfg.forwardSubagentText,
 		flushTimeout:            flushTimeout,
 		stderrCallback:          cfg.stderr,
@@ -886,6 +889,10 @@ func (q *query) initialize() (map[string]any, error) {
 
 	if q.excludeDynamicSections {
 		request["excludeDynamicSections"] = true
+	}
+
+	if q.systemPromptSnapshot {
+		request["systemPromptSnapshot"] = true
 	}
 
 	if q.agents != nil {

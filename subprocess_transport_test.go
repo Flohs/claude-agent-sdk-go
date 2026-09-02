@@ -64,6 +64,17 @@ func TestBuildCommand_SystemPrompt(t *testing.T) {
 		cmd := transport.buildCommand()
 		assertContains(t, cmd, "--append-system-prompt", "extra instructions")
 	})
+
+	t.Run("custom prompt with snapshot", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "claude",
+			options: &Options{
+				SystemPrompt: CustomPrompt{Prompt: "You are helpful", Snapshot: true},
+			},
+		}
+		cmd := transport.buildCommand()
+		assertContains(t, cmd, "--system-prompt", "You are helpful")
+	})
 }
 
 func TestBuildCommand_Tools(t *testing.T) {

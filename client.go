@@ -99,10 +99,15 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 	// Extract SDK MCP servers
 	sdkServers := extractSdkMcpServers(configuredOpts.McpServers)
 
-	// Extract excludeDynamicSections from PresetPrompt if set
-	var excludeDynamic bool
-	if pp, ok := configuredOpts.SystemPrompt.(PresetPrompt); ok {
-		excludeDynamic = pp.ExcludeDynamicSections
+	// Extract excludeDynamicSections and systemPromptSnapshot from
+	// PresetPrompt/CustomPrompt if set
+	var excludeDynamic, snapshot bool
+	switch sp := configuredOpts.SystemPrompt.(type) {
+	case PresetPrompt:
+		excludeDynamic = sp.ExcludeDynamicSections
+		snapshot = sp.Snapshot
+	case CustomPrompt:
+		snapshot = sp.Snapshot
 	}
 
 	// Create query handler
@@ -113,6 +118,7 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		mcpServers:             sdkServers,
 		agents:                 configuredOpts.Agents,
 		excludeDynamicSections: excludeDynamic,
+		systemPromptSnapshot:   snapshot,
 		forwardSubagentText:    configuredOpts.ForwardSubagentText,
 		sessionStore:           configuredOpts.SessionStore,
 		projectsDir:            projectsDir,

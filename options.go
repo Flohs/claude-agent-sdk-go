@@ -238,9 +238,30 @@ type PresetPrompt struct {
 	Preset                 string `json:"preset"` // e.g. "claude_code"
 	Append                 string `json:"append,omitempty"`
 	ExcludeDynamicSections bool   `json:"excludeDynamicSections,omitempty"`
+	// Snapshot, when true, records the conversation's system prompt once (in
+	// the session transcript) and reuses it verbatim on every later request
+	// and resume/continue, instead of rendering it fresh each time.
+	// Recommended for stability with extended thinking and the API's prompt
+	// cache, since a re-rendered prompt invalidates both. A mid-session
+	// change to the model or the system prompt (e.g. a different Append)
+	// then has no effect until the next compaction or a new session.
+	// Omitted/default only records the bare "claude_code" preset with no
+	// Append; passing Append turns recording off unless Snapshot is set.
+	Snapshot bool `json:"snapshot,omitempty"`
 }
 
 func (PresetPrompt) systemPromptMarker() {}
+
+// CustomPrompt is a custom system prompt with the option to record it in
+// the session transcript (Snapshot) for reuse across requests and resume,
+// instead of re-rendering it fresh every time — see PresetPrompt.Snapshot.
+// A bare StringPrompt is always snapshot:false; use CustomPrompt to opt in.
+type CustomPrompt struct {
+	Prompt   string
+	Snapshot bool
+}
+
+func (CustomPrompt) systemPromptMarker() {}
 
 // ContentBlocksPrompt is a system prompt expressed as an array of content blocks,
 // matching the Anthropic API's list-form system parameter.
