@@ -1959,6 +1959,79 @@ func TestParseMessage_TaskNotification_Ambient(t *testing.T) {
 	}
 }
 
+func TestParseMessage_TaskNotification_ResourceLinks(t *testing.T) {
+	size := 1234
+	data := map[string]any{
+		"type":        "system",
+		"subtype":     "task_notification",
+		"task_id":     "t1",
+		"status":      "completed",
+		"uuid":        "u1",
+		"session_id":  "s1",
+		"tool_use_id": "tu1",
+		"resource_links": []any{
+			map[string]any{
+				"uri":         "file:///tmp/report.pdf",
+				"name":        "report.pdf",
+				"title":       "Report",
+				"description": "Generated report",
+				"mimeType":    "application/pdf",
+				"size":        float64(size),
+				"annotations": map[string]any{"audience": []any{"user"}},
+			},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	n := msg.(*TaskNotificationMessage)
+	if len(n.ResourceLinks) != 1 {
+		t.Fatalf("ResourceLinks: got %d links, want 1", len(n.ResourceLinks))
+	}
+	link := n.ResourceLinks[0]
+	if link.URI != "file:///tmp/report.pdf" {
+		t.Errorf("URI = %q", link.URI)
+	}
+	if link.Name != "report.pdf" {
+		t.Errorf("Name = %q", link.Name)
+	}
+	if link.Title != "Report" {
+		t.Errorf("Title = %q", link.Title)
+	}
+	if link.Description != "Generated report" {
+		t.Errorf("Description = %q", link.Description)
+	}
+	if link.MimeType != "application/pdf" {
+		t.Errorf("MimeType = %q", link.MimeType)
+	}
+	if link.Size == nil || *link.Size != size {
+		t.Errorf("Size = %v, want %d", link.Size, size)
+	}
+	if link.Annotations == nil {
+		t.Errorf("Annotations = nil, want populated map")
+	}
+}
+
+func TestParseMessage_TaskNotification_ResourceLinksAbsent(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "task_notification",
+		"task_id":    "t1",
+		"status":     "completed",
+		"uuid":       "u1",
+		"session_id": "s1",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	n := msg.(*TaskNotificationMessage)
+	if n.ResourceLinks != nil {
+		t.Errorf("ResourceLinks = %v, want nil", n.ResourceLinks)
+	}
+}
+
 func TestParseWorkerShuttingDownMessage_WithReason(t *testing.T) {
 	data := map[string]any{
 		"type":    "system",

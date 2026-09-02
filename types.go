@@ -433,6 +433,19 @@ type TaskProgressMessage struct {
 	Blocked bool `json:"blocked,omitempty"`
 }
 
+// McpResourceLink is a resource_link content block an MCP tool result
+// returned, referencing a file by URI rather than embedding its content.
+// Carried on [TaskNotificationMessage.ResourceLinks].
+type McpResourceLink struct {
+	URI         string         `json:"uri"`
+	Name        string         `json:"name"`
+	Title       string         `json:"title,omitempty"`
+	Description string         `json:"description,omitempty"`
+	MimeType    string         `json:"mimeType,omitempty"`
+	Size        *int           `json:"size,omitempty"`
+	Annotations map[string]any `json:"annotations,omitempty"`
+}
+
 // TaskNotificationMessage is emitted when a task completes, fails, or is stopped.
 type TaskNotificationMessage struct {
 	SystemMessage
@@ -453,6 +466,16 @@ type TaskNotificationMessage struct {
 	// live-update watchers); hosts should exclude these from activity
 	// indicators. Port of TypeScript SDK v0.3.247.
 	Ambient *bool `json:"ambient,omitempty"`
+	// ResourceLinks holds the resource_link content blocks from the final
+	// result of a backgrounded MCP tool call (task_type mcp_task) that
+	// completed — the files it returned by reference — collected before the
+	// CLI renders the result as text; a backgrounded task's tool_result is
+	// only placeholder text, so this is where a host learns which files that
+	// call produced. Join to the originating call via ToolUseID. Same caps as
+	// the analogous tool_use_result.resourceLinks field on user messages (at
+	// most 50 links, 64 KiB serialized). Nil when the result had none or the
+	// task is any other type. Port of TypeScript SDK v0.3.257.
+	ResourceLinks []McpResourceLink `json:"resource_links,omitempty"`
 }
 
 // TaskUpdatedStatus represents the lifecycle status reported in a task_updated patch.
