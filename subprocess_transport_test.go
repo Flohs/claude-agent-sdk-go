@@ -33,6 +33,34 @@ func TestBuildCommand_BasicFlags(t *testing.T) {
 	assertContainsFlag(t, cmd, "--verbose")
 }
 
+func TestBuildCommand_PermissionPrompts(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "/usr/local/bin/claude",
+		options: &Options{
+			PermissionPrompts: "none",
+		},
+	}
+
+	cmd := transport.buildCommand()
+
+	assertContains(t, cmd, "--permission-prompts", "none")
+}
+
+func TestBuildCommand_PermissionPromptsOmittedWhenEmpty(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "/usr/local/bin/claude",
+		options: &Options{},
+	}
+
+	cmd := transport.buildCommand()
+
+	for _, arg := range cmd {
+		if arg == "--permission-prompts" {
+			t.Fatalf("expected --permission-prompts to be omitted when PermissionPrompts is empty, got %v", cmd)
+		}
+	}
+}
+
 func TestBuildCommand_SystemPrompt(t *testing.T) {
 	t.Run("nil system prompt sends empty", func(t *testing.T) {
 		transport := &SubprocessTransport{

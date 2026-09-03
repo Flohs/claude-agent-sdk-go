@@ -681,6 +681,15 @@ type Options struct {
 	Betas []SdkBeta
 	// PermissionPromptToolName sets the permission prompt tool name.
 	PermissionPromptToolName string
+	// PermissionPrompts controls who answers permission prompts: "host"
+	// (default) routes them to this process via CanUseTool or
+	// PermissionPromptToolName; "none" means nobody — the permission mode
+	// (including auto mode's classifier), rules and hooks still decide, and
+	// anything that would otherwise prompt is denied immediately with a
+	// message telling Claude the session has no approval surface, without
+	// ever invoking CanUseTool. Empty leaves the CLI's default in effect.
+	// Port of TypeScript SDK v0.3.259.
+	PermissionPrompts string
 	// Cwd sets the working directory for the CLI process.
 	Cwd string
 	// CLIPath overrides the path to the Claude CLI binary.
