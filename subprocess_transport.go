@@ -723,6 +723,10 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--permission-prompt-tool", opts.PermissionPromptToolName)
 	}
 
+	if opts.PermissionPrompts != "" {
+		cmd = append(cmd, "--permission-prompts", opts.PermissionPrompts)
+	}
+
 	if opts.PermissionMode != "" {
 		cmd = append(cmd, "--permission-mode", string(opts.PermissionMode))
 	}
