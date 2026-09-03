@@ -259,6 +259,17 @@ type AssistantMessage struct {
 	// without a client uuid, and from older CLIs. Port of TypeScript SDK
 	// v0.3.246.
 	UserMessageUUID string `json:"user_message_uuid,omitempty"`
+	// UserMessageUUIDs lists the client uuids of every user message this
+	// turn's prompt batch has consumed so far, in consumption order — a host
+	// that merges several close-together sends into one turn stamps
+	// UserMessageUUID with the last member's uuid alone, while this lists
+	// every member, so a consumer that sent any of them can bind this
+	// message to its own send by finding its uuid anywhere in the list.
+	// Always contains UserMessageUUID when either is populated; at most 64
+	// entries. Present exactly when UserMessageUUID is, on the same frame;
+	// nil from older CLIs (fall back to UserMessageUUID). Port of
+	// TypeScript SDK v0.3.259.
+	UserMessageUUIDs []string `json:"user_message_uuids,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
@@ -1394,6 +1405,16 @@ type ResultMessage struct {
 	// empty when the CLI omits it (e.g. synthetic/scheduled turns, turns
 	// without a client uuid, or older CLIs).
 	UserMessageUUID string `json:"user_message_uuid,omitempty"`
+	// UserMessageUUIDs lists the client uuids of every user message this
+	// result's turn consumed, in consumption order — every member of a
+	// prompt batch a host merged into this one turn, plus any queued user
+	// message folded in between tool rounds, once taken off the queue — so
+	// a consumer that sent any of them can bind this result to its own send
+	// by finding its uuid anywhere in the list. Always contains
+	// UserMessageUUID when either is populated; at most 64 entries;
+	// populated on both success and error result subtypes. Nil from older
+	// CLIs (fall back to UserMessageUUID). Port of TypeScript SDK v0.3.259.
+	UserMessageUUIDs []string `json:"user_message_uuids,omitempty"`
 	// RequestSentWallMs is the wall-clock timestamp (ms) when the request was
 	// sent, for cross-host request-latency correlation. Nil when not
 	// provided by the CLI.
@@ -1423,6 +1444,11 @@ type StreamEvent struct {
 	// (meta) turns, on turns without a client uuid, and from older CLIs.
 	// Port of TypeScript SDK v0.3.246.
 	UserMessageUUID string `json:"user_message_uuid,omitempty"`
+	// UserMessageUUIDs lists the client uuids of every user message this
+	// turn's prompt batch has consumed so far, in consumption order — see
+	// AssistantMessage.UserMessageUUIDs for the full semantics; this field
+	// mirrors it on the streamed frame. Port of TypeScript SDK v0.3.259.
+	UserMessageUUIDs []string `json:"user_message_uuids,omitempty"`
 }
 
 func (StreamEvent) messageMarker() {}
