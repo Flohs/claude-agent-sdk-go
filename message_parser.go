@@ -126,17 +126,18 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 	model, _ := message["model"].(string)
 
 	msg := &AssistantMessage{
-		Content:         blocks,
-		Model:           model,
-		ParentToolUseID: stringField(data, "parent_tool_use_id"),
-		MessageID:       stringField(message, "id"),
-		SessionID:       stringField(data, "session_id"),
-		UUID:            stringField(data, "uuid"),
-		StopReason:      stringField(message, "stop_reason"),
-		Aborted:         boolField(message, "aborted"),
-		RequestID:       stringField(data, "request_id"),
-		Timestamp:       stringField(data, "timestamp"),
-		UserMessageUUID: stringField(data, "user_message_uuid"),
+		Content:          blocks,
+		Model:            model,
+		ParentToolUseID:  stringField(data, "parent_tool_use_id"),
+		MessageID:        stringField(message, "id"),
+		SessionID:        stringField(data, "session_id"),
+		UUID:             stringField(data, "uuid"),
+		StopReason:       stringField(message, "stop_reason"),
+		Aborted:          boolField(message, "aborted"),
+		RequestID:        stringField(data, "request_id"),
+		Timestamp:        stringField(data, "timestamp"),
+		UserMessageUUID:  stringField(data, "user_message_uuid"),
+		UserMessageUUIDs: stringSliceField(data, "user_message_uuids"),
 	}
 
 	if errStr := stringField(data, "error"); errStr != "" {
@@ -421,11 +422,12 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		FastModeDisabledReason: FastModeDisabledReason(
 			stringField(data, "fast_mode_disabled_reason"),
 		),
-		Origin:          parseMessageOrigin(data),
-		RequestID:       stringField(data, "request_id"),
-		Result:          stringField(data, "result"),
-		Timestamp:       stringField(data, "timestamp"),
-		UserMessageUUID: stringField(data, "user_message_uuid"),
+		Origin:           parseMessageOrigin(data),
+		RequestID:        stringField(data, "request_id"),
+		Result:           stringField(data, "result"),
+		Timestamp:        stringField(data, "timestamp"),
+		UserMessageUUID:  stringField(data, "user_message_uuid"),
+		UserMessageUUIDs: stringSliceField(data, "user_message_uuids"),
 	}
 
 	if errors, ok := data["errors"].([]any); ok {
@@ -504,11 +506,12 @@ func parseModelUsage(raw map[string]any) map[string]ModelUsage {
 func parseStreamEvent(data map[string]any) (*StreamEvent, error) {
 	event, _ := data["event"].(map[string]any)
 	return &StreamEvent{
-		UUID:            stringField(data, "uuid"),
-		SessionID:       stringField(data, "session_id"),
-		Event:           event,
-		ParentToolUseID: stringField(data, "parent_tool_use_id"),
-		UserMessageUUID: stringField(data, "user_message_uuid"),
+		UUID:             stringField(data, "uuid"),
+		SessionID:        stringField(data, "session_id"),
+		Event:            event,
+		ParentToolUseID:  stringField(data, "parent_tool_use_id"),
+		UserMessageUUID:  stringField(data, "user_message_uuid"),
+		UserMessageUUIDs: stringSliceField(data, "user_message_uuids"),
 	}, nil
 }
 

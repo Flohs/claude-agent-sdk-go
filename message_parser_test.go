@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -265,6 +266,45 @@ func TestParseMessage_AssistantMessage_TypedFields(t *testing.T) {
 	}
 	if asst.UserMessageUUID != "user-msg-uuid-xyz" {
 		t.Errorf("UserMessageUUID = %q, want user-msg-uuid-xyz", asst.UserMessageUUID)
+	}
+}
+
+func TestParseMessage_AssistantMessage_UserMessageUUIDs(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model":   "claude-sonnet-4-5-20250514",
+			"content": []any{},
+		},
+		"user_message_uuid":  "um_last",
+		"user_message_uuids": []any{"um_first", "um_last"},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	want := []string{"um_first", "um_last"}
+	if !reflect.DeepEqual(asst.UserMessageUUIDs, want) {
+		t.Errorf("UserMessageUUIDs = %v, want %v", asst.UserMessageUUIDs, want)
+	}
+}
+
+func TestParseMessage_AssistantMessage_UserMessageUUIDsAbsent(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model":   "claude-sonnet-4-5-20250514",
+			"content": []any{},
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	if asst.UserMessageUUIDs != nil {
+		t.Errorf("UserMessageUUIDs = %v, want nil when absent", asst.UserMessageUUIDs)
 	}
 }
 
@@ -1098,6 +1138,27 @@ func TestParseMessage_StreamEvent(t *testing.T) {
 	}
 }
 
+func TestParseMessage_StreamEvent_UserMessageUUIDs(t *testing.T) {
+	data := map[string]any{
+		"type":               "stream_event",
+		"uuid":               "u1",
+		"session_id":         "s1",
+		"event":              map[string]any{"type": "content_block_delta"},
+		"user_message_uuid":  "um_last",
+		"user_message_uuids": []any{"um_first", "um_last"},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*StreamEvent)
+	want := []string{"um_first", "um_last"}
+	if !reflect.DeepEqual(event.UserMessageUUIDs, want) {
+		t.Errorf("UserMessageUUIDs = %v, want %v", event.UserMessageUUIDs, want)
+	}
+}
+
 func TestParseMessage_MirrorErrorMessage(t *testing.T) {
 	data := map[string]any{
 		"type":    "system",
@@ -1704,6 +1765,26 @@ func TestParseMessage_ResultMessage_UserMessageUUIDAndRequestSentWallMs_Absent(t
 	}
 	if r.RequestSentWallMs != nil {
 		t.Errorf("RequestSentWallMs = %v, want nil when absent", *r.RequestSentWallMs)
+	}
+}
+
+func TestParseMessage_ResultMessage_UserMessageUUIDs(t *testing.T) {
+	data := map[string]any{
+		"type":               "result",
+		"subtype":            "success",
+		"is_error":           false,
+		"session_id":         "s",
+		"user_message_uuid":  "um_last",
+		"user_message_uuids": []any{"um_first", "um_last"},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	want := []string{"um_first", "um_last"}
+	if !reflect.DeepEqual(r.UserMessageUUIDs, want) {
+		t.Errorf("UserMessageUUIDs = %v, want %v", r.UserMessageUUIDs, want)
 	}
 }
 
