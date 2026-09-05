@@ -1675,6 +1675,68 @@ func TestGetContextUsage_DetailSummarySendsDetailKey(t *testing.T) {
 	}
 }
 
+// TestGetUsageExperimental_OmitsSkipBehaviorsByDefault verifies that
+// query.getUsageExperimentalDetail(false) (the path used by
+// Client.GetUsageExperimental) sends a get_usage control request with no
+// "skip_behaviors" key, letting the CLI fall back to its default of
+// scanning local transcripts to populate the behaviors section.
+func TestGetUsageExperimental_OmitsSkipBehaviorsByDefault(t *testing.T) {
+	mt := newAutoRespondTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	if _, err := q.getUsageExperimentalDetail(false); err != nil {
+		t.Fatalf("getUsageExperimentalDetail failed: %v", err)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"get_usage"`) {
+			found = true
+			if strings.Contains(w, `"skip_behaviors"`) {
+				t.Fatalf("expected no skip_behaviors key in request, got %v", w)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written get_usage control_request, got %v", written)
+	}
+}
+
+// TestGetUsageExperimental_SkipBehaviorsSendsSkipBehaviorsKey verifies that
+// query.getUsageExperimentalDetail(true) (the path used by
+// Client.GetUsageExperimentalDetail) sends "skip_behaviors":true on the
+// wire, so the CLI skips the local-transcript scan.
+// Port of TypeScript SDK v0.3.261.
+func TestGetUsageExperimental_SkipBehaviorsSendsSkipBehaviorsKey(t *testing.T) {
+	mt := newAutoRespondTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	if _, err := q.getUsageExperimentalDetail(true); err != nil {
+		t.Fatalf("getUsageExperimentalDetail failed: %v", err)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"skip_behaviors":true`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written control_request containing skip_behaviors:true, got %v", written)
+	}
+}
+
 // TestHandleHookCallback_TimesOutHungCallback verifies that a hook callback
 // which never returns is bounded by its configured per-callback timeout
 // instead of wedging the control request forever.

@@ -556,12 +556,32 @@ func (c *Client) RewindConversation(ctx context.Context, userMessageID string) e
 
 // GetUsageExperimental returns session cost, plan rate-limit, and local
 // usage-behavior data. The method name signals that the returned data shape
-// may change without notice. Port of TypeScript SDK v0.3.169. ([#350])
+// may change without notice. Equivalent to calling
+// [Client.GetUsageExperimentalDetail] with skipBehaviors false. Port of
+// TypeScript SDK v0.3.169. ([#350])
 func (c *Client) GetUsageExperimental(ctx context.Context) (*UsageDataExperimental, error) {
 	if c.q == nil {
 		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
 	return c.q.getUsageExperimental()
+}
+
+// GetUsageExperimentalDetail is like [Client.GetUsageExperimental], but lets
+// the caller skip the local-behavior scan: skipBehaviors true skips the scan
+// of local transcripts that fills the response's behaviors section, for
+// callers that need only the plan rate limits — the scan reads every
+// transcript touched in the last seven days. skipBehaviors false (the
+// default, and what [Client.GetUsageExperimental] always requests) scans as
+// before. This SDK does not currently model the behaviors section of the
+// response, so skipping it changes only the cost of the CLI-side scan, not
+// the shape of the returned [UsageDataExperimental]. The method name signals
+// that the returned data shape may change without notice. Port of
+// TypeScript SDK v0.3.261. ([#675])
+func (c *Client) GetUsageExperimentalDetail(ctx context.Context, skipBehaviors bool) (*UsageDataExperimental, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getUsageExperimentalDetail(skipBehaviors)
 }
 
 // GetServerInfo returns server initialization info.
