@@ -1375,9 +1375,15 @@ func (q *query) rewindConversation(userMessageID string) error {
 }
 
 func (q *query) getUsageExperimental() (*UsageDataExperimental, error) {
-	resp, err := q.sendControlRequest(map[string]any{
-		"subtype": "get_usage",
-	}, 30*time.Second)
+	return q.getUsageExperimentalDetail(false)
+}
+
+func (q *query) getUsageExperimentalDetail(skipBehaviors bool) (*UsageDataExperimental, error) {
+	req := map[string]any{"subtype": "get_usage"}
+	if skipBehaviors {
+		req["skip_behaviors"] = true
+	}
+	resp, err := q.sendControlRequest(req, 30*time.Second)
 	if err != nil {
 		return nil, err
 	}
