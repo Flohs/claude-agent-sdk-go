@@ -82,6 +82,22 @@ func TestGetServerCapabilities_PopulatesFastModeState(t *testing.T) {
 	}
 }
 
+// TestReloadOutputStyles_NotConnectedReturnsConnectionError verifies that
+// Client.ReloadOutputStyles fails fast with a ConnectionError when called
+// before Connect(), mirroring the nil-query guard used by the other control
+// methods (e.g. ReloadPlugins). Port of TypeScript SDK v0.3.261. ([#673])
+func TestReloadOutputStyles_NotConnectedReturnsConnectionError(t *testing.T) {
+	c := &Client{}
+
+	_, err := c.ReloadOutputStyles(context.Background())
+	if err == nil {
+		t.Fatal("expected an error when not connected, got nil")
+	}
+	if _, ok := err.(*ConnectionError); !ok {
+		t.Fatalf("expected a *ConnectionError, got %T: %v", err, err)
+	}
+}
+
 // TestSetPermissionMode_RejectsInvalidModeWithoutSendingRequest verifies
 // that Client.SetPermissionMode validates the mode before dispatching a
 // set_permission_mode control request, so a typo never reaches the CLI.
