@@ -70,6 +70,13 @@ type query struct {
 	excludeDynamicSections bool
 	systemPromptSnapshot   bool
 	forwardSubagentText    bool
+	// pluginDelivery and plugins mirror Options.PluginDelivery/Options.Plugins.
+	// When pluginDelivery is "initialize" and plugins is non-empty, the
+	// initialize control request includes a "plugins" key so the CLI (started
+	// with --await-initialize instead of per-plugin --plugin-dir flags) can
+	// load them from stdin.
+	pluginDelivery string
+	plugins        []SdkPluginConfig
 	// lastIsErrorResultDelivered is set (and never cleared) once a result
 	// message with is_error:true has been delivered to messageCh in this
 	// query's lifetime. Together with lastErrorResultMsg (which does clear,
@@ -136,6 +143,8 @@ type queryConfig struct {
 	excludeDynamicSections bool
 	systemPromptSnapshot   bool
 	forwardSubagentText    bool
+	pluginDelivery         string
+	plugins                []SdkPluginConfig
 	// sessionStore, when non-nil, enables transcript mirroring. projectsDir
 	// is the base directory the CLI emits transcript filePath values under
 	// (resolved by [getProjectsDir]). loadTimeoutMs caps the batcher's
@@ -191,6 +200,8 @@ func newQuery(cfg queryConfig) *query {
 		excludeDynamicSections:  cfg.excludeDynamicSections,
 		systemPromptSnapshot:    cfg.systemPromptSnapshot,
 		forwardSubagentText:     cfg.forwardSubagentText,
+		pluginDelivery:          cfg.pluginDelivery,
+		plugins:                 cfg.plugins,
 		flushTimeout:            flushTimeout,
 		stderrCallback:          cfg.stderr,
 		ctx:                     ctx,
@@ -901,6 +912,10 @@ func (q *query) initialize() (map[string]any, error) {
 
 	if q.forwardSubagentText {
 		request["forwardSubagentText"] = true
+	}
+
+	if q.pluginDelivery == "initialize" && len(q.plugins) > 0 {
+		request["plugins"] = q.plugins
 	}
 
 	response, err := q.sendControlRequest(request, time.Duration(q.initTimeout*float64(time.Second)))

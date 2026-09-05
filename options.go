@@ -797,6 +797,20 @@ type Options struct {
 	WorkflowSizeGuideline WorkflowSizeGuideline
 	// Plugins configures custom plugins.
 	Plugins []SdkPluginConfig
+	// PluginDelivery controls how Plugins reach the Claude Code process.
+	// "argv" (default) emits one --plugin-dir flag per plugin. Works with
+	// any Claude Code version, but the command line grows with the plugin
+	// count and Windows refuses to start a process whose command line
+	// exceeds 32,767 characters. "initialize" sends the list over stdin in
+	// the initialize control request instead and starts the CLI with
+	// --await-initialize, so the command line does not depend on the
+	// plugin count; loading is otherwise identical. Requires Claude Code
+	// 2.1.261 or newer (the binary bundled with this SDK qualifies); an
+	// older binary exits at startup with an unknown-option error.
+	// Client.GetServerInfo's "plugins_applied" key then reports whether
+	// every listed plugin is loaded in the process. Empty behaves as
+	// "argv". Port of TypeScript SDK v0.3.261.
+	PluginDelivery string
 	// MaxThinkingTokens limits thinking block tokens. Deprecated: use Thinking instead.
 	MaxThinkingTokens *int
 	// Thinking controls extended thinking behavior. Takes precedence over MaxThinkingTokens.

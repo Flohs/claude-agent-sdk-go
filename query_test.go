@@ -877,6 +877,121 @@ func TestInitialize_ForwardSubagentText(t *testing.T) {
 	})
 }
 
+func TestInitialize_PluginDelivery(t *testing.T) {
+	testPlugins := []SdkPluginConfig{
+		{Type: "local", Path: "/plugins/one"},
+		{Type: "local", Path: "/plugins/two", SkipMcpDiscovery: true},
+	}
+
+	t.Run("sends plugins when delivery is initialize and plugins are set", func(t *testing.T) {
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{
+			transport:      mt,
+			pluginDelivery: "initialize",
+			plugins:        testPlugins,
+		})
+
+		q.start()
+		_, err := q.initialize()
+		if err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+
+		_ = q.close()
+
+		found := false
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			req, _ := msg["request"].(map[string]any)
+			if req != nil && req["subtype"] == "initialize" {
+				plugins, ok := req["plugins"].([]any)
+				if ok && len(plugins) == 2 {
+					found = true
+				}
+			}
+		}
+		if !found {
+			t.Error("initialize request should contain plugins when pluginDelivery is 'initialize'")
+		}
+	})
+
+	t.Run("omits plugins when delivery is argv (default)", func(t *testing.T) {
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{
+			transport: mt,
+			plugins:   testPlugins,
+		})
+
+		q.start()
+		_, err := q.initialize()
+		if err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+
+		_ = q.close()
+
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			req, _ := msg["request"].(map[string]any)
+			if req != nil && req["subtype"] == "initialize" {
+				if _, ok := req["plugins"]; ok {
+					t.Error("initialize request should not contain plugins when pluginDelivery is 'argv' (default)")
+				}
+			}
+		}
+	})
+
+	t.Run("omits plugins when delivery is initialize but no plugins are configured", func(t *testing.T) {
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{
+			transport:      mt,
+			pluginDelivery: "initialize",
+		})
+
+		q.start()
+		_, err := q.initialize()
+		if err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+
+		_ = q.close()
+
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			req, _ := msg["request"].(map[string]any)
+			if req != nil && req["subtype"] == "initialize" {
+				if _, ok := req["plugins"]; ok {
+					t.Error("initialize request should not contain plugins when none are configured")
+				}
+			}
+		}
+	})
+}
+
 // ---------------------------------------------------------------------------
 // ProcessError / ResultError construction on subprocess exit (#204 follow-up
 // for #174, refined by #602). query.readMessages must:
