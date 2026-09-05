@@ -61,6 +61,77 @@ func TestBuildCommand_PermissionPromptsOmittedWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestBuildCommand_PluginDeliveryInitialize(t *testing.T) {
+	transport := &SubprocessTransport{
+		cliPath: "/usr/local/bin/claude",
+		options: &Options{
+			Plugins: []SdkPluginConfig{
+				{Type: "local", Path: "/plugins/one"},
+				{Type: "local", Path: "/plugins/two", SkipMcpDiscovery: true},
+			},
+			PluginDelivery: "initialize",
+		},
+	}
+
+	cmd := transport.buildCommand()
+
+	assertContainsFlag(t, cmd, "--await-initialize")
+	assertNotContainsFlag(t, cmd, "--plugin-dir")
+	assertNotContainsFlag(t, cmd, "--plugin-skip-mcp-discovery")
+}
+
+func TestBuildCommand_PluginDeliveryArgvDefault(t *testing.T) {
+	t.Run("default (empty) behaves like argv", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "/usr/local/bin/claude",
+			options: &Options{
+				Plugins: []SdkPluginConfig{
+					{Type: "local", Path: "/plugins/one"},
+					{Type: "local", Path: "/plugins/two", SkipMcpDiscovery: true},
+				},
+			},
+		}
+
+		cmd := transport.buildCommand()
+
+		assertContains(t, cmd, "--plugin-dir", "/plugins/one")
+		assertContains(t, cmd, "--plugin-dir", "/plugins/two")
+		assertContains(t, cmd, "--plugin-skip-mcp-discovery", "/plugins/two")
+		assertNotContainsFlag(t, cmd, "--await-initialize")
+	})
+
+	t.Run("explicit argv behaves the same", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "/usr/local/bin/claude",
+			options: &Options{
+				Plugins: []SdkPluginConfig{
+					{Type: "local", Path: "/plugins/one"},
+				},
+				PluginDelivery: "argv",
+			},
+		}
+
+		cmd := transport.buildCommand()
+
+		assertContains(t, cmd, "--plugin-dir", "/plugins/one")
+		assertNotContainsFlag(t, cmd, "--await-initialize")
+	})
+
+	t.Run("initialize delivery with no plugins configured omits both", func(t *testing.T) {
+		transport := &SubprocessTransport{
+			cliPath: "/usr/local/bin/claude",
+			options: &Options{
+				PluginDelivery: "initialize",
+			},
+		}
+
+		cmd := transport.buildCommand()
+
+		assertNotContainsFlag(t, cmd, "--await-initialize")
+		assertNotContainsFlag(t, cmd, "--plugin-dir")
+	})
+}
+
 func TestBuildCommand_SystemPrompt(t *testing.T) {
 	t.Run("nil system prompt sends empty", func(t *testing.T) {
 		transport := &SubprocessTransport{

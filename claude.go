@@ -125,6 +125,8 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			excludeDynamicSections: excludeDynamic,
 			systemPromptSnapshot:   snapshot,
 			forwardSubagentText:    configuredOpts.ForwardSubagentText,
+			pluginDelivery:         configuredOpts.PluginDelivery,
+			plugins:                configuredOpts.Plugins,
 		})
 
 		q.start()
@@ -313,6 +315,8 @@ func Startup(ctx context.Context, opts *Options) (*WarmQuery, error) {
 		excludeDynamicSections: excludeDynamic,
 		systemPromptSnapshot:   snapshot,
 		forwardSubagentText:    configuredOpts.ForwardSubagentText,
+		pluginDelivery:         configuredOpts.PluginDelivery,
+		plugins:                configuredOpts.Plugins,
 	})
 	q.start()
 

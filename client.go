@@ -120,6 +120,8 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		excludeDynamicSections: excludeDynamic,
 		systemPromptSnapshot:   snapshot,
 		forwardSubagentText:    configuredOpts.ForwardSubagentText,
+		pluginDelivery:         configuredOpts.PluginDelivery,
+		plugins:                configuredOpts.Plugins,
 		sessionStore:           configuredOpts.SessionStore,
 		projectsDir:            projectsDir,
 		loadTimeoutMs:          configuredOpts.LoadTimeoutMs,

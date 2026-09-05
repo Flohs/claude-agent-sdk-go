@@ -837,12 +837,19 @@ func (t *SubprocessTransport) buildCommand() []string {
 		cmd = append(cmd, "--setting-sources", strings.Join(sources, ","))
 	}
 
-	// Plugins
-	for _, plugin := range opts.Plugins {
-		if plugin.Type == "local" {
-			cmd = append(cmd, "--plugin-dir", plugin.Path)
-			if plugin.SkipMcpDiscovery {
-				cmd = append(cmd, "--plugin-skip-mcp-discovery", plugin.Path)
+	// Plugins. With PluginDelivery "initialize", the list is sent over
+	// stdin in the initialize control request instead (see query.go's
+	// initialize()), and the CLI is started with --await-initialize so the
+	// command line does not depend on the plugin count.
+	if opts.PluginDelivery == "initialize" && len(opts.Plugins) > 0 {
+		cmd = append(cmd, "--await-initialize")
+	} else {
+		for _, plugin := range opts.Plugins {
+			if plugin.Type == "local" {
+				cmd = append(cmd, "--plugin-dir", plugin.Path)
+				if plugin.SkipMcpDiscovery {
+					cmd = append(cmd, "--plugin-skip-mcp-discovery", plugin.Path)
+				}
 			}
 		}
 	}
