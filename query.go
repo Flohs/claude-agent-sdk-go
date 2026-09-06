@@ -1223,6 +1223,16 @@ func (q *query) reloadPlugins() (map[string]any, error) {
 	return resp, err
 }
 
+func (q *query) reloadOutputStyles() ([]string, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "reload_output_styles",
+	}, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return stringSliceFromResponse(resp, "available_output_styles")
+}
+
 func (q *query) enableMcpChannel(serverName, channel string) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype":    "mcp_enable_channel",

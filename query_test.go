@@ -1902,6 +1902,109 @@ func TestUpdateSettings_SendsSubtypeSourceAndSettings(t *testing.T) {
 	}
 }
 
+// stubResponseTransport is a mockTransport that answers every control
+// request with a fixed response payload, letting tests assert on the value
+// a query method extracts from a specific response shape.
+type stubResponseTransport struct {
+	mockTransport
+	response map[string]any
+}
+
+func newStubResponseTransport(response map[string]any) *stubResponseTransport {
+	return &stubResponseTransport{
+		mockTransport: mockTransport{
+			messages: make(chan map[string]any, 100),
+		},
+		response: response,
+	}
+}
+
+func (s *stubResponseTransport) Write(data string) error {
+	s.mu.Lock()
+	s.written = append(s.written, data)
+	s.mu.Unlock()
+
+	var msg map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(data)), &msg); err == nil {
+		if msg["type"] == "control_request" {
+			reqID, _ := msg["request_id"].(string)
+			go func() {
+				s.messages <- map[string]any{
+					"type": "control_response",
+					"response": map[string]any{
+						"subtype":    "success",
+						"request_id": reqID,
+						"response":   s.response,
+					},
+				}
+			}()
+		}
+	}
+	return nil
+}
+
+func (s *stubResponseTransport) ReadMessages(ctx context.Context) <-chan map[string]any {
+	out := make(chan map[string]any, 100)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case msg, ok := <-s.messages:
+				if !ok {
+					return
+				}
+				out <- msg
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out
+}
+
+// TestReloadOutputStyles_SendsSubtypeAndParsesResponse verifies that
+// query.reloadOutputStyles() (the path used by Client.ReloadOutputStyles)
+// sends a reload_output_styles control_request and extracts the
+// available_output_styles string slice from the response. Port of
+// TypeScript SDK v0.3.261. ([#673])
+func TestReloadOutputStyles_SendsSubtypeAndParsesResponse(t *testing.T) {
+	mt := newStubResponseTransport(map[string]any{
+		"available_output_styles": []any{"default", "explanatory", "custom-style"},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	styles, err := q.reloadOutputStyles()
+	if err != nil {
+		t.Fatalf("reloadOutputStyles failed: %v", err)
+	}
+
+	want := []string{"default", "explanatory", "custom-style"}
+	if len(styles) != len(want) {
+		t.Fatalf("styles = %v, want %v", styles, want)
+	}
+	for i, s := range want {
+		if styles[i] != s {
+			t.Fatalf("styles[%d] = %q, want %q", i, styles[i], s)
+		}
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"reload_output_styles"`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written reload_output_styles control_request, got %v", written)
+	}
+}
+
 // TestHandleHookCallback_TimesOutHungCallback verifies that a hook callback
 // which never returns is bounded by its configured per-callback timeout
 // instead of wedging the control request forever.

@@ -451,6 +451,19 @@ func (c *Client) ReloadPlugins(ctx context.Context) (map[string]any, error) {
 	return c.q.reloadPlugins()
 }
 
+// ReloadOutputStyles re-reads the output-style directories from disk and
+// returns the refreshed style names. A style file written while the session
+// runs is otherwise invisible to it until the next session. This also drops
+// the shared markdown-file scan cache, so agents, skills and routines
+// re-read their directories on their next use. Port of TypeScript SDK
+// v0.3.261. ([#673])
+func (c *Client) ReloadOutputStyles(ctx context.Context) ([]string, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.reloadOutputStyles()
+}
+
 // EnableMcpChannel activates a capability channel on an MCP server. Available
 // channels for a given server are advertised in McpServerStatus.Capabilities.
 func (c *Client) EnableMcpChannel(ctx context.Context, serverName, channel string) error {
