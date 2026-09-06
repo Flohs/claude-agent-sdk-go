@@ -425,6 +425,23 @@ func (c *Client) GetSettings(ctx context.Context) (map[string]any, error) {
 	return c.q.getSettings()
 }
 
+// UpdateSettings merges settings into a settings file through the CLI's own
+// writer (canonical store root, gitignore upkeep, hardened write) and
+// live-applies them — the same path /config uses. Unlike ApplyFlagSettings,
+// which only touches the session-scoped flag layer, this persists to disk.
+// source is currently only "localSettings" (the project's local settings
+// file). The CLI enforces an explicit key allowlist (currently just
+// "outputStyle"), string-only values (no deletion), and refuses remote
+// transports and sessions whose --setting-sources excludes the target
+// source — this method does not pre-validate any of that itself. Port of
+// TypeScript SDK v0.3.257.
+func (c *Client) UpdateSettings(ctx context.Context, source string, settings map[string]any) error {
+	if c.q == nil {
+		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.updateSettings(source, settings)
+}
+
 // ReloadPlugins reloads plugins and returns refreshed commands, agents, and
 // MCP server status.
 func (c *Client) ReloadPlugins(ctx context.Context) (map[string]any, error) {
