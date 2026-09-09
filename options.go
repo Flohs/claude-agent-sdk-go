@@ -238,15 +238,21 @@ type PresetPrompt struct {
 	Preset                 string `json:"preset"` // e.g. "claude_code"
 	Append                 string `json:"append,omitempty"`
 	ExcludeDynamicSections bool   `json:"excludeDynamicSections,omitempty"`
-	// Snapshot, when true, records the conversation's system prompt once (in
-	// the session transcript) and reuses it verbatim on every later request
-	// and resume/continue, instead of rendering it fresh each time.
-	// Recommended for stability with extended thinking and the API's prompt
-	// cache, since a re-rendered prompt invalidates both. A mid-session
-	// change to the model or the system prompt (e.g. a different Append)
-	// then has no effect until the next compaction or a new session.
-	// Omitted/default only records the bare "claude_code" preset with no
-	// Append; passing Append turns recording off unless Snapshot is set.
+	// Snapshot records the conversation's system prompt once (in the session
+	// transcript) and reuses it verbatim on every later request and
+	// resume/continue, instead of rendering it fresh each time. Recommended
+	// for stability with extended thinking and the API's prompt cache, since
+	// a re-rendered prompt invalidates both. A mid-session change to the
+	// model or the system prompt (e.g. a different Append) then has no
+	// effect until the next compaction or a new session.
+	//
+	// As of Claude Code CLI v2.1.265+, omitting Snapshot (the Go zero value,
+	// false) behaves the same as setting it to true: the CLI records on the
+	// first request and reuses that record. Earlier CLI versions instead
+	// rendered fresh on every request when Snapshot was omitted/false. Go
+	// has no way to request the pre-v2.1.265 "always render fresh" behavior
+	// explicitly — Snapshot is only ever sent as `true` or omitted, never
+	// `false` — see https://github.com/Flohs/claude-agent-sdk-go/issues/685.
 	Snapshot bool `json:"snapshot,omitempty"`
 }
 
@@ -254,8 +260,9 @@ func (PresetPrompt) systemPromptMarker() {}
 
 // CustomPrompt is a custom system prompt with the option to record it in
 // the session transcript (Snapshot) for reuse across requests and resume,
-// instead of re-rendering it fresh every time — see PresetPrompt.Snapshot.
-// A bare StringPrompt is always snapshot:false; use CustomPrompt to opt in.
+// instead of re-rendering it fresh every time — see PresetPrompt.Snapshot,
+// including the CLI v2.1.265+ default-flip note.
+// A bare StringPrompt follows the same CLI default as an omitted Snapshot.
 type CustomPrompt struct {
 	Prompt   string
 	Snapshot bool
