@@ -190,6 +190,7 @@ const (
 	AssistantMessageErrorServer             AssistantMessageError = "server_error"
 	AssistantMessageErrorUnknown            AssistantMessageError = "unknown"
 	AssistantMessageErrorMaxOutputTokens    AssistantMessageError = "max_output_tokens"
+	AssistantMessageErrorCloudCredential    AssistantMessageError = "cloud_credential_error"
 )
 
 // ToolUseMetaEntry holds display-friendly metadata for a single tool call.
