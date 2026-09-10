@@ -250,6 +250,49 @@ func (r *sdkMcpRouter) addServer(name string, server *McpSdkServerConfig) {
 	r.servers[name] = server
 }
 
+// buildManifests captures the initialize and tools/list handshake results
+// for every currently registered SDK MCP server, keyed by server name, for
+// use as the initialize control request's sdkMcpServerManifests field. This
+// lets the CLI answer its own MCP client's initialize/tools-list from a
+// one-shot cache instead of round-tripping through mcp_message for each
+// in-process server before the first turn. Only servers registered before
+// this call (i.e. before the initialize control request is sent) are
+// captured; servers added later via mcp_set_servers still handshake over
+// mcp_message as before.
+func (r *sdkMcpRouter) buildManifests(ctx context.Context) map[string]any {
+	r.mu.RLock()
+	names := make([]string, 0, len(r.servers))
+	for name := range r.servers {
+		names = append(names, name)
+	}
+	r.mu.RUnlock()
+
+	manifests := make(map[string]any, len(names))
+	for _, name := range names {
+		initResp := r.handleRequest(ctx, name, map[string]any{
+			"jsonrpc": "2.0",
+			"id":      "sdk-manifest-initialize",
+			"method":  "initialize",
+		})
+		initResult, ok := initResp["result"].(map[string]any)
+		if !ok {
+			continue
+		}
+		entry := map[string]any{"initializeResult": initResult}
+
+		listResp := r.handleRequest(ctx, name, map[string]any{
+			"jsonrpc": "2.0",
+			"id":      "sdk-manifest-tools-list",
+			"method":  "tools/list",
+		})
+		if listResult, ok := listResp["result"].(map[string]any); ok {
+			entry["toolsListResult"] = listResult
+		}
+		manifests[name] = entry
+	}
+	return manifests
+}
+
 func (r *sdkMcpRouter) handleRequest(ctx context.Context, serverName string, message map[string]any) map[string]any {
 	r.mu.RLock()
 	server, ok := r.servers[serverName]

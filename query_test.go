@@ -802,6 +802,105 @@ func TestInitialize_SystemPromptSnapshot(t *testing.T) {
 	})
 }
 
+func TestInitialize_SdkMcpServerManifests(t *testing.T) {
+	t.Run("includes manifests for registered SDK MCP servers", func(t *testing.T) {
+		mt := newAutoRespondTransport()
+		server := NewSdkMcpServer("calculator", "1.0.0", []SdkMcpTool{
+			{
+				Name:        "add",
+				Description: "Adds two numbers",
+				InputSchema: map[string]any{"type": "object"},
+				Handler: func(ctx context.Context, args map[string]any) (map[string]any, error) {
+					return nil, nil
+				},
+			},
+		})
+		q := newQuery(queryConfig{
+			transport:  mt,
+			mcpServers: map[string]*McpSdkServerConfig{"calculator": server},
+		})
+
+		q.start()
+		_, err := q.initialize()
+		if err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+
+		_ = q.close()
+
+		var manifests map[string]any
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			req, _ := msg["request"].(map[string]any)
+			if req != nil && req["subtype"] == "initialize" {
+				manifests, _ = req["sdkMcpServerManifests"].(map[string]any)
+			}
+		}
+		if manifests == nil {
+			t.Fatal("initialize request should contain sdkMcpServerManifests")
+		}
+		entry, ok := manifests["calculator"].(map[string]any)
+		if !ok {
+			t.Fatal("sdkMcpServerManifests should contain an entry for 'calculator'")
+		}
+		initResult, ok := entry["initializeResult"].(map[string]any)
+		if !ok {
+			t.Fatal("manifest entry should contain initializeResult")
+		}
+		serverInfo, _ := initResult["serverInfo"].(map[string]any)
+		if serverInfo == nil || serverInfo["name"] != "calculator" {
+			t.Errorf("initializeResult.serverInfo.name = %v, want %q", serverInfo, "calculator")
+		}
+		toolsResult, ok := entry["toolsListResult"].(map[string]any)
+		if !ok {
+			t.Fatal("manifest entry should contain toolsListResult")
+		}
+		tools, _ := toolsResult["tools"].([]any)
+		if len(tools) != 1 {
+			t.Errorf("toolsListResult.tools has %d entries, want 1", len(tools))
+		}
+	})
+
+	t.Run("omits sdkMcpServerManifests when no SDK servers are registered", func(t *testing.T) {
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{transport: mt})
+
+		q.start()
+		_, err := q.initialize()
+		if err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+
+		_ = q.close()
+
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			req, _ := msg["request"].(map[string]any)
+			if req != nil && req["subtype"] == "initialize" {
+				if _, ok := req["sdkMcpServerManifests"]; ok {
+					t.Error("initialize request should not contain sdkMcpServerManifests when no SDK servers are registered")
+				}
+			}
+		}
+	})
+}
+
 func TestInitialize_ForwardSubagentText(t *testing.T) {
 	t.Run("sends forwardSubagentText when true", func(t *testing.T) {
 		mt := newAutoRespondTransport()
