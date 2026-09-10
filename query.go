@@ -918,6 +918,10 @@ func (q *query) initialize() (map[string]any, error) {
 		request["plugins"] = q.plugins
 	}
 
+	if manifests := q.mcpRouter.buildManifests(q.ctx); len(manifests) > 0 {
+		request["sdkMcpServerManifests"] = manifests
+	}
+
 	response, err := q.sendControlRequest(request, time.Duration(q.initTimeout*float64(time.Second)))
 	if err != nil {
 		// A second initialize call returns "Already initialized" — treat as success.
