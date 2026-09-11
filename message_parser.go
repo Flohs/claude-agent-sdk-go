@@ -138,6 +138,7 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		Timestamp:        stringField(data, "timestamp"),
 		UserMessageUUID:  stringField(data, "user_message_uuid"),
 		UserMessageUUIDs: stringSliceField(data, "user_message_uuids"),
+		ResumeReason:     stringField(data, "resume_reason"),
 	}
 
 	if errStr := stringField(data, "error"); errStr != "" {
@@ -428,6 +429,7 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		Timestamp:        stringField(data, "timestamp"),
 		UserMessageUUID:  stringField(data, "user_message_uuid"),
 		UserMessageUUIDs: stringSliceField(data, "user_message_uuids"),
+		ResumeReason:     stringField(data, "resume_reason"),
 	}
 
 	if errors, ok := data["errors"].([]any); ok {
@@ -512,6 +514,7 @@ func parseStreamEvent(data map[string]any) (*StreamEvent, error) {
 		ParentToolUseID:  stringField(data, "parent_tool_use_id"),
 		UserMessageUUID:  stringField(data, "user_message_uuid"),
 		UserMessageUUIDs: stringSliceField(data, "user_message_uuids"),
+		ResumeReason:     stringField(data, "resume_reason"),
 	}, nil
 }
 
