@@ -1489,6 +1489,12 @@ type RateLimitInfo struct {
 	ErrorCode                       *string         `json:"error_code,omitempty"`
 	CanUserPurchaseCredits          *bool           `json:"can_user_purchase_credits,omitempty"`
 	HasChargeableSavedPaymentMethod *bool           `json:"has_chargeable_saved_payment_method,omitempty"`
+	// LimitScope identifies which spend limit blocked the request when it is
+	// not the member's own cap: "group_pool" means a pooled group budget
+	// shared by the member's team is used up (the denial otherwise looks
+	// like the member's own monthly cap). Nil on a plain member denial and
+	// from older CLIs. Port of TypeScript SDK v0.3.268.
+	LimitScope *string `json:"limit_scope,omitempty"`
 }
 
 // RateLimitEvent represents a rate limit status change from the CLI.
