@@ -1442,6 +1442,12 @@ type ResultMessage struct {
 	// success and error result subtypes; empty on every other turn and from
 	// older CLIs. Port of TypeScript SDK v0.3.268.
 	ResumeReason string `json:"resume_reason,omitempty"`
+	// ResultIndex is the delivery sequence of this result within the run:
+	// how many results the run numbered before this one, starting at 0, in
+	// the order the process writes them. Distinct from NumTurns, which
+	// counts model round-trips within one turn. Nil from older CLIs. Port
+	// of TypeScript SDK v0.3.268.
+	ResultIndex *int `json:"result_index,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`

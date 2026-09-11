@@ -1695,6 +1695,44 @@ func TestParseMessage_ResultMessage_QueuedTurnCount(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_ResultIndex(t *testing.T) {
+	data := map[string]any{
+		"type":         "result",
+		"subtype":      "success",
+		"is_error":     false,
+		"session_id":   "s",
+		"result_index": float64(3),
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.ResultIndex == nil {
+		t.Fatal("ResultIndex is nil, want a present value")
+	}
+	if *r.ResultIndex != 3 {
+		t.Errorf("*ResultIndex = %d, want 3", *r.ResultIndex)
+	}
+}
+
+func TestParseMessage_ResultMessage_ResultIndex_Absent(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.ResultIndex != nil {
+		t.Errorf("ResultIndex = %v, want nil", r.ResultIndex)
+	}
+}
+
 func TestParseMessage_ResultMessage_QueuedTurnCount_Absent(t *testing.T) {
 	data := map[string]any{
 		"type":       "result",
