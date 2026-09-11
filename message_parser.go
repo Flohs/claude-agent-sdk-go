@@ -564,6 +564,7 @@ func parseRateLimitInfo(m map[string]any) RateLimitInfo {
 	info.OverageResetsAt = optionalStringField(m, "overage_resets_at")
 	info.OverageDisabledReason = optionalStringField(m, "overage_disabled_reason")
 	info.ErrorCode = optionalStringField(m, "error_code")
+	info.LimitScope = optionalStringField(m, "limit_scope")
 	if v, ok := m["utilization"].(float64); ok {
 		info.Utilization = &v
 	}
