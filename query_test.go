@@ -1951,6 +1951,67 @@ func TestGetUsageExperimental_SkipBehaviorsSendsSkipBehaviorsKey(t *testing.T) {
 	}
 }
 
+// TestReloadPlugins_OmitsHoldOnCacheImpactByDefault verifies that
+// query.reloadPlugins(false) (the path used by Client.ReloadPlugins) sends
+// a reload_plugins control request with no "hold_on_cache_impact" key,
+// letting the CLI apply the reload unconditionally.
+func TestReloadPlugins_OmitsHoldOnCacheImpactByDefault(t *testing.T) {
+	mt := newAutoRespondTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	if _, err := q.reloadPlugins(false); err != nil {
+		t.Fatalf("reloadPlugins failed: %v", err)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"reload_plugins"`) {
+			found = true
+			if strings.Contains(w, `"hold_on_cache_impact"`) {
+				t.Fatalf("expected no hold_on_cache_impact key in request, got %v", w)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written reload_plugins control_request, got %v", written)
+	}
+}
+
+// TestReloadPlugins_HoldOnCacheImpactSendsKey verifies that
+// query.reloadPlugins(true) (the path used by
+// Client.ReloadPluginsWithOptions) sends "hold_on_cache_impact":true on the
+// wire, so the CLI holds the reload back when it would invalidate the
+// conversation's prompt cache. Port of TypeScript SDK v0.3.268.
+func TestReloadPlugins_HoldOnCacheImpactSendsKey(t *testing.T) {
+	mt := newAutoRespondTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	if _, err := q.reloadPlugins(true); err != nil {
+		t.Fatalf("reloadPlugins failed: %v", err)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"hold_on_cache_impact":true`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written control_request containing hold_on_cache_impact:true, got %v", written)
+	}
+}
+
 // TestUpdateSettings_SendsSubtypeSourceAndSettings verifies that
 // query.updateSettings sends a control request with subtype
 // "update_settings" carrying the given source and settings map on the wire.
