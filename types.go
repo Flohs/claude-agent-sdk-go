@@ -275,6 +275,13 @@ type AssistantMessage struct {
 	// nil from older CLIs (fall back to UserMessageUUID). Port of
 	// TypeScript SDK v0.3.259.
 	UserMessageUUIDs []string `json:"user_message_uuids,omitempty"`
+	// ResumeReason explains why this frame's turn is the automatic re-run of
+	// a turn a worker restart interrupted: the host's
+	// CLAUDE_CODE_RESUME_REASON when it set one (e.g. "host_draining",
+	// "checkpoint_restore", "container_recreated"), else "interrupted_turn".
+	// Stamped on the same frames as UserMessageUUID. Empty on every other
+	// turn and from older CLIs. Port of TypeScript SDK v0.3.268.
+	ResumeReason string `json:"resume_reason,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
@@ -1428,6 +1435,13 @@ type ResultMessage struct {
 	// result was produced. Nil when not provided by the CLI; 0 is a
 	// meaningful value (nothing queued), distinct from absent.
 	QueuedTurnCount *int `json:"queued_turn_count,omitempty"`
+	// ResumeReason explains why this turn was the automatic re-run of a turn
+	// a worker restart interrupted: the host's CLAUDE_CODE_RESUME_REASON
+	// when it set one (e.g. "host_draining", "checkpoint_restore",
+	// "container_recreated"), else "interrupted_turn". Present on both
+	// success and error result subtypes; empty on every other turn and from
+	// older CLIs. Port of TypeScript SDK v0.3.268.
+	ResumeReason string `json:"resume_reason,omitempty"`
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
@@ -1454,6 +1468,13 @@ type StreamEvent struct {
 	// AssistantMessage.UserMessageUUIDs for the full semantics; this field
 	// mirrors it on the streamed frame. Port of TypeScript SDK v0.3.259.
 	UserMessageUUIDs []string `json:"user_message_uuids,omitempty"`
+	// ResumeReason explains why this frame's turn is the automatic re-run of
+	// a turn a worker restart interrupted: the host's
+	// CLAUDE_CODE_RESUME_REASON when it set one (e.g. "host_draining",
+	// "checkpoint_restore", "container_recreated"), else "interrupted_turn".
+	// Stamped on the same frames as UserMessageUUID. Empty on every other
+	// turn and from older CLIs. Port of TypeScript SDK v0.3.268.
+	ResumeReason string `json:"resume_reason,omitempty"`
 }
 
 func (StreamEvent) messageMarker() {}

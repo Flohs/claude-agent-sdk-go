@@ -290,6 +290,25 @@ func TestParseMessage_AssistantMessage_UserMessageUUIDs(t *testing.T) {
 	}
 }
 
+func TestParseMessage_AssistantMessage_ResumeReason(t *testing.T) {
+	data := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model":   "claude-sonnet-4-5-20250514",
+			"content": []any{},
+		},
+		"resume_reason": "host_draining",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	asst := msg.(*AssistantMessage)
+	if asst.ResumeReason != "host_draining" {
+		t.Errorf("ResumeReason = %q, want host_draining", asst.ResumeReason)
+	}
+}
+
 func TestParseMessage_AssistantMessage_UserMessageUUIDsAbsent(t *testing.T) {
 	data := map[string]any{
 		"type": "assistant",
@@ -1163,6 +1182,25 @@ func TestParseMessage_StreamEvent_UserMessageUUIDs(t *testing.T) {
 	}
 }
 
+func TestParseMessage_StreamEvent_ResumeReason(t *testing.T) {
+	data := map[string]any{
+		"type":          "stream_event",
+		"uuid":          "u1",
+		"session_id":    "s1",
+		"event":         map[string]any{"type": "content_block_delta"},
+		"resume_reason": "checkpoint_restore",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	event := msg.(*StreamEvent)
+	if event.ResumeReason != "checkpoint_restore" {
+		t.Errorf("ResumeReason = %q, want checkpoint_restore", event.ResumeReason)
+	}
+}
+
 func TestParseMessage_MirrorErrorMessage(t *testing.T) {
 	data := map[string]any{
 		"type":    "system",
@@ -1789,6 +1827,24 @@ func TestParseMessage_ResultMessage_UserMessageUUIDs(t *testing.T) {
 	want := []string{"um_first", "um_last"}
 	if !reflect.DeepEqual(r.UserMessageUUIDs, want) {
 		t.Errorf("UserMessageUUIDs = %v, want %v", r.UserMessageUUIDs, want)
+	}
+}
+
+func TestParseMessage_ResultMessage_ResumeReason(t *testing.T) {
+	data := map[string]any{
+		"type":          "result",
+		"subtype":       "success",
+		"is_error":      false,
+		"session_id":    "s",
+		"resume_reason": "container_recreated",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.ResumeReason != "container_recreated" {
+		t.Errorf("ResumeReason = %q, want container_recreated", r.ResumeReason)
 	}
 }
 
