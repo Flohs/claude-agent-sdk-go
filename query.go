@@ -1220,10 +1220,14 @@ func (q *query) updateSettings(source string, settings map[string]any) error {
 	return err
 }
 
-func (q *query) reloadPlugins() (map[string]any, error) {
-	resp, err := q.sendControlRequest(map[string]any{
+func (q *query) reloadPlugins(holdOnCacheImpact bool) (map[string]any, error) {
+	req := map[string]any{
 		"subtype": "reload_plugins",
-	}, 60*time.Second)
+	}
+	if holdOnCacheImpact {
+		req["hold_on_cache_impact"] = true
+	}
+	resp, err := q.sendControlRequest(req, 60*time.Second)
 	return resp, err
 }
 

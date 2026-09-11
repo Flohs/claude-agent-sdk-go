@@ -443,12 +443,28 @@ func (c *Client) UpdateSettings(ctx context.Context, source string, settings map
 }
 
 // ReloadPlugins reloads plugins and returns refreshed commands, agents, and
-// MCP server status.
+// MCP server status. Use [Client.ReloadPluginsWithOptions] to hold the
+// reload back when it would invalidate the conversation's prompt cache.
 func (c *Client) ReloadPlugins(ctx context.Context) (map[string]any, error) {
 	if c.q == nil {
 		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
-	return c.q.reloadPlugins()
+	return c.q.reloadPlugins(false)
+}
+
+// ReloadPluginsWithOptions is like [Client.ReloadPlugins], but lets the
+// caller opt into the check the interactive /reload-plugins makes before it
+// asks for --force: with holdOnCacheImpact true, the CLI does not apply the
+// reload if doing so would change the session's tool list while the
+// conversation's prompt cache depends on it — the returned map then carries
+// "held": true and "cache_impact" describing what applying would change,
+// and the session keeps its current plugins; call again with
+// holdOnCacheImpact false to apply anyway. Port of TypeScript SDK v0.3.268.
+func (c *Client) ReloadPluginsWithOptions(ctx context.Context, holdOnCacheImpact bool) (map[string]any, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.reloadPlugins(holdOnCacheImpact)
 }
 
 // ReloadOutputStyles re-reads the output-style directories from disk and
