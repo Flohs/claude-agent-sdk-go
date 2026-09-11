@@ -191,6 +191,10 @@ const (
 	AssistantMessageErrorUnknown            AssistantMessageError = "unknown"
 	AssistantMessageErrorMaxOutputTokens    AssistantMessageError = "max_output_tokens"
 	AssistantMessageErrorCloudCredential    AssistantMessageError = "cloud_credential_error"
+	// AssistantMessageErrorVerificationRequired indicates the account needs
+	// additional verification before the request can proceed. Port of
+	// TypeScript SDK v0.3.268.
+	AssistantMessageErrorVerificationRequired AssistantMessageError = "verification_required"
 )
 
 // ToolUseMetaEntry holds display-friendly metadata for a single tool call.
