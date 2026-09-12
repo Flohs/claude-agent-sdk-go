@@ -1657,6 +1657,104 @@ type ContextUsage struct {
 	UsageByCategory map[string]int `json:"usage_by_category,omitempty"`
 }
 
+// PermissionRuleSource identifies where a permission rule entry returned by
+// Client.ListPermissionRules came from.
+type PermissionRuleSource string
+
+const (
+	// PermissionRuleSourceUserSettings is a rule from the user's settings file.
+	PermissionRuleSourceUserSettings PermissionRuleSource = "userSettings"
+	// PermissionRuleSourceProjectSettings is a rule from the project's shared settings file.
+	PermissionRuleSourceProjectSettings PermissionRuleSource = "projectSettings"
+	// PermissionRuleSourceLocalSettings is a rule from the project's local (gitignored) settings file.
+	PermissionRuleSourceLocalSettings PermissionRuleSource = "localSettings"
+	// PermissionRuleSourceFlagSettings is a rule from settings applied via a CLI flag.
+	PermissionRuleSourceFlagSettings PermissionRuleSource = "flagSettings"
+	// PermissionRuleSourcePolicySettings is a rule from managed/policy settings.
+	PermissionRuleSourcePolicySettings PermissionRuleSource = "policySettings"
+	// PermissionRuleSourceCliArg is a rule from a CLI argument such as --allowedTools.
+	PermissionRuleSourceCliArg PermissionRuleSource = "cliArg"
+	// PermissionRuleSourceCommand is a rule granted by a slash command.
+	PermissionRuleSourceCommand PermissionRuleSource = "command"
+	// PermissionRuleSourceSession is a rule granted for this session only (e.g. an interactive approval).
+	PermissionRuleSourceSession PermissionRuleSource = "session"
+	// PermissionRuleSourceToolsNarrowing is a rule derived from narrowing the available tool set.
+	PermissionRuleSourceToolsNarrowing PermissionRuleSource = "toolsNarrowing"
+	// PermissionRuleSourceMcpServerPolicy is a rule derived from an MCP server's own policy.
+	PermissionRuleSourceMcpServerPolicy PermissionRuleSource = "mcpServerPolicy"
+	// PermissionRuleSourceHostCredential is a rule derived from a host-supplied credential.
+	PermissionRuleSourceHostCredential PermissionRuleSource = "hostCredential"
+)
+
+// PermissionRuleEditability indicates whether and how a permission rule
+// entry returned by Client.ListPermissionRules can be changed.
+type PermissionRuleEditability string
+
+const (
+	// PermissionRuleEditabilityPersistent means the rule can be edited and the change persists to disk.
+	PermissionRuleEditabilityPersistent PermissionRuleEditability = "persistent"
+	// PermissionRuleEditabilitySession means the rule can be edited, but the change lasts only for this session.
+	PermissionRuleEditabilitySession PermissionRuleEditability = "session"
+	// PermissionRuleEditabilityReadonly means the rule cannot be edited (e.g. it comes from managed policy).
+	PermissionRuleEditabilityReadonly PermissionRuleEditability = "readonly"
+)
+
+// PermissionRuleDescription is a human-readable, structured description of a
+// permission rule entry, split into a prefix, an optional emphasized
+// segment, and an optional suffix so a host can render the emphasized part
+// distinctly (e.g. bolded).
+type PermissionRuleDescription struct {
+	Prefix   string  `json:"prefix"`
+	Emphasis *string `json:"emphasis,omitempty"`
+	Suffix   *string `json:"suffix,omitempty"`
+}
+
+// PermissionRuleEntry is one live permission rule as returned by
+// Client.ListPermissionRules — the same data the terminal's /permissions
+// lists. Rule is stored verbatim by the CLI and may carry invisible or
+// control characters.
+type PermissionRuleEntry struct {
+	// Behavior is the rule's effect: PermissionBehaviorAllow,
+	// PermissionBehaviorDeny, or PermissionBehaviorAsk.
+	Behavior PermissionBehavior `json:"behavior"`
+	// Source identifies where this rule came from.
+	Source PermissionRuleSource `json:"source"`
+	// Rule is the rule text, stored verbatim (may carry invisible/control characters).
+	Rule string `json:"rule"`
+	// Description is an optional structured, human-readable description of the rule.
+	Description *PermissionRuleDescription `json:"description,omitempty"`
+	// Editability says whether and how this rule can be changed.
+	Editability PermissionRuleEditability `json:"editability"`
+	// NotInEffect, when true, means the rule is currently shadowed or otherwise not applied.
+	NotInEffect *bool `json:"notInEffect,omitempty"`
+}
+
+// PermissionWorkspaceDirectory is one directory in the session's permission
+// workspace, as returned by Client.ListPermissionRules.
+type PermissionWorkspaceDirectory struct {
+	Path string `json:"path"`
+	// Source is a settings source (see PermissionRuleSource), "cliArg", or "session".
+	Source string `json:"source"`
+}
+
+// PermissionRulesState is the session's live permission rules and workspace
+// directories, as returned by Client.ListPermissionRules — the same data
+// the terminal's /permissions command lists: rules from settings files plus
+// session-only approvals, slash-command grants, and --allowedTools flag
+// rules, each with its source.
+type PermissionRulesState struct {
+	Rules                []PermissionRuleEntry          `json:"rules"`
+	WorkspaceDirectories []PermissionWorkspaceDirectory `json:"workspaceDirectories"`
+	OriginalCwd          string                         `json:"originalCwd"`
+	// ManagedOnly is true when allowManagedPermissionRulesOnly is pinned.
+	ManagedOnly bool `json:"managedOnly"`
+	// Errors carries any settings-parse errors encountered while assembling
+	// this state. Its element shape (TypeScript's SDKSettingsParseError) is
+	// not exposed in the bundled sdk.d.ts, so entries are passed through
+	// untyped rather than modeled with an invented struct.
+	Errors []map[string]any `json:"errors,omitempty"`
+}
+
 // ModelScopedUsage holds token usage counts for a single model within a session.
 // Port of TypeScript SDK v0.3.191.
 type ModelScopedUsage struct {

@@ -425,6 +425,18 @@ func (c *Client) GetSettings(ctx context.Context) (map[string]any, error) {
 	return c.q.getSettings()
 }
 
+// ListPermissionRules returns the session's live permission rules and
+// workspace directories — the same data the terminal's /permissions command
+// lists: rules from settings files plus session-only approvals,
+// slash-command grants, and --allowedTools flag rules, each with its
+// source. Port of TypeScript SDK v0.3.269.
+func (c *Client) ListPermissionRules(ctx context.Context) (*PermissionRulesState, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.listPermissionRules()
+}
+
 // UpdateSettings merges settings into a settings file through the CLI's own
 // writer (canonical store root, gitignore upkeep, hardened write) and
 // live-applies them — the same path /config uses. Unlike ApplyFlagSettings,
