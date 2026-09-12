@@ -2266,3 +2266,182 @@ func TestHandleHookCallback_SessionCancellationPropagates(t *testing.T) {
 		t.Fatal("handleHookCallback never returned after session cancellation")
 	}
 }
+
+// TestListPermissionRules_FullResponseUnmarshalsAllFields verifies that
+// query.listPermissionRules() (the path used by Client.ListPermissionRules)
+// sends a list_permission_rules control request, unwraps the response's
+// "state" envelope, and unmarshals every nested field — including the
+// optional Description, NotInEffect, and Errors fields — into
+// PermissionRulesState. Port of TypeScript SDK v0.3.269.
+func TestListPermissionRules_FullResponseUnmarshalsAllFields(t *testing.T) {
+	mt := newStubResponseTransport(map[string]any{
+		"state": map[string]any{
+			"rules": []any{
+				map[string]any{
+					"behavior": "allow",
+					"source":   "userSettings",
+					"rule":     "Bash(git diff:*)",
+					"description": map[string]any{
+						"prefix":   "Run ",
+						"emphasis": "git diff",
+						"suffix":   " commands",
+					},
+					"editability": "persistent",
+				},
+				map[string]any{
+					"behavior":    "ask",
+					"source":      "session",
+					"rule":        "Bash(rm:*)",
+					"editability": "session",
+					"notInEffect": true,
+				},
+			},
+			"workspaceDirectories": []any{
+				map[string]any{"path": "/home/user/project", "source": "cliArg"},
+			},
+			"originalCwd": "/home/user/project",
+			"managedOnly": false,
+			"errors": []any{
+				map[string]any{"message": "bad json", "path": "/home/user/.claude/settings.json"},
+			},
+		},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	state, err := q.listPermissionRules()
+	if err != nil {
+		t.Fatalf("listPermissionRules failed: %v", err)
+	}
+	if state == nil {
+		t.Fatal("expected non-nil state")
+	}
+
+	if len(state.Rules) != 2 {
+		t.Fatalf("len(Rules) = %d, want 2", len(state.Rules))
+	}
+	r0 := state.Rules[0]
+	if r0.Behavior != PermissionBehaviorAllow {
+		t.Errorf("Rules[0].Behavior = %q, want %q", r0.Behavior, PermissionBehaviorAllow)
+	}
+	if r0.Source != PermissionRuleSourceUserSettings {
+		t.Errorf("Rules[0].Source = %q, want %q", r0.Source, PermissionRuleSourceUserSettings)
+	}
+	if r0.Rule != "Bash(git diff:*)" {
+		t.Errorf("Rules[0].Rule = %q, want %q", r0.Rule, "Bash(git diff:*)")
+	}
+	if r0.Editability != PermissionRuleEditabilityPersistent {
+		t.Errorf("Rules[0].Editability = %q, want %q", r0.Editability, PermissionRuleEditabilityPersistent)
+	}
+	if r0.Description == nil {
+		t.Fatal("Rules[0].Description = nil, want non-nil")
+	}
+	if r0.Description.Prefix != "Run " {
+		t.Errorf("Rules[0].Description.Prefix = %q, want %q", r0.Description.Prefix, "Run ")
+	}
+	if r0.Description.Emphasis == nil || *r0.Description.Emphasis != "git diff" {
+		t.Errorf("Rules[0].Description.Emphasis = %v, want %q", r0.Description.Emphasis, "git diff")
+	}
+	if r0.Description.Suffix == nil || *r0.Description.Suffix != " commands" {
+		t.Errorf("Rules[0].Description.Suffix = %v, want %q", r0.Description.Suffix, " commands")
+	}
+	if r0.NotInEffect != nil {
+		t.Errorf("Rules[0].NotInEffect = %v, want nil", r0.NotInEffect)
+	}
+
+	r1 := state.Rules[1]
+	if r1.Behavior != PermissionBehaviorAsk {
+		t.Errorf("Rules[1].Behavior = %q, want %q", r1.Behavior, PermissionBehaviorAsk)
+	}
+	if r1.Source != PermissionRuleSourceSession {
+		t.Errorf("Rules[1].Source = %q, want %q", r1.Source, PermissionRuleSourceSession)
+	}
+	if r1.Editability != PermissionRuleEditabilitySession {
+		t.Errorf("Rules[1].Editability = %q, want %q", r1.Editability, PermissionRuleEditabilitySession)
+	}
+	if r1.NotInEffect == nil || !*r1.NotInEffect {
+		t.Errorf("Rules[1].NotInEffect = %v, want true", r1.NotInEffect)
+	}
+	if r1.Description != nil {
+		t.Errorf("Rules[1].Description = %v, want nil", r1.Description)
+	}
+
+	if len(state.WorkspaceDirectories) != 1 {
+		t.Fatalf("len(WorkspaceDirectories) = %d, want 1", len(state.WorkspaceDirectories))
+	}
+	if state.WorkspaceDirectories[0].Path != "/home/user/project" {
+		t.Errorf("WorkspaceDirectories[0].Path = %q, want %q", state.WorkspaceDirectories[0].Path, "/home/user/project")
+	}
+	if state.WorkspaceDirectories[0].Source != "cliArg" {
+		t.Errorf("WorkspaceDirectories[0].Source = %q, want %q", state.WorkspaceDirectories[0].Source, "cliArg")
+	}
+
+	if state.OriginalCwd != "/home/user/project" {
+		t.Errorf("OriginalCwd = %q, want %q", state.OriginalCwd, "/home/user/project")
+	}
+	if state.ManagedOnly {
+		t.Errorf("ManagedOnly = true, want false")
+	}
+	if len(state.Errors) != 1 {
+		t.Fatalf("len(Errors) = %d, want 1", len(state.Errors))
+	}
+	if state.Errors[0]["message"] != "bad json" {
+		t.Errorf("Errors[0][message] = %v, want %q", state.Errors[0]["message"], "bad json")
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"list_permission_rules"`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written list_permission_rules control_request, got %v", written)
+	}
+}
+
+// TestListPermissionRules_MinimalResponseUnmarshalsWithoutError verifies
+// that a response omitting every optional field (Description, NotInEffect,
+// Errors) and containing an empty rules/workspaceDirectories list still
+// unmarshals without error.
+func TestListPermissionRules_MinimalResponseUnmarshalsWithoutError(t *testing.T) {
+	mt := newStubResponseTransport(map[string]any{
+		"state": map[string]any{
+			"rules":                []any{},
+			"workspaceDirectories": []any{},
+			"originalCwd":          "/home/user/project",
+			"managedOnly":          true,
+		},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	state, err := q.listPermissionRules()
+	if err != nil {
+		t.Fatalf("listPermissionRules failed: %v", err)
+	}
+	if state == nil {
+		t.Fatal("expected non-nil state")
+	}
+	if len(state.Rules) != 0 {
+		t.Errorf("len(Rules) = %d, want 0", len(state.Rules))
+	}
+	if len(state.WorkspaceDirectories) != 0 {
+		t.Errorf("len(WorkspaceDirectories) = %d, want 0", len(state.WorkspaceDirectories))
+	}
+	if state.OriginalCwd != "/home/user/project" {
+		t.Errorf("OriginalCwd = %q, want %q", state.OriginalCwd, "/home/user/project")
+	}
+	if !state.ManagedOnly {
+		t.Errorf("ManagedOnly = false, want true")
+	}
+	if state.Errors != nil {
+		t.Errorf("Errors = %v, want nil", state.Errors)
+	}
+}

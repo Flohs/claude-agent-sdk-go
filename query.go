@@ -1201,6 +1201,28 @@ func (q *query) getContextUsage(detail string) (*ContextUsage, error) {
 	return &usage, nil
 }
 
+func (q *query) listPermissionRules() (*PermissionRulesState, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "list_permission_rules",
+	}, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var wrapper struct {
+		State PermissionRulesState `json:"state"`
+	}
+	if err := json.Unmarshal(data, &wrapper); err != nil {
+		return nil, err
+	}
+	return &wrapper.State, nil
+}
+
 func (q *query) getSettings() (map[string]any, error) {
 	resp, err := q.sendControlRequest(map[string]any{
 		"subtype": "get_settings",
