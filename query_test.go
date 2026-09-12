@@ -1889,6 +1889,281 @@ func TestGetContextUsage_DetailSummarySendsDetailKey(t *testing.T) {
 	}
 }
 
+// hooksListingRespondTransport auto-responds to control requests like
+// autoRespondTransport, but replies to "get_hooks_listing" requests with a
+// configurable response body so tests can simulate both a full /hooks menu
+// snapshot and a minimal one that omits every optional field.
+type hooksListingRespondTransport struct {
+	mockTransport
+	hooksListingResponse map[string]any
+}
+
+func newHooksListingRespondTransport(hooksListingResponse map[string]any) *hooksListingRespondTransport {
+	return &hooksListingRespondTransport{
+		mockTransport:        mockTransport{messages: make(chan map[string]any, 100)},
+		hooksListingResponse: hooksListingResponse,
+	}
+}
+
+func (a *hooksListingRespondTransport) Write(data string) error {
+	a.mu.Lock()
+	a.written = append(a.written, data)
+	a.mu.Unlock()
+
+	var msg map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(data)), &msg); err == nil {
+		if msg["type"] == "control_request" {
+			reqID, _ := msg["request_id"].(string)
+			response := map[string]any{}
+			if req, ok := msg["request"].(map[string]any); ok && req["subtype"] == "get_hooks_listing" {
+				response = a.hooksListingResponse
+			}
+			go func() {
+				a.messages <- map[string]any{
+					"type": "control_response",
+					"response": map[string]any{
+						"subtype":    "success",
+						"request_id": reqID,
+						"response":   response,
+					},
+				}
+			}()
+		}
+	}
+	return nil
+}
+
+func (a *hooksListingRespondTransport) ReadMessages(ctx context.Context) <-chan map[string]any {
+	out := make(chan map[string]any, 100)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case msg, ok := <-a.messages:
+				if !ok {
+					return
+				}
+				out <- msg
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out
+}
+
+// TestGetHooksListing_FullResponse verifies that query.getHooksListing()
+// (the path used by Client.GetHooksListing) unmarshals a full get_hooks_listing
+// response — every optional field present — into all nested HooksListing
+// struct fields. Port of TypeScript SDK v0.3.269.
+func TestGetHooksListing_FullResponse(t *testing.T) {
+	mt := newHooksListingRespondTransport(map[string]any{
+		"events": []any{
+			map[string]any{
+				"name":            "PreToolUse",
+				"summary":         "Runs before a tool call",
+				"supportsMatcher": true,
+				"hookCount":       2,
+			},
+		},
+		"hooks": []any{
+			map[string]any{
+				"event":            "PreToolUse",
+				"matcher":          "Bash",
+				"source":           "userSettings",
+				"sourceLabel":      "User settings",
+				"pluginName":       "my-plugin",
+				"type":             "command",
+				"displayText":      "echo hi",
+				"commandText":      "echo hi",
+				"contentLabel":     "Command",
+				"condition":        "always",
+				"timeout":          30,
+				"statusMessage":    "ok",
+				"runsOnce":         true,
+				"runsInBackground": true,
+				"disabled":         true,
+				"editable": map[string]any{
+					"matcher":         "Bash",
+					"config":          map[string]any{"command": "echo hi"},
+					"headersRedacted": true,
+				},
+			},
+		},
+		"eventCatalog": []any{
+			map[string]any{
+				"name":            "PreToolUse",
+				"summary":         "Runs before a tool call",
+				"supportsMatcher": true,
+			},
+		},
+		"policy": map[string]any{
+			"disabledByPolicy": false,
+			"managedOnly":      false,
+			"pluginOnly":       false,
+			"allDisabled":      false,
+			"policyHookCount":  0,
+			"policyUnreadable": true,
+		},
+		"safeMode": map[string]any{
+			"managedHooksStillApply": true,
+			"exitHint":               "Press q to exit safe mode",
+		},
+		"bareMode": map[string]any{
+			"exitHint": "Press q to exit bare mode",
+		},
+		"errors": []any{
+			map[string]any{"message": "bad settings file", "path": "/tmp/settings.json"},
+		},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	listing, err := q.getHooksListing()
+	if err != nil {
+		t.Fatalf("getHooksListing failed: %v", err)
+	}
+	if listing == nil {
+		t.Fatal("expected non-nil listing")
+	}
+
+	if len(listing.Events) != 1 || listing.Events[0].Name != "PreToolUse" ||
+		listing.Events[0].Summary != "Runs before a tool call" ||
+		!listing.Events[0].SupportsMatcher || listing.Events[0].HookCount != 2 {
+		t.Fatalf("unexpected Events: %+v", listing.Events)
+	}
+
+	if len(listing.Hooks) != 1 {
+		t.Fatalf("expected 1 hook, got %d", len(listing.Hooks))
+	}
+	h := listing.Hooks[0]
+	if h.Event != "PreToolUse" || h.Matcher != "Bash" || h.Source != "userSettings" ||
+		h.SourceLabel != "User settings" || h.Type != "command" ||
+		h.DisplayText != "echo hi" || h.CommandText != "echo hi" || h.ContentLabel != "Command" {
+		t.Fatalf("unexpected hook base fields: %+v", h)
+	}
+	if h.PluginName == nil || *h.PluginName != "my-plugin" {
+		t.Fatalf("PluginName = %v, want my-plugin", h.PluginName)
+	}
+	if h.Condition == nil || *h.Condition != "always" {
+		t.Fatalf("Condition = %v, want always", h.Condition)
+	}
+	if h.Timeout == nil || *h.Timeout != 30 {
+		t.Fatalf("Timeout = %v, want 30", h.Timeout)
+	}
+	if h.StatusMessage == nil || *h.StatusMessage != "ok" {
+		t.Fatalf("StatusMessage = %v, want ok", h.StatusMessage)
+	}
+	if h.RunsOnce == nil || !*h.RunsOnce {
+		t.Fatalf("RunsOnce = %v, want true", h.RunsOnce)
+	}
+	if h.RunsInBackground == nil || !*h.RunsInBackground {
+		t.Fatalf("RunsInBackground = %v, want true", h.RunsInBackground)
+	}
+	if h.Disabled == nil || !*h.Disabled {
+		t.Fatalf("Disabled = %v, want true", h.Disabled)
+	}
+	if h.Editable == nil {
+		t.Fatal("expected non-nil Editable")
+	}
+	if h.Editable.Matcher != "Bash" {
+		t.Fatalf("Editable.Matcher = %q, want Bash", h.Editable.Matcher)
+	}
+	if h.Editable.Config["command"] != "echo hi" {
+		t.Fatalf("Editable.Config[command] = %v, want echo hi", h.Editable.Config["command"])
+	}
+	if h.Editable.HeadersRedacted == nil || !*h.Editable.HeadersRedacted {
+		t.Fatalf("Editable.HeadersRedacted = %v, want true", h.Editable.HeadersRedacted)
+	}
+
+	if len(listing.EventCatalog) != 1 || listing.EventCatalog[0].Name != "PreToolUse" ||
+		!listing.EventCatalog[0].SupportsMatcher {
+		t.Fatalf("unexpected EventCatalog: %+v", listing.EventCatalog)
+	}
+
+	if listing.Policy.DisabledByPolicy || listing.Policy.ManagedOnly || listing.Policy.PluginOnly ||
+		listing.Policy.AllDisabled || listing.Policy.PolicyHookCount != 0 {
+		t.Fatalf("unexpected Policy: %+v", listing.Policy)
+	}
+	if listing.Policy.PolicyUnreadable == nil || !*listing.Policy.PolicyUnreadable {
+		t.Fatalf("PolicyUnreadable = %v, want true", listing.Policy.PolicyUnreadable)
+	}
+
+	if listing.SafeMode == nil || !listing.SafeMode.ManagedHooksStillApply ||
+		listing.SafeMode.ExitHint != "Press q to exit safe mode" {
+		t.Fatalf("unexpected SafeMode: %+v", listing.SafeMode)
+	}
+
+	if listing.BareMode == nil || listing.BareMode.ExitHint != "Press q to exit bare mode" {
+		t.Fatalf("unexpected BareMode: %+v", listing.BareMode)
+	}
+
+	if len(listing.Errors) != 1 || listing.Errors[0]["message"] != "bad settings file" {
+		t.Fatalf("unexpected Errors: %+v", listing.Errors)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	found := false
+	for _, w := range written {
+		if strings.Contains(w, `"get_hooks_listing"`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected a written get_hooks_listing control_request, got %v", written)
+	}
+}
+
+// TestGetHooksListing_MinimalResponse verifies that query.getHooksListing()
+// unmarshals a minimal get_hooks_listing response — no hooks and every
+// optional field absent — without error, leaving the optional pointer
+// fields nil. Port of TypeScript SDK v0.3.269.
+func TestGetHooksListing_MinimalResponse(t *testing.T) {
+	mt := newHooksListingRespondTransport(map[string]any{
+		"events":       []any{},
+		"hooks":        []any{},
+		"eventCatalog": []any{},
+		"policy": map[string]any{
+			"disabledByPolicy": false,
+			"managedOnly":      false,
+			"pluginOnly":       false,
+			"allDisabled":      false,
+			"policyHookCount":  0,
+		},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	listing, err := q.getHooksListing()
+	if err != nil {
+		t.Fatalf("getHooksListing failed: %v", err)
+	}
+	if listing == nil {
+		t.Fatal("expected non-nil listing")
+	}
+	if len(listing.Events) != 0 || len(listing.Hooks) != 0 || len(listing.EventCatalog) != 0 {
+		t.Fatalf("expected empty slices, got events=%v hooks=%v eventCatalog=%v",
+			listing.Events, listing.Hooks, listing.EventCatalog)
+	}
+	if listing.SafeMode != nil {
+		t.Fatalf("expected nil SafeMode, got %+v", listing.SafeMode)
+	}
+	if listing.BareMode != nil {
+		t.Fatalf("expected nil BareMode, got %+v", listing.BareMode)
+	}
+	if listing.Errors != nil {
+		t.Fatalf("expected nil Errors, got %+v", listing.Errors)
+	}
+	if listing.Policy.PolicyUnreadable != nil {
+		t.Fatalf("expected nil PolicyUnreadable, got %v", *listing.Policy.PolicyUnreadable)
+	}
+}
+
 // TestGetUsageExperimental_OmitsSkipBehaviorsByDefault verifies that
 // query.getUsageExperimentalDetail(false) (the path used by
 // Client.GetUsageExperimental) sends a get_usage control request with no

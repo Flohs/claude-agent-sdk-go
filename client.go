@@ -437,6 +437,19 @@ func (c *Client) ListPermissionRules(ctx context.Context) (*PermissionRulesState
 	return c.q.listPermissionRules()
 }
 
+// GetHooksListing returns the same data the CLI's read-only /hooks menu
+// renders: settings-file, session, and plugin hooks grouped by event and
+// matcher, with display-ready strings (control characters revealed) and the
+// policy/safe-mode/bare-mode state the menu banners on. The result is a
+// snapshot at request time; callers should re-request it when the
+// consuming surface (re)opens. Port of TypeScript SDK v0.3.269.
+func (c *Client) GetHooksListing(ctx context.Context) (*HooksListing, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getHooksListing()
+}
+
 // UpdateSettings merges settings into a settings file through the CLI's own
 // writer (canonical store root, gitignore upkeep, hardened write) and
 // live-applies them — the same path /config uses. Unlike ApplyFlagSettings,
