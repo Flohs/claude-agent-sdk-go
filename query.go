@@ -1233,6 +1233,26 @@ func (q *query) getSettings() (map[string]any, error) {
 	return resp, nil
 }
 
+func (q *query) getHooksListing() (*HooksListing, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "get_hooks_listing",
+	}, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var listing HooksListing
+	if err := json.Unmarshal(data, &listing); err != nil {
+		return nil, err
+	}
+	return &listing, nil
+}
+
 func (q *query) updateSettings(source string, settings map[string]any) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype":  "update_settings",

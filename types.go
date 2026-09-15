@@ -1755,6 +1755,105 @@ type PermissionRulesState struct {
 	Errors []map[string]any `json:"errors,omitempty"`
 }
 
+// HookListingEvent summarizes one hook event in the CLI's /hooks menu
+// listing: how many hooks are currently registered for it and whether it
+// supports a matcher. Port of TypeScript SDK v0.3.269.
+type HookListingEvent struct {
+	Name            string `json:"name"`
+	Summary         string `json:"summary"`
+	SupportsMatcher bool   `json:"supportsMatcher"`
+	HookCount       int    `json:"hookCount"`
+}
+
+// HookListingEditable describes the editable configuration backing a hook
+// entry in the /hooks menu, present only for entries that support in-place
+// editing. Port of TypeScript SDK v0.3.269.
+type HookListingEditable struct {
+	Matcher         string         `json:"matcher"`
+	Config          map[string]any `json:"config"`
+	HeadersRedacted *bool          `json:"headersRedacted,omitempty"`
+}
+
+// HookListingEntry describes a single registered hook as rendered by the
+// CLI's read-only /hooks menu: display-ready strings with control
+// characters revealed, its source and type, and any optional runtime
+// metadata. Port of TypeScript SDK v0.3.269.
+type HookListingEntry struct {
+	Event            string               `json:"event"`
+	Matcher          string               `json:"matcher"`
+	Source           string               `json:"source"`
+	SourceLabel      string               `json:"sourceLabel"`
+	PluginName       *string              `json:"pluginName,omitempty"`
+	Type             string               `json:"type"`
+	DisplayText      string               `json:"displayText"`
+	CommandText      string               `json:"commandText"`
+	ContentLabel     string               `json:"contentLabel"`
+	Condition        *string              `json:"condition,omitempty"`
+	Timeout          *int                 `json:"timeout,omitempty"`
+	StatusMessage    *string              `json:"statusMessage,omitempty"`
+	RunsOnce         *bool                `json:"runsOnce,omitempty"`
+	RunsInBackground *bool                `json:"runsInBackground,omitempty"`
+	Disabled         *bool                `json:"disabled,omitempty"`
+	Editable         *HookListingEditable `json:"editable,omitempty"`
+}
+
+// HookEventCatalogEntry describes one event in the full catalog of hookable
+// events the CLI supports, independent of whether any hooks are currently
+// registered for it. Port of TypeScript SDK v0.3.269.
+type HookEventCatalogEntry struct {
+	Name            string `json:"name"`
+	Summary         string `json:"summary"`
+	SupportsMatcher bool   `json:"supportsMatcher"`
+}
+
+// HooksListingPolicy reports managed-settings policy constraints on hooks
+// for the running session, as rendered by the /hooks menu. Port of
+// TypeScript SDK v0.3.269.
+type HooksListingPolicy struct {
+	DisabledByPolicy bool `json:"disabledByPolicy"`
+	ManagedOnly      bool `json:"managedOnly"`
+	PluginOnly       bool `json:"pluginOnly"`
+	AllDisabled      bool `json:"allDisabled"`
+	PolicyHookCount  int  `json:"policyHookCount"`
+	// PolicyUnreadable is set when a managed settings source exists but
+	// could not be read: what the organization configured is unknown, so
+	// edit_hook refuses every edit (fail-closed) and a host should lock its
+	// editing controls, as it does for the cases above. Port of TypeScript
+	// SDK v0.3.271.
+	PolicyUnreadable *bool `json:"policyUnreadable,omitempty"`
+}
+
+// HooksListingSafeMode reports the /hooks menu's safe-mode banner state.
+// Port of TypeScript SDK v0.3.269.
+type HooksListingSafeMode struct {
+	ManagedHooksStillApply bool   `json:"managedHooksStillApply"`
+	ExitHint               string `json:"exitHint"`
+}
+
+// HooksListingBareMode reports the /hooks menu's bare-mode banner state.
+// Port of TypeScript SDK v0.3.269.
+type HooksListingBareMode struct {
+	ExitHint string `json:"exitHint"`
+}
+
+// HooksListing is the response to the get_hooks_listing control request: the
+// same data the CLI's read-only /hooks menu renders — settings-file,
+// session, and plugin hooks grouped by event and matcher, with
+// display-ready strings and the policy/safe-mode/bare-mode state the menu
+// banners on. It is a snapshot at request time; re-request when the
+// consuming surface (re)opens. Errors carries the same untyped
+// settings-parse-error shape GetSettings-adjacent responses already surface.
+// Port of TypeScript SDK v0.3.269.
+type HooksListing struct {
+	Events       []HookListingEvent      `json:"events"`
+	Hooks        []HookListingEntry      `json:"hooks"`
+	EventCatalog []HookEventCatalogEntry `json:"eventCatalog"`
+	Policy       HooksListingPolicy      `json:"policy"`
+	SafeMode     *HooksListingSafeMode   `json:"safeMode,omitempty"`
+	BareMode     *HooksListingBareMode   `json:"bareMode,omitempty"`
+	Errors       []map[string]any        `json:"errors,omitempty"`
+}
+
 // ModelScopedUsage holds token usage counts for a single model within a session.
 // Port of TypeScript SDK v0.3.191.
 type ModelScopedUsage struct {
