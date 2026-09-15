@@ -395,8 +395,8 @@ const (
 	WorkflowSizeGuidelineUnrestricted WorkflowSizeGuideline = "unrestricted"
 	// WorkflowSizeGuidelineSmall aims for fewer than 5 agents.
 	WorkflowSizeGuidelineSmall WorkflowSizeGuideline = "small"
-	// WorkflowSizeGuidelineMedium aims for fewer than 15 agents. This is the
-	// CLI's default when no guideline is set.
+	// WorkflowSizeGuidelineMedium aims for fewer than 10 agents. Unset
+	// defaults to this, or to WorkflowSizeGuidelineSmall on Pro plans.
 	WorkflowSizeGuidelineMedium WorkflowSizeGuideline = "medium"
 	// WorkflowSizeGuidelineLarge aims for fewer than 50 agents.
 	WorkflowSizeGuidelineLarge WorkflowSizeGuideline = "large"
@@ -801,11 +801,12 @@ type Options struct {
 	Sandbox *SandboxSettings
 	// WorkflowSizeGuideline sets an advisory size guideline for the dynamic
 	// workflows Claude writes: WorkflowSizeGuidelineSmall aims for fewer than
-	// 5 agents, WorkflowSizeGuidelineMedium (the CLI default) fewer than 15,
+	// 5 agents, WorkflowSizeGuidelineMedium fewer than 10,
 	// WorkflowSizeGuidelineLarge fewer than 50, and WorkflowSizeGuidelineUnrestricted
-	// sends no guideline. This is a guideline, not an enforced limit. Empty
-	// leaves the CLI/managed-settings default in place. Port of TypeScript
-	// SDK v0.3.219.
+	// sends no guideline. Unset defaults to WorkflowSizeGuidelineMedium, or
+	// WorkflowSizeGuidelineSmall on Pro plans. This is a guideline, not an
+	// enforced limit. Empty leaves the CLI/managed-settings default in
+	// place. Port of TypeScript SDK v0.3.219, doc corrected per v0.3.271.
 	WorkflowSizeGuideline WorkflowSizeGuideline
 	// Plugins configures custom plugins.
 	Plugins []SdkPluginConfig
