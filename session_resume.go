@@ -649,16 +649,18 @@ func isSafeSubpath(subpath, sessionDir string) bool {
 }
 
 // copyAuthFiles copies ~/.credentials.json (with refreshToken redacted),
-// ~/.claude.json, and settings.json/cowork_settings.json (settings.json with
-// resume-incompatible keys stripped) from the caller's effective config dir
-// into tempDir so the spawned CLI can reuse existing credentials and
-// settings.
+// the global config (see resolveGlobalConfigPath), and
+// settings.json/cowork_settings.json (settings.json with resume-incompatible
+// keys stripped) from the caller's effective config dir into tempDir so the
+// spawned CLI can reuse existing credentials and settings.
 //
 // Resolution mirrors the CLI:
 //   - .credentials.json, settings.json, and cowork_settings.json live under
 //     the config dir (default ~/.claude/)
-//   - .claude.json lives at $CLAUDE_CONFIG_DIR/.claude.json when set,
-//     else ~/.claude.json (NOT ~/.claude/.claude.json)
+//   - the global config lives at $CLAUDE_CONFIG_DIR/.claude.json when set,
+//     else ~/.claude.json (NOT ~/.claude/.claude.json) — unless a legacy
+//     .config.json or an OAuth-environment-suffixed file is what is
+//     actually present, see resolveGlobalConfigPath
 //
 // All copies are best-effort; missing files are silently skipped (API-key
 // auth or a fresh install is fine).
@@ -692,14 +694,51 @@ func copyAuthFiles(tempDir string, optEnv map[string]string) {
 	coworkSettingsSrc := filepath.Join(sourceConfigDir, "cowork_settings.json")
 	copyIfPresent(coworkSettingsSrc, filepath.Join(tempDir, "cowork_settings.json"))
 
-	var claudeJSONSrc string
-	if callerConfigDir != "" {
-		claudeJSONSrc = filepath.Join(callerConfigDir, ".claude.json")
-	} else {
-		home, _ := os.UserHomeDir()
-		claudeJSONSrc = filepath.Join(home, ".claude.json")
+	claudeJSONName, claudeJSONSrc := resolveGlobalConfigPath(sourceConfigDir, callerConfigDir, optEnv)
+	copyIfPresent(claudeJSONSrc, filepath.Join(tempDir, claudeJSONName))
+}
+
+// oauthEnvSuffix returns the OAuth-environment suffix the CLI appends to its
+// global config's default basename ("" normally, "-custom-oauth" when
+// CLAUDE_CODE_CUSTOM_OAUTH_URL is set — checking optEnv before the process
+// environment, matching copyAuthFiles' own override precedence).
+func oauthEnvSuffix(optEnv map[string]string) string {
+	customOAuthURL := optEnv["CLAUDE_CODE_CUSTOM_OAUTH_URL"]
+	if customOAuthURL == "" {
+		customOAuthURL = os.Getenv("CLAUDE_CODE_CUSTOM_OAUTH_URL")
 	}
-	copyIfPresent(claudeJSONSrc, filepath.Join(tempDir, ".claude.json"))
+	if customOAuthURL != "" {
+		return "-custom-oauth"
+	}
+	return ""
+}
+
+// resolveGlobalConfigPath resolves the source basename and path for the
+// CLI's global config file, mirroring the CLI's own resolver: a legacy
+// .config.json under sourceConfigDir (the config dir: $CLAUDE_CONFIG_DIR, or
+// ~/.claude/ when unset) takes precedence when present; otherwise the
+// current name, .claude.json (or, under a non-default OAuth environment,
+// .claude-custom-oauth.json etc — see oauthEnvSuffix), resolved at
+// $CLAUDE_CONFIG_DIR when set, else ~ (NOT ~/.claude/, unlike the legacy
+// name). The basename returned is also the destination basename the copy
+// should use, so the resumed subprocess — which re-derives this same
+// resolution under its redirected CLAUDE_CONFIG_DIR pointed at tempDir —
+// finds the copy under the name it looks for. Port of TypeScript SDK
+// v0.3.271 ("Fixed sessionStore resume losing the global config when it is
+// stored under the legacy .config.json name or an OAuth-suffixed file
+// name").
+func resolveGlobalConfigPath(sourceConfigDir, callerConfigDir string, optEnv map[string]string) (name, path string) {
+	legacyPath := filepath.Join(sourceConfigDir, ".config.json")
+	if _, err := os.Stat(legacyPath); err == nil {
+		return ".config.json", legacyPath
+	}
+
+	name = ".claude" + oauthEnvSuffix(optEnv) + ".json"
+	if callerConfigDir != "" {
+		return name, filepath.Join(callerConfigDir, name)
+	}
+	home, _ := os.UserHomeDir()
+	return name, filepath.Join(home, name)
 }
 
 // writeRedactedCredentials writes credsJSON to dst with
