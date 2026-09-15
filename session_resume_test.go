@@ -540,6 +540,119 @@ func TestMaterializeResumeSession_AuthFilesCopied(t *testing.T) {
 	}
 }
 
+// TestResolveGlobalConfigPath_Default verifies the unchanged default case:
+// no legacy .config.json present, no OAuth environment suffix, so the
+// global config resolves to plain .claude.json at the config dir.
+func TestResolveGlobalConfigPath_Default(t *testing.T) {
+	configDir := t.TempDir()
+	name, path := resolveGlobalConfigPath(configDir, configDir, nil)
+	if name != ".claude.json" {
+		t.Errorf("name = %q, want .claude.json", name)
+	}
+	if want := filepath.Join(configDir, ".claude.json"); path != want {
+		t.Errorf("path = %q, want %q", path, want)
+	}
+}
+
+// TestResolveGlobalConfigPath_LegacyConfigJSON verifies that a legacy
+// .config.json under the config dir takes precedence over .claude.json when
+// present. Port of TypeScript SDK v0.3.271.
+func TestResolveGlobalConfigPath_LegacyConfigJSON(t *testing.T) {
+	configDir := t.TempDir()
+	legacyPath := filepath.Join(configDir, ".config.json")
+	if err := os.WriteFile(legacyPath, []byte(`{"legacy":true}`), 0o600); err != nil {
+		t.Fatalf("write legacy .config.json: %v", err)
+	}
+
+	name, path := resolveGlobalConfigPath(configDir, configDir, nil)
+	if name != ".config.json" {
+		t.Errorf("name = %q, want .config.json", name)
+	}
+	if path != legacyPath {
+		t.Errorf("path = %q, want %q", path, legacyPath)
+	}
+}
+
+// TestResolveGlobalConfigPath_CustomOAuthSuffix verifies that
+// CLAUDE_CODE_CUSTOM_OAUTH_URL (checked via optEnv, then the process
+// environment) resolves the global config to the -custom-oauth-suffixed
+// basename when no legacy .config.json is present. Port of TypeScript SDK
+// v0.3.271.
+func TestResolveGlobalConfigPath_CustomOAuthSuffix(t *testing.T) {
+	configDir := t.TempDir()
+	optEnv := map[string]string{"CLAUDE_CODE_CUSTOM_OAUTH_URL": "https://example.test/oauth"}
+
+	name, path := resolveGlobalConfigPath(configDir, configDir, optEnv)
+	if name != ".claude-custom-oauth.json" {
+		t.Errorf("name = %q, want .claude-custom-oauth.json", name)
+	}
+	if want := filepath.Join(configDir, ".claude-custom-oauth.json"); path != want {
+		t.Errorf("path = %q, want %q", path, want)
+	}
+}
+
+// TestResolveGlobalConfigPath_LegacyConfigJSONTakesPrecedenceOverOAuthSuffix
+// verifies the legacy .config.json check runs before the OAuth-suffix
+// resolution, matching the CLI's own resolver.
+func TestResolveGlobalConfigPath_LegacyConfigJSONTakesPrecedenceOverOAuthSuffix(t *testing.T) {
+	configDir := t.TempDir()
+	legacyPath := filepath.Join(configDir, ".config.json")
+	if err := os.WriteFile(legacyPath, []byte(`{"legacy":true}`), 0o600); err != nil {
+		t.Fatalf("write legacy .config.json: %v", err)
+	}
+	optEnv := map[string]string{"CLAUDE_CODE_CUSTOM_OAUTH_URL": "https://example.test/oauth"}
+
+	name, path := resolveGlobalConfigPath(configDir, configDir, optEnv)
+	if name != ".config.json" {
+		t.Errorf("name = %q, want .config.json (legacy takes precedence)", name)
+	}
+	if path != legacyPath {
+		t.Errorf("path = %q, want %q", path, legacyPath)
+	}
+}
+
+// TestMaterializeResumeSession_LegacyConfigJSONCopied verifies the
+// end-to-end copyAuthFiles path: when the caller's config dir has a legacy
+// .config.json instead of .claude.json, materializeResumeSession copies it
+// under its own name (.config.json) into the resumed subprocess's temp
+// config dir, rather than losing it. Port of TypeScript SDK v0.3.271.
+func TestMaterializeResumeSession_LegacyConfigJSONCopied(t *testing.T) {
+	fakeHome := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", fakeHome)
+
+	legacyPath := filepath.Join(fakeHome, ".config.json")
+	if err := os.WriteFile(legacyPath, []byte(`{"legacy":true}`), 0o600); err != nil {
+		t.Fatalf("write legacy .config.json: %v", err)
+	}
+
+	ctx := context.Background()
+	store := NewInMemorySessionStore()
+	cwd := t.TempDir()
+	projectKey := ProjectKeyForDirectory(cwd)
+	_ = store.Append(ctx, SessionKey{ProjectKey: projectKey, SessionID: sessionA}, []SessionStoreEntry{
+		entry(map[string]any{"type": "user"}),
+	})
+
+	opts := &Options{SessionStore: store, Resume: sessionA, Cwd: cwd}
+	mr, err := materializeResumeSession(ctx, opts)
+	if err != nil {
+		t.Fatalf("materializeResumeSession: %v", err)
+	}
+	defer mr.cleanup()
+
+	legacyOut, err := os.ReadFile(filepath.Join(mr.configDir, ".config.json"))
+	if err != nil {
+		t.Fatalf("read copied .config.json: %v", err)
+	}
+	if string(legacyOut) != `{"legacy":true}` {
+		t.Errorf(".config.json not copied verbatim, got %q", string(legacyOut))
+	}
+
+	if _, err := os.Stat(filepath.Join(mr.configDir, ".claude.json")); !os.IsNotExist(err) {
+		t.Errorf(".claude.json should not exist when only legacy .config.json was present, stat err = %v", err)
+	}
+}
+
 func TestMaterializeResumeSession_SettingsStrippedAndCoworkSettingsCopied(t *testing.T) {
 	fakeHome := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", fakeHome)

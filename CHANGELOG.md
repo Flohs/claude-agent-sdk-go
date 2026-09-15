@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `copyAuthFiles` (a `sessionStore`-backed resume's global-config copy, `session_resume.go`) hardcoded its source straight to `.claude.json`, so a caller whose global config was still stored under the legacy `.config.json` name (pre-migration installs), or under the `-custom-oauth` suffix (`CLAUDE_CODE_CUSTOM_OAUTH_URL` set), silently lost it on resume — settings and account state from that file would not reach the resumed subprocess. New `resolveGlobalConfigPath` mirrors the CLI's own resolver: a legacy `.config.json` under the config dir takes precedence when present; otherwise the current `.claude<oauthSuffix>.json` name, at `$CLAUDE_CONFIG_DIR` (or `~`) as before. The copy lands in the resumed subprocess's temp config dir under the same basename it was found under, so the subprocess — which re-derives this same resolution under its redirected `CLAUDE_CONFIG_DIR` — finds it. Port of TypeScript SDK v0.3.271 ("Fixed `sessionStore` resume losing the global config when it is stored under the legacy `.config.json` name or an OAuth-suffixed file name"), applied to the equivalent Go bug: the TS fix was making the `sessionStore`/resume call site use TypeScript's shared global-config resolver instead of a hardcoded path — that resolver's own logic is unchanged between v0.3.270 and v0.3.271 in the bundled `sdk.mjs`. ([#709](https://github.com/Flohs/claude-agent-sdk-go/issues/709))
+
 ### Added
 
 - `AgentDefinition.OmitClaudeMd` field (`bool`), sent as `"omitClaudeMd": true` in the `agents` option (omitted when false): runs the agent without the user, project and local `CLAUDE.md` instruction files when it runs as a subagent — managed policy files are still loaded. For agents that take everything they need from the delegation prompt. No effect on the main session agent. Port of TypeScript SDK v0.3.271 (npm package's bundled `sdk.d.ts`, confirmed by diffing the npm tarballs for v0.3.270 → v0.3.271 directly, since the TypeScript SDK's GitHub repository does not expose this file directly). ([#707](https://github.com/Flohs/claude-agent-sdk-go/issues/707))
