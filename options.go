@@ -313,14 +313,19 @@ type BuiltinToolConfig struct {
 
 // AgentDefinition is an agent definition configuration.
 type AgentDefinition struct {
-	Description     string   `json:"description"`
-	Prompt          string   `json:"prompt"`
-	Tools           []string `json:"tools,omitempty"`
-	Model           string   `json:"model,omitempty"` // "sonnet", "opus", "haiku", "inherit"
-	Skills          []string `json:"skills,omitempty"`
-	Memory          string   `json:"memory,omitempty"` // "user" | "project" | "local"
-	MCPServers      []any    `json:"mcpServers,omitempty"`
-	Background      bool     `json:"background,omitempty"`
+	Description string   `json:"description"`
+	Prompt      string   `json:"prompt"`
+	Tools       []string `json:"tools,omitempty"`
+	Model       string   `json:"model,omitempty"` // "sonnet", "opus", "haiku", "inherit"
+	Skills      []string `json:"skills,omitempty"`
+	Memory      string   `json:"memory,omitempty"` // "user" | "project" | "local"
+	MCPServers  []any    `json:"mcpServers,omitempty"`
+	Background  bool     `json:"background,omitempty"`
+	// OmitClaudeMd runs this agent without the user, project and local
+	// CLAUDE.md instruction files when it runs as a subagent; managed policy
+	// files are kept. For agents that take everything they need from the
+	// delegation prompt. No effect on the main session agent.
+	OmitClaudeMd    bool     `json:"omitClaudeMd,omitempty"`
 	Effort          string   `json:"effort,omitempty"`
 	PermissionMode  string   `json:"permissionMode,omitempty"`
 	DisallowedTools []string `json:"disallowedTools,omitempty"`
