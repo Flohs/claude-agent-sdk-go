@@ -101,13 +101,14 @@ func TestWarnCanUseToolPermissionConflicts_Both(t *testing.T) {
 
 func TestAgentDefinition_JSONMarshal(t *testing.T) {
 	def := AgentDefinition{
-		Description: "test agent",
-		Prompt:      "You are a test agent",
-		Tools:       []string{"Bash", "Read"},
-		Model:       "sonnet",
-		Skills:      []string{"commit", "review-pr"},
-		Memory:      "project",
-		MCPServers:  []any{map[string]any{"name": "test-server"}},
+		Description:  "test agent",
+		Prompt:       "You are a test agent",
+		Tools:        []string{"Bash", "Read"},
+		Model:        "sonnet",
+		Skills:       []string{"commit", "review-pr"},
+		Memory:       "project",
+		MCPServers:   []any{map[string]any{"name": "test-server"}},
+		OmitClaudeMd: true,
 	}
 
 	data, err := json.Marshal(def)
@@ -125,6 +126,9 @@ func TestAgentDefinition_JSONMarshal(t *testing.T) {
 	}
 	if result["memory"] != "project" {
 		t.Errorf("expected memory 'project', got %v", result["memory"])
+	}
+	if result["omitClaudeMd"] != true {
+		t.Errorf("expected omitClaudeMd true, got %v", result["omitClaudeMd"])
 	}
 
 	skills, ok := result["skills"].([]any)
@@ -154,7 +158,7 @@ func TestAgentDefinition_JSONMarshal_OmitEmpty(t *testing.T) {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 
-	for _, key := range []string{"tools", "model", "skills", "memory", "mcpServers"} {
+	for _, key := range []string{"tools", "model", "skills", "memory", "mcpServers", "omitClaudeMd"} {
 		if _, ok := result[key]; ok {
 			t.Errorf("expected %q to be omitted when empty, but it was present", key)
 		}
