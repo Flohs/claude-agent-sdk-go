@@ -255,6 +255,15 @@ type AssistantMessage struct {
 	// different, on-demand control-request/response shape. Port of
 	// TypeScript SDK v0.3.232.
 	ContextUsage *AssistantContextUsage `json:"context_usage,omitempty"`
+	// UsageReport is a structured twin of the /usage report, carried on the
+	// synthetic assistant message that delivers its text: the session
+	// totals, the plan's usage rows and extra-usage spend, for remote
+	// clients that render a card from data. Nil except on /usage results
+	// from CLIs new enough to attach it and from claude.ai-subscriber
+	// sessions; the text in Content remains the canonical fallback.
+	// Experimental — the shape may change upstream. Port of TypeScript SDK
+	// v0.3.273.
+	UsageReport *AssistantUsageReport `json:"usage_report,omitempty"`
 	// UserMessageUUID is the client uuid of the user message that triggered
 	// this turn, stamped on the turn's first reply frame only — a turn that
 	// produces no stream events still stamps its first assistant message —
@@ -374,6 +383,95 @@ type AssistantContextUsage struct {
 	Agents      []AssistantContextUsageAgent      `json:"agents"`
 	// Skills is nil when no skills contribute tokens.
 	Skills []AssistantContextUsageSkill `json:"skills,omitempty"`
+}
+
+// AssistantUsageReportSession holds the session's accumulated cost and
+// usage, carried on [AssistantUsageReport.Session].
+type AssistantUsageReportSession struct {
+	TotalCostUSD       float64 `json:"total_cost_usd"`
+	TotalAPIDurationMs int     `json:"total_api_duration_ms"`
+	TotalDurationMs    int     `json:"total_duration_ms"`
+	TotalLinesAdded    int     `json:"total_lines_added"`
+	TotalLinesRemoved  int     `json:"total_lines_removed"`
+	// ModelUsage reuses the same [ModelUsage] shape as
+	// [ResultMessage.ModelUsage], keyed by model name.
+	ModelUsage map[string]ModelUsage `json:"model_usage"`
+}
+
+// AssistantUsageReportScopeLabel names what a scoped rate-limit row is for.
+type AssistantUsageReportScopeLabel struct {
+	DisplayName string `json:"display_name"`
+}
+
+// AssistantUsageReportScope identifies what a scoped rate-limit row
+// measures: a model or a surface, each with the server's display label.
+type AssistantUsageReportScope struct {
+	Model   *AssistantUsageReportScopeLabel `json:"model,omitempty"`
+	Surface *AssistantUsageReportScopeLabel `json:"surface,omitempty"`
+}
+
+// AssistantUsageReportLimit is one row of the plan's usage meters, as the
+// server sent it: which meters apply, their scope, labels, severity, and
+// order are the server's, so a client renders them verbatim and a new
+// meter needs no client release.
+type AssistantUsageReportLimit struct {
+	// Kind is the server's meter kind, e.g. "session", "weekly_all", or
+	// "weekly_scoped". Classify a row on this, never on a label.
+	Kind string `json:"kind"`
+	// Group is the server's row group, e.g. "session" or "weekly"; rows
+	// render grouped under it, in the server's order.
+	Group string `json:"group"`
+	// Percent is the share of the window used, 0-100.
+	Percent float64 `json:"percent"`
+	// ResetsAt is the ISO 8601 timestamp when the window resets. Empty when
+	// the server sent null.
+	ResetsAt string `json:"resets_at,omitempty"`
+	// Scope is what a scoped row is for. Nil for an unscoped row.
+	Scope *AssistantUsageReportScope `json:"scope,omitempty"`
+	// Severity is the server's reading of the row for a meter's colour,
+	// e.g. "normal", "warning", or "critical". Empty when the server sent
+	// none; a client falls back to its own thresholds.
+	Severity string `json:"severity,omitempty"`
+	// IsActive is the server's headline pick: the row a single-value
+	// indicator shows. Nil when the server sent none.
+	IsActive *bool `json:"is_active,omitempty"`
+}
+
+// AssistantUsageReportExtraUsage is the extra-usage (overage) spend for the
+// billing period, when the plan has it. Amounts are in minor units of
+// Currency (cents for USD).
+type AssistantUsageReportExtraUsage struct {
+	// IsEnabled is false while extra usage cannot cover sends.
+	IsEnabled    bool     `json:"is_enabled"`
+	MonthlyLimit *int     `json:"monthly_limit,omitempty"`
+	UsedCredits  *int     `json:"used_credits,omitempty"`
+	Utilization  *float64 `json:"utilization,omitempty"`
+	Currency     string   `json:"currency,omitempty"`
+}
+
+// AssistantUsageReportRateLimits carries the plan's usage rows and
+// extra-usage spend from the claude.ai usage endpoint.
+type AssistantUsageReportRateLimits struct {
+	// Limits are the server's usage rows (the usage endpoint's limits[]),
+	// as sent. Nil when the server reported no meters, or when the usage
+	// fetch failed and no fallback row could be synthesized from
+	// rate-limit response headers.
+	Limits []AssistantUsageReportLimit `json:"limits,omitempty"`
+	// ExtraUsage is nil when the plan has none.
+	ExtraUsage *AssistantUsageReportExtraUsage `json:"extra_usage,omitempty"`
+}
+
+// AssistantUsageReport is a structured twin of a /usage result, carried on
+// [AssistantMessage.UsageReport]: the session's totals, the plan's usage
+// rows as the server sent them, and the extra-usage spend — nothing else
+// from the usage body (the get_usage control reply carries the rest).
+// Experimental — the shape may change upstream. Port of TypeScript SDK
+// v0.3.273 (SDKUsageReport).
+type AssistantUsageReport struct {
+	Session AssistantUsageReportSession `json:"session"`
+	// RateLimits is nil when the CLI could not fetch plan usage rows (no
+	// plan on this lane, or a token without the profile scope).
+	RateLimits *AssistantUsageReportRateLimits `json:"rate_limits"`
 }
 
 func (AssistantMessage) messageMarker() {}
