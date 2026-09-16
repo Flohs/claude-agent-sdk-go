@@ -403,6 +403,18 @@ const (
 	TaskNotificationStatusStopped   TaskNotificationStatus = "stopped"
 )
 
+// TaskNotificationReason is a machine-readable cause for a task notification,
+// set only when the task did not end through an ordinary completion, failure,
+// or stop. Port of TypeScript SDK v0.3.273.
+type TaskNotificationReason string
+
+const (
+	// TaskNotificationReasonWorkerRestart means the worker process restarted
+	// and the resumed process found the task orphaned (always paired with
+	// [TaskNotificationStatusStopped]).
+	TaskNotificationReasonWorkerRestart TaskNotificationReason = "worker_restart"
+)
+
 // TaskStartedMessage is emitted when a task starts.
 type TaskStartedMessage struct {
 	SystemMessage
@@ -472,8 +484,12 @@ type McpResourceLink struct {
 // TaskNotificationMessage is emitted when a task completes, fails, or is stopped.
 type TaskNotificationMessage struct {
 	SystemMessage
-	TaskID     string                 `json:"task_id"`
-	Status     TaskNotificationStatus `json:"status"`
+	TaskID string                 `json:"task_id"`
+	Status TaskNotificationStatus `json:"status"`
+	// Reason is a machine-readable cause, set only when Status did not come
+	// from an ordinary completion, failure, or stop. Empty from older CLIs
+	// and on ordinary notifications. Port of TypeScript SDK v0.3.273.
+	Reason     TaskNotificationReason `json:"reason,omitempty"`
 	OutputFile string                 `json:"output_file"`
 	Summary    string                 `json:"summary"`
 	UUID       string                 `json:"uuid"`

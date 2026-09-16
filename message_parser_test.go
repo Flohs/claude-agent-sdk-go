@@ -2138,6 +2138,45 @@ func TestParseMessage_TaskNotification_Ambient(t *testing.T) {
 	}
 }
 
+func TestParseMessage_TaskNotification_Reason(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "task_notification",
+		"task_id":    "t1",
+		"status":     "stopped",
+		"reason":     "worker_restart",
+		"uuid":       "u1",
+		"session_id": "s1",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	n := msg.(*TaskNotificationMessage)
+	if n.Reason != TaskNotificationReasonWorkerRestart {
+		t.Errorf("Reason = %q, want %q", n.Reason, TaskNotificationReasonWorkerRestart)
+	}
+}
+
+func TestParseMessage_TaskNotification_ReasonAbsent(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "task_notification",
+		"task_id":    "t1",
+		"status":     "completed",
+		"uuid":       "u1",
+		"session_id": "s1",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	n := msg.(*TaskNotificationMessage)
+	if n.Reason != "" {
+		t.Errorf("Reason = %q, want empty", n.Reason)
+	}
+}
+
 func TestParseMessage_TaskNotification_ResourceLinks(t *testing.T) {
 	size := 1234
 	data := map[string]any{

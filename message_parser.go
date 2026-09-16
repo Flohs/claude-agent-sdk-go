@@ -298,6 +298,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			SystemMessage:   base,
 			TaskID:          stringField(data, "task_id"),
 			Status:          TaskNotificationStatus(stringField(data, "status")),
+			Reason:          TaskNotificationReason(stringField(data, "reason")),
 			OutputFile:      stringField(data, "output_file"),
 			Summary:         stringField(data, "summary"),
 			UUID:            stringField(data, "uuid"),
