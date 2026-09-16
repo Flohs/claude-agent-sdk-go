@@ -159,6 +159,12 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		msg.ContextUsage = parseAssistantContextUsage(rawCU)
 	}
 
+	if rawUR, ok := data["usage_report"].(map[string]any); ok {
+		msg.UsageReport = parseAssistantUsageReport(rawUR)
+	} else if rawUR, ok := message["usage_report"].(map[string]any); ok {
+		msg.UsageReport = parseAssistantUsageReport(rawUR)
+	}
+
 	if rawMeta, ok := data["tool_use_meta"].(map[string]any); ok {
 		meta := make(ToolUseMeta, len(rawMeta))
 		for id, v := range rawMeta {
@@ -791,6 +797,72 @@ func parseAssistantContextUsage(m map[string]any) *AssistantContextUsage {
 	}
 
 	return cu
+}
+
+// parseAssistantUsageReport converts the CLI's raw usage_report map into an
+// [AssistantUsageReport].
+func parseAssistantUsageReport(m map[string]any) *AssistantUsageReport {
+	ur := &AssistantUsageReport{}
+
+	if s, ok := m["session"].(map[string]any); ok {
+		session := AssistantUsageReportSession{
+			TotalCostUSD:       float64FromAny(s["total_cost_usd"]),
+			TotalAPIDurationMs: intField(s, "total_api_duration_ms"),
+			TotalDurationMs:    intField(s, "total_duration_ms"),
+			TotalLinesAdded:    intField(s, "total_lines_added"),
+			TotalLinesRemoved:  intField(s, "total_lines_removed"),
+		}
+		if mu, ok := s["model_usage"].(map[string]any); ok {
+			session.ModelUsage = parseModelUsage(mu)
+		}
+		ur.Session = session
+	}
+
+	if rl, ok := m["rate_limits"].(map[string]any); ok {
+		rateLimits := &AssistantUsageReportRateLimits{}
+
+		if rawLimits, ok := rl["limits"].([]any); ok {
+			for _, rawLimit := range rawLimits {
+				l, ok := rawLimit.(map[string]any)
+				if !ok {
+					continue
+				}
+				entry := AssistantUsageReportLimit{
+					Kind:     stringField(l, "kind"),
+					Group:    stringField(l, "group"),
+					Percent:  float64FromAny(l["percent"]),
+					ResetsAt: stringField(l, "resets_at"),
+					Severity: stringField(l, "severity"),
+					IsActive: optionalBoolField(l, "is_active"),
+				}
+				if sc, ok := l["scope"].(map[string]any); ok {
+					scope := &AssistantUsageReportScope{}
+					if mo, ok := sc["model"].(map[string]any); ok {
+						scope.Model = &AssistantUsageReportScopeLabel{DisplayName: stringField(mo, "display_name")}
+					}
+					if su, ok := sc["surface"].(map[string]any); ok {
+						scope.Surface = &AssistantUsageReportScopeLabel{DisplayName: stringField(su, "display_name")}
+					}
+					entry.Scope = scope
+				}
+				rateLimits.Limits = append(rateLimits.Limits, entry)
+			}
+		}
+
+		if eu, ok := rl["extra_usage"].(map[string]any); ok {
+			rateLimits.ExtraUsage = &AssistantUsageReportExtraUsage{
+				IsEnabled:    boolField(eu, "is_enabled"),
+				MonthlyLimit: optionalIntField(eu, "monthly_limit"),
+				UsedCredits:  optionalIntField(eu, "used_credits"),
+				Utilization:  optionalFloat64Field(eu, "utilization"),
+				Currency:     stringField(eu, "currency"),
+			}
+		}
+
+		ur.RateLimits = rateLimits
+	}
+
+	return ur
 }
 
 func parseTaskUsage(v any) TaskUsage {

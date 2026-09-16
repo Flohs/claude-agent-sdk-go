@@ -2718,6 +2718,129 @@ func TestParseAssistantMessage_ContextUsage_Absent(t *testing.T) {
 	}
 }
 
+func TestParseAssistantMessage_UsageReport(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{},
+		},
+		"usage_report": map[string]any{
+			"session": map[string]any{
+				"total_cost_usd":        1.5,
+				"total_api_duration_ms": float64(2000),
+				"total_duration_ms":     float64(3000),
+				"total_lines_added":     float64(10),
+				"total_lines_removed":   float64(4),
+				"model_usage": map[string]any{
+					"claude-opus-4-8": map[string]any{
+						"inputTokens":              float64(100),
+						"outputTokens":             float64(50),
+						"cacheReadInputTokens":     float64(0),
+						"cacheCreationInputTokens": float64(0),
+						"webSearchRequests":        float64(0),
+						"costUSD":                  1.5,
+						"contextWindow":            float64(200000),
+						"maxOutputTokens":          float64(8192),
+					},
+				},
+			},
+			"rate_limits": map[string]any{
+				"limits": []any{
+					map[string]any{
+						"kind":      "session",
+						"group":     "session",
+						"percent":   float64(42),
+						"resets_at": "2026-09-17T00:00:00Z",
+						"severity":  "warning",
+						"is_active": true,
+						"scope": map[string]any{
+							"model": map[string]any{"display_name": "Opus"},
+						},
+					},
+				},
+				"extra_usage": map[string]any{
+					"is_enabled":    true,
+					"monthly_limit": float64(1000),
+					"used_credits":  float64(250),
+					"utilization":   0.25,
+					"currency":      "USD",
+				},
+			},
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	am, ok := msg.(*AssistantMessage)
+	if !ok {
+		t.Fatalf("expected AssistantMessage, got %T", msg)
+	}
+	ur := am.UsageReport
+	if ur == nil {
+		t.Fatal("expected UsageReport to be non-nil")
+	}
+	if ur.Session.TotalCostUSD != 1.5 || ur.Session.TotalAPIDurationMs != 2000 || ur.Session.TotalDurationMs != 3000 {
+		t.Errorf("unexpected Session fields: %+v", ur.Session)
+	}
+	if ur.Session.TotalLinesAdded != 10 || ur.Session.TotalLinesRemoved != 4 {
+		t.Errorf("unexpected Session line fields: %+v", ur.Session)
+	}
+	mu, ok := ur.Session.ModelUsage["claude-opus-4-8"]
+	if !ok || mu.InputTokens != 100 || mu.OutputTokens != 50 {
+		t.Errorf("unexpected ModelUsage: %+v", ur.Session.ModelUsage)
+	}
+	if ur.RateLimits == nil {
+		t.Fatal("expected RateLimits to be non-nil")
+	}
+	if len(ur.RateLimits.Limits) != 1 {
+		t.Fatalf("expected 1 limit, got %d", len(ur.RateLimits.Limits))
+	}
+	l := ur.RateLimits.Limits[0]
+	if l.Kind != "session" || l.Group != "session" || l.Percent != 42 || l.ResetsAt != "2026-09-17T00:00:00Z" || l.Severity != "warning" {
+		t.Errorf("unexpected Limit fields: %+v", l)
+	}
+	if l.IsActive == nil || !*l.IsActive {
+		t.Errorf("expected IsActive true, got %v", l.IsActive)
+	}
+	if l.Scope == nil || l.Scope.Model == nil || l.Scope.Model.DisplayName != "Opus" {
+		t.Errorf("unexpected Scope: %+v", l.Scope)
+	}
+	eu := ur.RateLimits.ExtraUsage
+	if eu == nil || !eu.IsEnabled || eu.Currency != "USD" {
+		t.Errorf("unexpected ExtraUsage: %+v", eu)
+	}
+	if eu.MonthlyLimit == nil || *eu.MonthlyLimit != 1000 {
+		t.Errorf("unexpected MonthlyLimit: %v", eu.MonthlyLimit)
+	}
+	if eu.UsedCredits == nil || *eu.UsedCredits != 250 {
+		t.Errorf("unexpected UsedCredits: %v", eu.UsedCredits)
+	}
+	if eu.Utilization == nil || *eu.Utilization != 0.25 {
+		t.Errorf("unexpected Utilization: %v", eu.Utilization)
+	}
+}
+
+func TestParseAssistantMessage_UsageReport_Absent(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{},
+		},
+	}
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	am, ok := msg.(*AssistantMessage)
+	if !ok {
+		t.Fatalf("expected AssistantMessage, got %T", msg)
+	}
+	if am.UsageReport != nil {
+		t.Errorf("expected nil UsageReport when absent, got %+v", am.UsageReport)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tests for HookEventMessage (hook_started / hook_response) — issue #328
 // Port of Python SDK PR anthropics/claude-agent-sdk-python#917.
