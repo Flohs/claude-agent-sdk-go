@@ -168,6 +168,20 @@ type McpServerStatus struct {
 	// Capabilities lists the SDK-driven channels this MCP server can activate.
 	// Use Client.EnableChannel to activate one of the listed capabilities.
 	Capabilities []string `json:"capabilities,omitempty"`
+	// Source identifies how this server is hosted, e.g. "sdk" for an
+	// in-process server created via [NewSdkMcpServer]. Empty when not
+	// provided by the CLI. Port of TypeScript SDK v0.3.274.
+	Source string `json:"source,omitempty"`
+}
+
+// ToolMcpServerRef identifies the MCP server a tool call belongs to,
+// surfaced on [PreToolUseHookInput], [PostToolUseHookInput], and
+// [ToolPermissionContext] so a host can key trust on Source == "sdk" (an
+// in-process server the host itself defined via [NewSdkMcpServer]) versus an
+// externally configured one. Port of TypeScript SDK v0.3.274.
+type ToolMcpServerRef struct {
+	Name   string `json:"name"`
+	Source string `json:"source,omitempty"`
 }
 
 // McpStatusResponse is the response from GetMcpStatus.

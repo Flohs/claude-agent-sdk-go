@@ -149,6 +149,44 @@ func TestParseHookInput_PreToolUse_WithAgentID(t *testing.T) {
 	}
 }
 
+func TestParseHookInput_PreToolUse_WithMcpServer(t *testing.T) {
+	input := merge(base("PreToolUse"), HookInput{
+		"tool_name":   "mcp__calculator__add",
+		"tool_input":  map[string]any{"a": 1, "b": 2},
+		"tool_use_id": "toolu_abc123",
+		"mcp_server":  map[string]any{"name": "calculator", "source": "sdk"},
+	})
+
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	typed := result.(*PreToolUseHookInput)
+	if typed.McpServer == nil {
+		t.Fatal("McpServer is nil")
+	}
+	if typed.McpServer.Name != "calculator" || typed.McpServer.Source != "sdk" {
+		t.Errorf("McpServer = %+v, want {calculator sdk}", typed.McpServer)
+	}
+}
+
+func TestParseHookInput_PreToolUse_WithoutMcpServer(t *testing.T) {
+	input := merge(base("PreToolUse"), HookInput{
+		"tool_name":   "Bash",
+		"tool_input":  map[string]any{"command": "echo hello"},
+		"tool_use_id": "toolu_abc123",
+	})
+
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	typed := result.(*PreToolUseHookInput)
+	if typed.McpServer != nil {
+		t.Errorf("McpServer = %+v, want nil for a built-in tool", typed.McpServer)
+	}
+}
+
 func TestParseHookInput_PostToolUse(t *testing.T) {
 	input := merge(base("PostToolUse"), HookInput{
 		"tool_name":     "Bash",

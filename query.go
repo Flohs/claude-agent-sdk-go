@@ -740,6 +740,7 @@ func (q *query) handleCanUseTool(request map[string]any, requestID string) (map[
 		Description:             stringField(request, "description"),
 		SuppressAlwaysAllowRule: boolField(request, "suppress_always_allow_rule"),
 		DefaultToNo:             boolField(request, "default_to_no"),
+		McpServer:               parseToolMcpServerRef(request),
 	}
 	if suggestions, ok := request["permission_suggestions"].([]any); ok {
 		permCtx.Suggestions = make([]PermissionUpdate, 0, len(suggestions))

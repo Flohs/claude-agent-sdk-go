@@ -26,6 +26,24 @@ func TestMcpStdioServerConfig_RequestTimeoutMs(t *testing.T) {
 	}
 }
 
+func TestMcpServerStatus_Source(t *testing.T) {
+	data := []byte(`{"mcpServers":[{"name":"calculator","status":"connected","source":"sdk"},{"name":"github","status":"connected"}]}`)
+
+	var status McpStatusResponse
+	if err := json.Unmarshal(data, &status); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if len(status.McpServers) != 2 {
+		t.Fatalf("expected 2 servers, got %d", len(status.McpServers))
+	}
+	if status.McpServers[0].Source != "sdk" {
+		t.Errorf("McpServers[0].Source = %q, want %q", status.McpServers[0].Source, "sdk")
+	}
+	if status.McpServers[1].Source != "" {
+		t.Errorf("McpServers[1].Source = %q, want empty when absent", status.McpServers[1].Source)
+	}
+}
+
 func TestMcpStdioServerConfig_RequestTimeoutMs_OmitEmpty(t *testing.T) {
 	cfg := McpStdioServerConfig{Command: "my-server"}
 
