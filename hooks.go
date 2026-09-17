@@ -142,6 +142,9 @@ type PreToolUseHookInput struct {
 	// typed structs are available (e.g. [ExitPlanModeToolInput] for ExitPlanMode).
 	ToolInput map[string]any `json:"tool_input"`
 	ToolUseID string         `json:"tool_use_id"`
+	// McpServer identifies the MCP server this tool belongs to. Nil for
+	// built-in tools. Port of TypeScript SDK v0.3.274.
+	McpServer *ToolMcpServerRef `json:"mcp_server,omitempty"`
 }
 
 func (*PreToolUseHookInput) hookInputMarker() {}
@@ -154,6 +157,9 @@ type PostToolUseHookInput struct {
 	ToolInput    map[string]any `json:"tool_input"`
 	ToolResponse any            `json:"tool_response"`
 	ToolUseID    string         `json:"tool_use_id"`
+	// McpServer identifies the MCP server this tool belongs to. Nil for
+	// built-in tools. Port of TypeScript SDK v0.3.274.
+	McpServer *ToolMcpServerRef `json:"mcp_server,omitempty"`
 }
 
 func (*PostToolUseHookInput) hookInputMarker() {}

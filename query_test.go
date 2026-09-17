@@ -1584,6 +1584,62 @@ func TestHandleCanUseTool_PopulatesMatchedAskRuleAndSuppressAlwaysAllowRuleAndDe
 	}
 }
 
+func TestHandleCanUseTool_PopulatesMcpServer(t *testing.T) {
+	mt := newMockTransport()
+	var gotCtx ToolPermissionContext
+	q := newQuery(queryConfig{
+		transport: mt,
+		canUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+			gotCtx = permCtx
+			return PermissionResultAllow{}, nil
+		},
+	})
+
+	q.handleControlRequest(map[string]any{
+		"request_id": "req-mcp",
+		"request": map[string]any{
+			"subtype":     "can_use_tool",
+			"tool_name":   "mcp__calculator__add",
+			"tool_use_id": "tu-mcp",
+			"input":       map[string]any{},
+			"mcp_server":  map[string]any{"name": "calculator", "source": "sdk"},
+		},
+	})
+
+	if gotCtx.McpServer == nil {
+		t.Fatal("expected McpServer to be non-nil")
+	}
+	if gotCtx.McpServer.Name != "calculator" || gotCtx.McpServer.Source != "sdk" {
+		t.Errorf("McpServer = %+v, want {calculator sdk}", gotCtx.McpServer)
+	}
+}
+
+func TestHandleCanUseTool_McpServerAbsentForBuiltinTool(t *testing.T) {
+	mt := newMockTransport()
+	var gotCtx ToolPermissionContext
+	q := newQuery(queryConfig{
+		transport: mt,
+		canUseTool: func(ctx context.Context, toolName string, input map[string]any, permCtx ToolPermissionContext) (PermissionResult, error) {
+			gotCtx = permCtx
+			return PermissionResultAllow{}, nil
+		},
+	})
+
+	q.handleControlRequest(map[string]any{
+		"request_id": "req-builtin",
+		"request": map[string]any{
+			"subtype":     "can_use_tool",
+			"tool_name":   "Bash",
+			"tool_use_id": "tu-builtin",
+			"input":       map[string]any{},
+		},
+	})
+
+	if gotCtx.McpServer != nil {
+		t.Errorf("McpServer = %+v, want nil for a built-in tool", gotCtx.McpServer)
+	}
+}
+
 func TestHandleCanUseTool_NilResultSuppressesControlResponse(t *testing.T) {
 	mt := newMockTransport()
 	q := newQuery(queryConfig{

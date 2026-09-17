@@ -19,6 +19,7 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			ToolName:        stringField(input, "tool_name"),
 			ToolInput:       mapField(input, "tool_input"),
 			ToolUseID:       stringField(input, "tool_use_id"),
+			McpServer:       parseToolMcpServerRef(input),
 		}, nil
 
 	case HookEventPostToolUse:
@@ -29,6 +30,7 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			ToolInput:       mapField(input, "tool_input"),
 			ToolResponse:    input["tool_response"],
 			ToolUseID:       stringField(input, "tool_use_id"),
+			McpServer:       parseToolMcpServerRef(input),
 		}, nil
 
 	case HookEventPostToolUseFailure:
@@ -326,6 +328,23 @@ func parseSubagentContext(m map[string]any) SubagentContext {
 	return SubagentContext{
 		AgentID:   stringField(m, "agent_id"),
 		AgentType: stringField(m, "agent_type"),
+	}
+}
+
+// parseToolMcpServerRef reads the "mcp_server"/"mcpServer" object the CLI
+// attaches to tool hook inputs and can_use_tool requests when the tool
+// belongs to an MCP server. Returns nil when absent (built-in tools).
+func parseToolMcpServerRef(m map[string]any) *ToolMcpServerRef {
+	raw := mapField(m, "mcp_server")
+	if raw == nil {
+		raw = mapField(m, "mcpServer")
+	}
+	if raw == nil {
+		return nil
+	}
+	return &ToolMcpServerRef{
+		Name:   stringField(raw, "name"),
+		Source: stringField(raw, "source"),
 	}
 }
 

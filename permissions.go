@@ -156,6 +156,12 @@ type ToolPermissionContext struct {
 	// to declining (no digit-shortcut auto-accept). Port of TypeScript SDK
 	// v0.3.242.
 	DefaultToNo bool
+	// McpServer identifies the MCP server the requested tool belongs to. Nil
+	// for built-in tools. Callers can key trust on McpServer.Source == "sdk"
+	// to distinguish an in-process server the host itself defined via
+	// [NewSdkMcpServer] from an externally configured one. Port of
+	// TypeScript SDK v0.3.274.
+	McpServer *ToolMcpServerRef
 }
 
 // MatchedAskRule describes the user-configured permission ask rule that
