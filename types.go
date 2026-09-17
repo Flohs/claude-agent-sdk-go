@@ -1491,6 +1491,10 @@ type ResultMessage struct {
 	// failing API call when IsError is true. Zero when not provided by the
 	// CLI (requires CLI >= v2.1.110).
 	APIErrorStatus *int `json:"api_error_status,omitempty"`
+	// StartupFailureReason explains why a stream-json run exited before
+	// producing a normal result, e.g. a known CLI startup failure. Empty
+	// when not provided by the CLI. Port of TypeScript SDK v0.3.274.
+	StartupFailureReason string `json:"startup_failure_reason,omitempty"`
 	// Origin forwards the triggering message's origin so consumers can
 	// distinguish user-prompted results from task-notification followups.
 	// Nil when the CLI omits the field (the common case for main-session

@@ -430,13 +430,14 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		FastModeDisabledReason: FastModeDisabledReason(
 			stringField(data, "fast_mode_disabled_reason"),
 		),
-		Origin:           parseMessageOrigin(data),
-		RequestID:        stringField(data, "request_id"),
-		Result:           stringField(data, "result"),
-		Timestamp:        stringField(data, "timestamp"),
-		UserMessageUUID:  stringField(data, "user_message_uuid"),
-		UserMessageUUIDs: stringSliceField(data, "user_message_uuids"),
-		ResumeReason:     stringField(data, "resume_reason"),
+		Origin:               parseMessageOrigin(data),
+		RequestID:            stringField(data, "request_id"),
+		Result:               stringField(data, "result"),
+		Timestamp:            stringField(data, "timestamp"),
+		UserMessageUUID:      stringField(data, "user_message_uuid"),
+		UserMessageUUIDs:     stringSliceField(data, "user_message_uuids"),
+		ResumeReason:         stringField(data, "resume_reason"),
+		StartupFailureReason: stringField(data, "startup_failure_reason"),
 	}
 
 	if errors, ok := data["errors"].([]any); ok {
