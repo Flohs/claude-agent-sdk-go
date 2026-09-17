@@ -1674,6 +1674,41 @@ func TestParseMessage_ResultMessage_APIErrorStatus_Absent(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_StartupFailureReason(t *testing.T) {
+	data := map[string]any{
+		"type":                   "result",
+		"subtype":                "error",
+		"is_error":               true,
+		"session_id":             "s",
+		"startup_failure_reason": "invalid_mcp_config",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.StartupFailureReason != "invalid_mcp_config" {
+		t.Errorf("StartupFailureReason = %q, want invalid_mcp_config", r.StartupFailureReason)
+	}
+}
+
+func TestParseMessage_ResultMessage_StartupFailureReason_Absent(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.StartupFailureReason != "" {
+		t.Errorf("StartupFailureReason = %q, want empty when absent", r.StartupFailureReason)
+	}
+}
+
 func TestParseMessage_ResultMessage_QueuedTurnCount(t *testing.T) {
 	data := map[string]any{
 		"type":              "result",
