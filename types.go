@@ -1865,6 +1865,29 @@ type ContextUsage struct {
 	UsageByCategory map[string]int `json:"usage_by_category,omitempty"`
 }
 
+// SlashCommand describes one slash command available in the session
+// (user-, project-, plugin- or MCP-server-defined, or built into Claude
+// Code), as returned by [Client.SlashCommands] and [Client.SupportedCommands].
+// Field names mirror the TypeScript SDK's SlashCommand shape verbatim. Port
+// of TypeScript SDK v0.3.277 (Builtin).
+type SlashCommand struct {
+	// Name is the command's name, without the leading slash.
+	Name string `json:"name"`
+	// Description explains what the command does.
+	Description string `json:"description"`
+	// ArgumentHint hints at the command's expected arguments (e.g. "<file>").
+	ArgumentHint string `json:"argumentHint,omitempty"`
+	// Aliases lists alternate names that resolve to this command (e.g. /cost
+	// and /stats both resolving to /usage).
+	Aliases []string `json:"aliases,omitempty"`
+	// Builtin is true when the command is Claude Code's own, and absent for
+	// a command defined by a user, project, plugin or MCP server. Rows can
+	// share a name: when a marked row carries it, running the name invokes
+	// that one; an unmarked row is only picked when no marked row shares its
+	// name. The marker describes the row's name, not its aliases.
+	Builtin bool `json:"builtin,omitempty"`
+}
+
 // PermissionRuleSource identifies where a permission rule entry returned by
 // Client.ListPermissionRules came from.
 type PermissionRuleSource string

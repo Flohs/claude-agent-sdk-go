@@ -54,6 +54,20 @@ type query struct {
 	// e6e07f1 (#1103, fixing #1088).
 	inFlightTasks map[string]struct{}
 
+	// commandsMu guards latestCommands, the slash-command list from the most
+	// recent commands_changed system message (a fire-and-forget push the CLI
+	// sends after a mid-session change, e.g. skills discovered dynamically as
+	// the agent works in a subdirectory — see the handler in readMessages).
+	// Nil until the first such push arrives, in which case
+	// Client.SlashCommands/Client.SupportedCommands fall back to the
+	// initialize response's own "commands" field. Guarded separately from
+	// initializationResult because, unlike that field (written once,
+	// synchronously, before any other goroutine can read it), this one is
+	// written from the readMessages goroutine while a caller may read it
+	// concurrently from another goroutine.
+	commandsMu     sync.Mutex
+	latestCommands []SlashCommand
+
 	// Message channel
 	messageCh chan map[string]any
 
@@ -399,6 +413,23 @@ func (q *query) trackTaskLifecycle(msg map[string]any) {
 	}
 }
 
+// handleCommandsChanged updates q.latestCommands from a commands_changed
+// system message — the CLI's fire-and-forget push of the full slash-command
+// list after a mid-session change (e.g. skills discovered dynamically as the
+// agent works in a subdirectory). A malformed or missing "commands" field is
+// ignored rather than clearing the cache, matching the TypeScript client's
+// guard (Array.isArray(e.commands)) before it replaces this.latestCommands.
+// Port of TypeScript SDK v0.3.277 (SDKCommandsChangedMessage).
+func (q *query) handleCommandsChanged(msg map[string]any) {
+	commands, err := parseSlashCommands(msg["commands"])
+	if err != nil || commands == nil {
+		return
+	}
+	q.commandsMu.Lock()
+	q.latestCommands = commands
+	q.commandsMu.Unlock()
+}
+
 func (q *query) readMessages() {
 	defer q.wg.Done()
 	defer func() {
@@ -510,6 +541,9 @@ func (q *query) readMessages() {
 		// doesn't prematurely close stdin (see inFlightTasks doc comment).
 		if msgType == "system" {
 			q.trackTaskLifecycle(msg)
+			if subtype, _ := msg["subtype"].(string); subtype == "commands_changed" {
+				q.handleCommandsChanged(msg)
+			}
 		}
 
 		// Flush the batcher before yielding each result message so any
@@ -1303,14 +1337,35 @@ func (q *query) supportedAgents() ([]string, error) {
 	return stringSliceFromResponse(resp, "agents")
 }
 
+// slashCommands returns the session's slash-command list. It never issues a
+// control request: the real TypeScript client answers supportedCommands()
+// from this.latestCommands ?? initCommands — the initialize response's own
+// "commands" field, replaced wholesale once a commands_changed push arrives
+// (see handleCommandsChanged) — not a live round trip, so this mirrors that
+// instead of the previous per-call "supported_commands" control request.
+func (q *query) slashCommands() ([]SlashCommand, error) {
+	q.commandsMu.Lock()
+	cached := q.latestCommands
+	q.commandsMu.Unlock()
+	if cached != nil {
+		return cached, nil
+	}
+	if q.initializationResult == nil {
+		return nil, nil
+	}
+	return parseSlashCommands(q.initializationResult["commands"])
+}
+
 func (q *query) supportedCommands() ([]string, error) {
-	resp, err := q.sendControlRequest(map[string]any{
-		"subtype": "supported_commands",
-	}, 60*time.Second)
+	commands, err := q.slashCommands()
 	if err != nil {
 		return nil, err
 	}
-	return stringSliceFromResponse(resp, "commands")
+	names := make([]string, 0, len(commands))
+	for _, c := range commands {
+		names = append(names, c.Name)
+	}
+	return names, nil
 }
 
 func (q *query) promptSuggestion() ([]string, error) {
@@ -1341,6 +1396,30 @@ func (q *query) seedReadState(entries []ReadStateEntry) error {
 		"entries": payload,
 	}, 60*time.Second)
 	return err
+}
+
+// parseSlashCommands decodes a raw "commands" value (from the initialize
+// response or a commands_changed push) into typed SlashCommand values via
+// JSON round-tripping, rather than the lossy string-only extraction
+// stringSliceFromResponse uses for other list-shaped control responses:
+// a non-string element (e.g. the structured objects SlashCommand actually
+// is) would otherwise be silently dropped instead of decoded. Returns nil,
+// nil when raw isn't a JSON array at all (field absent or of an unexpected
+// shape), so callers can distinguish "nothing to parse" from a decode error.
+func parseSlashCommands(raw any) ([]SlashCommand, error) {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil, nil
+	}
+	data, err := json.Marshal(list)
+	if err != nil {
+		return nil, err
+	}
+	var commands []SlashCommand
+	if err := json.Unmarshal(data, &commands); err != nil {
+		return nil, err
+	}
+	return commands, nil
 }
 
 func stringSliceFromResponse(resp map[string]any, key string) ([]string, error) {

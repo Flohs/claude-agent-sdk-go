@@ -484,6 +484,77 @@ func TestReadMessages_InFlightTaskViaTaskUpdatedDelaysMainResultClose(t *testing
 	}
 }
 
+// TestReadMessages_CommandsChangedReplacesLatestCommands drives a
+// commands_changed system message (the CLI's fire-and-forget push of the
+// full slash-command list after a mid-session change, e.g. skills
+// discovered dynamically as the agent works in a subdirectory) through
+// readMessages and verifies q.slashCommands() then returns the pushed list
+// instead of falling back to the initialize response's own "commands"
+// field. A subsequent malformed push (missing "commands") is ignored rather
+// than clearing the cache, mirroring the TypeScript client's
+// Array.isArray(e.commands) guard. Port of TypeScript SDK v0.3.277
+// (SDKCommandsChangedMessage). ([#725])
+func TestReadMessages_CommandsChangedReplacesLatestCommands(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.initializationResult = map[string]any{
+		"commands": []any{
+			map[string]any{"name": "old-command", "description": "stale"},
+		},
+	}
+	q.start()
+	out := q.receiveMessages()
+	// mockTransport.ReadMessages doesn't respect context cancellation (unlike
+	// autoRespondTransport), so q.close() would deadlock here; following the
+	// other plain-mockTransport readMessages tests above, the query is left
+	// running and cleaned up by process exit.
+
+	// Before any push, slashCommands falls back to the initialize response.
+	commands, err := q.slashCommands()
+	if err != nil {
+		t.Fatalf("slashCommands failed: %v", err)
+	}
+	if len(commands) != 1 || commands[0].Name != "old-command" {
+		t.Fatalf("commands = %+v, want [old-command]", commands)
+	}
+
+	mt.messages <- map[string]any{
+		"type": "system", "subtype": "commands_changed",
+		"commands": []any{
+			map[string]any{"name": "new-command", "description": "fresh", "builtin": true},
+		},
+	}
+	select {
+	case <-out:
+	case <-time.After(time.Second):
+		t.Fatal("timed out draining commands_changed message")
+	}
+
+	commands, err = q.slashCommands()
+	if err != nil {
+		t.Fatalf("slashCommands failed: %v", err)
+	}
+	if len(commands) != 1 || commands[0].Name != "new-command" || !commands[0].Builtin {
+		t.Fatalf("commands = %+v, want a single builtin new-command", commands)
+	}
+
+	// A malformed push (no "commands" field) must not clear the cache.
+	mt.messages <- map[string]any{"type": "system", "subtype": "commands_changed"}
+	select {
+	case <-out:
+	case <-time.After(time.Second):
+		t.Fatal("timed out draining malformed commands_changed message")
+	}
+
+	commands, err = q.slashCommands()
+	if err != nil {
+		t.Fatalf("slashCommands failed: %v", err)
+	}
+	if len(commands) != 1 || commands[0].Name != "new-command" {
+		t.Fatalf("commands after malformed push = %+v, want cache unchanged at [new-command]", commands)
+	}
+}
+
 // autoRespondTransport extends mockTransport to automatically respond to control requests.
 // It overrides ReadMessages to respect context cancellation, so query.close() doesn't deadlock.
 type autoRespondTransport struct {
