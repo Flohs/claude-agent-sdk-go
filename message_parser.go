@@ -70,21 +70,40 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		}
 	}
 
-	content := message["content"]
-	switch c := content.(type) {
-	case string:
-		msg.Content = c
-	case []any:
-		blocks, err := parseContentBlocks(c)
-		if err != nil {
-			return nil, err
+	parsedContent, err := parseMessageContentValue(message["content"])
+	if err != nil {
+		return nil, err
+	}
+	msg.Content = parsedContent
+
+	if raw, ok := data["pasted_content"].([]any); ok {
+		pasted := make([]any, 0, len(raw))
+		for _, item := range raw {
+			v, err := parseMessageContentValue(item)
+			if err != nil {
+				return nil, err
+			}
+			pasted = append(pasted, v)
 		}
-		msg.Content = blocks
-	default:
-		msg.Content = fmt.Sprintf("%v", content)
+		msg.PastedContent = pasted
 	}
 
 	return msg, nil
+}
+
+// parseMessageContentValue parses a single MessageParam-shaped content
+// value: a plain string, or a []ContentBlock for a structured array. Used
+// for both UserMessage.Content and each element of UserMessage.PastedContent
+// (TypeScript SDK v0.3.277's `pasted_content?: MessageParam['content'][]`).
+func parseMessageContentValue(content any) (any, error) {
+	switch c := content.(type) {
+	case string:
+		return c, nil
+	case []any:
+		return parseContentBlocks(c)
+	default:
+		return fmt.Sprintf("%v", content), nil
+	}
 }
 
 func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {

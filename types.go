@@ -156,6 +156,12 @@ type UserMessage struct {
 	// cancelled tool call). Nil when the CLI omits the field. Port of
 	// TypeScript SDK v0.3.216.
 	ToolResultMeta *ToolResultMeta `json:"tool_result_meta,omitempty"`
+	// PastedContent holds text the user pasted rather than typed, appended
+	// after the typed prompt. Each element is parsed the same way Content
+	// is (a string, or a []ContentBlock for a structured entry). Nil when
+	// the turn had no pasted content or the CLI omits the field. Port of
+	// TypeScript SDK v0.3.277.
+	PastedContent []any `json:"pasted_content,omitempty"`
 }
 
 func (UserMessage) messageMarker() {}
