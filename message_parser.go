@@ -479,6 +479,36 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		}
 	}
 
+	if v, ok := data["time_origin_ms"]; ok {
+		if ms := int64FromAny(v); ms != 0 {
+			msg.TimeOriginMs = &ms
+		}
+	}
+	if v, ok := data["first_stream_post_wall_ms"]; ok {
+		if ms := int64FromAny(v); ms != 0 {
+			msg.FirstStreamPostWallMs = &ms
+		}
+	}
+	if v, ok := data["first_text_post_wall_ms"]; ok {
+		if ms := int64FromAny(v); ms != 0 {
+			msg.FirstTextPostWallMs = &ms
+		}
+	}
+
+	msg.TTFTMs = optionalIntField(data, "ttft_ms")
+	msg.TTFTStreamMs = optionalIntField(data, "ttft_stream_ms")
+	msg.TimeToRequestMs = optionalIntField(data, "time_to_request_ms")
+	msg.TimeToRequestFromSpawnMs = optionalIntField(data, "time_to_request_from_spawn_ms")
+	msg.FirstContentFrameMs = optionalIntField(data, "first_content_frame_ms")
+	msg.FirstStreamPostMs = optionalIntField(data, "first_stream_post_ms")
+	msg.FirstStreamPostAckMs = optionalIntField(data, "first_stream_post_ack_ms")
+	msg.FirstStreamPostQueueWaitMs = optionalIntField(data, "first_stream_post_queue_wait_ms")
+	msg.FirstTextPostMs = optionalIntField(data, "first_text_post_ms")
+	msg.WarmSpareClaimed = optionalBoolField(data, "warm_spare_claimed")
+	if v := stringField(data, "first_stream_post_queued_behind"); v != "" {
+		msg.FirstStreamPostQueuedBehind = FirstStreamPostQueuedBehind(v)
+	}
+
 	msg.QueuedTurnCount = optionalIntField(data, "queued_turn_count")
 	msg.ResultIndex = optionalIntField(data, "result_index")
 
