@@ -82,6 +82,137 @@ func TestGetServerCapabilities_PopulatesFastModeState(t *testing.T) {
 	}
 }
 
+// TestSlashCommands_ParsesTypedListFromInitializationResult verifies that
+// Client.SlashCommands decodes the initialize handshake's "commands" field
+// into typed SlashCommand values — including a builtin entry, and one that
+// omits every optional field (argumentHint, aliases, builtin) to confirm
+// those don't break parsing. It never issues a control request: the CLI's
+// commands list is sourced from the cached initialize response, mirroring
+// the TypeScript SDK's supportedCommands(). Port of TypeScript SDK v0.3.277
+// (SlashCommand.Builtin). ([#725])
+func TestSlashCommands_ParsesTypedListFromInitializationResult(t *testing.T) {
+	c := &Client{
+		q: &query{
+			initializationResult: map[string]any{
+				"commands": []any{
+					map[string]any{
+						"name":         "usage",
+						"description":  "Show plan usage",
+						"argumentHint": "<period>",
+						"aliases":      []any{"cost", "stats"},
+						"builtin":      true,
+					},
+					map[string]any{
+						"name":        "my-skill",
+						"description": "A user-defined skill",
+					},
+				},
+			},
+		},
+	}
+
+	commands, err := c.SlashCommands(context.Background())
+	if err != nil {
+		t.Fatalf("SlashCommands failed: %v", err)
+	}
+	if len(commands) != 2 {
+		t.Fatalf("len(commands) = %d, want 2: %+v", len(commands), commands)
+	}
+
+	usage := commands[0]
+	if usage.Name != "usage" || usage.Description != "Show plan usage" {
+		t.Errorf("usage = %+v, want name=usage description=%q", usage, "Show plan usage")
+	}
+	if usage.ArgumentHint != "<period>" {
+		t.Errorf("usage.ArgumentHint = %q, want %q", usage.ArgumentHint, "<period>")
+	}
+	if len(usage.Aliases) != 2 || usage.Aliases[0] != "cost" || usage.Aliases[1] != "stats" {
+		t.Errorf("usage.Aliases = %v, want [cost stats]", usage.Aliases)
+	}
+	if !usage.Builtin {
+		t.Error("usage.Builtin = false, want true")
+	}
+
+	skill := commands[1]
+	if skill.Name != "my-skill" || skill.Description != "A user-defined skill" {
+		t.Errorf("skill = %+v, want name=my-skill description=%q", skill, "A user-defined skill")
+	}
+	if skill.ArgumentHint != "" {
+		t.Errorf("skill.ArgumentHint = %q, want empty", skill.ArgumentHint)
+	}
+	if skill.Aliases != nil {
+		t.Errorf("skill.Aliases = %v, want nil", skill.Aliases)
+	}
+	if skill.Builtin {
+		t.Error("skill.Builtin = true, want false")
+	}
+}
+
+// TestSupportedCommands_ReturnsNamesForBackwardCompat verifies that
+// Client.SupportedCommands keeps its pre-existing []string-of-names
+// signature and behavior, deriving the names from the same typed data
+// Client.SlashCommands returns rather than dropping any command whose CLI
+// payload isn't a bare string (the bug this SDK's typed SlashCommand fixes).
+// ([#725])
+func TestSupportedCommands_ReturnsNamesForBackwardCompat(t *testing.T) {
+	c := &Client{
+		q: &query{
+			initializationResult: map[string]any{
+				"commands": []any{
+					map[string]any{"name": "usage", "description": "Show plan usage", "builtin": true},
+					map[string]any{"name": "my-skill", "description": "A user-defined skill"},
+				},
+			},
+		},
+	}
+
+	names, err := c.SupportedCommands(context.Background())
+	if err != nil {
+		t.Fatalf("SupportedCommands failed: %v", err)
+	}
+	want := []string{"usage", "my-skill"}
+	if len(names) != len(want) {
+		t.Fatalf("names = %v, want %v", names, want)
+	}
+	for i, n := range want {
+		if names[i] != n {
+			t.Errorf("names[%d] = %q, want %q", i, names[i], n)
+		}
+	}
+}
+
+// TestSlashCommands_NotConnectedReturnsConnectionError verifies that
+// Client.SlashCommands fails fast with a ConnectionError when called before
+// Connect(), mirroring the nil-query guard used by the other control
+// methods. ([#725])
+func TestSlashCommands_NotConnectedReturnsConnectionError(t *testing.T) {
+	c := &Client{}
+
+	_, err := c.SlashCommands(context.Background())
+	if err == nil {
+		t.Fatal("expected an error when not connected, got nil")
+	}
+	if _, ok := err.(*ConnectionError); !ok {
+		t.Fatalf("expected a *ConnectionError, got %T: %v", err, err)
+	}
+}
+
+// TestSupportedCommands_NotConnectedReturnsConnectionError verifies that
+// Client.SupportedCommands fails fast with a ConnectionError when called
+// before Connect(), mirroring the nil-query guard used by the other control
+// methods (e.g. ReloadPlugins).
+func TestSupportedCommands_NotConnectedReturnsConnectionError(t *testing.T) {
+	c := &Client{}
+
+	_, err := c.SupportedCommands(context.Background())
+	if err == nil {
+		t.Fatal("expected an error when not connected, got nil")
+	}
+	if _, ok := err.(*ConnectionError); !ok {
+		t.Fatalf("expected a *ConnectionError, got %T: %v", err, err)
+	}
+}
+
 // TestReloadOutputStyles_NotConnectedReturnsConnectionError verifies that
 // Client.ReloadOutputStyles fails fast with a ConnectionError when called
 // before Connect(), mirroring the nil-query guard used by the other control

@@ -525,13 +525,32 @@ func (c *Client) SupportedAgents(ctx context.Context) ([]string, error) {
 	return c.q.supportedAgents()
 }
 
-// SupportedCommands returns the list of slash command names available in the
-// session (including plugin-provided commands).
+// SupportedCommands returns the names of the slash commands available in the
+// session (including plugin-provided commands). It never issues a control
+// request: like the TypeScript SDK, it answers from the initialize
+// handshake's own command list, kept fresh by any commands_changed push the
+// CLI sends mid-session (e.g. skills discovered dynamically as the agent
+// works in a subdirectory). Use [Client.SlashCommands] for the full typed
+// list (description, argument hint, aliases, and whether the command is
+// built into Claude Code) this method derives its names from.
 func (c *Client) SupportedCommands(ctx context.Context) ([]string, error) {
 	if c.q == nil {
 		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
 	return c.q.supportedCommands()
+}
+
+// SlashCommands returns the full typed slash-command list available in the
+// session (including plugin-provided commands and, per [SlashCommand]'s
+// Builtin field, which ones are built into Claude Code), the data
+// [Client.SupportedCommands] derives its name-only list from. Like
+// SupportedCommands, it never issues a control request. Port of TypeScript
+// SDK v0.3.277 (SlashCommand.Builtin).
+func (c *Client) SlashCommands(ctx context.Context) ([]SlashCommand, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.slashCommands()
 }
 
 // PromptSuggestion requests prompt suggestions based on the current
