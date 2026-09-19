@@ -61,6 +61,63 @@ func TestParseMessage_UserMessage_StringContent(t *testing.T) {
 	}
 }
 
+func TestParseMessage_UserMessage_PastedContent(t *testing.T) {
+	data := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"content": "typed prompt",
+		},
+		"pasted_content": []any{
+			"pasted text one",
+			[]any{
+				map[string]any{"type": "text", "text": "pasted block"},
+			},
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	user, ok := msg.(*UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+	if len(user.PastedContent) != 2 {
+		t.Fatalf("expected 2 pasted content entries, got %d", len(user.PastedContent))
+	}
+	if s, ok := user.PastedContent[0].(string); !ok || s != "pasted text one" {
+		t.Fatalf("expected first entry to be string 'pasted text one', got %#v", user.PastedContent[0])
+	}
+	blocks, ok := user.PastedContent[1].([]ContentBlock)
+	if !ok || len(blocks) != 1 {
+		t.Fatalf("expected second entry to be []ContentBlock with 1 block, got %#v", user.PastedContent[1])
+	}
+}
+
+func TestParseMessage_UserMessage_PastedContent_Absent(t *testing.T) {
+	data := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"content": "typed prompt",
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	user, ok := msg.(*UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+	if user.PastedContent != nil {
+		t.Fatalf("expected nil PastedContent when absent, got %#v", user.PastedContent)
+	}
+}
+
 func TestParseMessage_UserMessage_IsMeta(t *testing.T) {
 	data := map[string]any{
 		"type": "user",
