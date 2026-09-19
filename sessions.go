@@ -1032,6 +1032,7 @@ func filterTranscriptEntries(entries []SessionStoreEntry) []transcriptEntry {
 // system) messages, and apply offset/limit.
 func entriesToSessionMessages(entries []transcriptEntry, includeSystem bool, limit *int, offset int) []SessionMessage {
 	chain := buildConversationChain(entries)
+	chain = convertQueuedCommandAttachments(chain)
 
 	var visible []transcriptEntry
 	for _, e := range chain {
@@ -1182,6 +1183,264 @@ func buildConversationChain(entries []transcriptEntry) []transcriptEntry {
 		chain[i], chain[j] = chain[j], chain[i]
 	}
 	return chain
+}
+
+// queuedCommandInterruptPrefixes lists the exact synthetic "user"-authored
+// transcript strings the CLI injects when a tool call was interrupted or
+// skipped so a queued message could be delivered instead. A "user" entry
+// whose entire text is one of these (or every content-block item of it)
+// reads as bookkeeping inside an in-progress assistant turn rather than a
+// fresh prompt from the person. Mirrors the TS SDK's internal prefix list
+// (named "o4"/"w4" in the minified v0.3.274/v0.3.275 bundles respectively,
+// byte-identical between them) used by its mid-turn detection.
+var queuedCommandInterruptPrefixes = []string{
+	"[Request interrupted by user]",
+	"[Request interrupted by user for tool use]",
+	"[Tool call did not complete: the turn was ended to deliver the message that follows. Nothing refused it; re-run it if still needed.]",
+	"The user doesn't want to take this action right now. STOP what you are doing and wait for the user to tell you how to proceed.",
+	"[Tool call skipped: the turn ended to deliver the message that follows before this call ran. Nothing refused it; re-run it if still needed.]",
+}
+
+func hasQueuedCommandInterruptPrefix(s string) bool {
+	for _, prefix := range queuedCommandInterruptPrefixes {
+		if strings.HasPrefix(s, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// isToolResultUserEntry reports whether entry is a "user"-typed transcript
+// entry that actually carries a tool_result content block — the shape the
+// CLI uses to feed a tool call's output back into the conversation, as
+// opposed to a fresh prompt from the person. Mirrors TS SDK's "vZ"/"BZ"
+// (byte-identical between v0.3.274 and v0.3.275).
+func isToolResultUserEntry(entry transcriptEntry) bool {
+	if t, _ := entry["type"].(string); t != "user" {
+		return false
+	}
+	if p, ok := entry["parentUuid"].(string); !ok || p == "" {
+		return false
+	}
+	msg, ok := entry["message"].(map[string]any)
+	if !ok {
+		return false
+	}
+	content, ok := msg["content"].([]any)
+	if !ok {
+		return false
+	}
+	for _, item := range content {
+		if block, ok := item.(map[string]any); ok {
+			if bt, _ := block["type"].(string); bt == "tool_result" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isInterruptOrSkipUserEntry reports whether entry is a "user"-typed
+// transcript entry whose entire text (as a plain string, or as every item of
+// a content-block array) is one of queuedCommandInterruptPrefixes. Like
+// isToolResultUserEntry, this shape is bookkeeping inside an ongoing
+// assistant turn, not a real prompt from the person. Mirrors TS SDK's
+// "s4"/"A4" (byte-identical between v0.3.274 and v0.3.275).
+func isInterruptOrSkipUserEntry(entry transcriptEntry) bool {
+	if t, _ := entry["type"].(string); t != "user" {
+		return false
+	}
+	msg, ok := entry["message"].(map[string]any)
+	if !ok {
+		return false
+	}
+	content := msg["content"]
+	if text, ok := content.(string); ok {
+		return hasQueuedCommandInterruptPrefix(text)
+	}
+	items, ok := content.([]any)
+	if !ok || len(items) == 0 {
+		return false
+	}
+	for _, item := range items {
+		block, ok := item.(map[string]any)
+		if !ok {
+			return false
+		}
+		blockType, _ := block["type"].(string)
+		var text string
+		switch blockType {
+		case "text":
+			text, _ = block["text"].(string)
+		case "tool_result":
+			if boolField(block, "is_error") {
+				text, _ = block["content"].(string)
+			}
+		}
+		if text == "" || !hasQueuedCommandInterruptPrefix(text) {
+			return false
+		}
+	}
+	return true
+}
+
+// queuedCommandEligibility computes, for each position in chain (already in
+// chronological/root-to-leaf order, as returned by buildConversationChain),
+// whether a "queued_command" attachment sitting there was injected mid-turn
+// and so should be surfaced as a synthetic user message. Scanning backward,
+// position i is eligible when the nearest later position that settles the
+// question is an assistant reply or one of its "reply" stand-ins
+// (isToolResultUserEntry, isInterruptOrSkipUserEntry) rather than a fresh
+// user prompt — i.e. the attachment sits between a real prompt and the
+// eventual reply that read it, not after that reply or at the very end with
+// nothing addressing it yet. Mirrors TS SDK's "cGe" (v0.3.274) / "MGe"
+// (v0.3.275): the backward-scan logic itself is unchanged between versions —
+// only the gate in convertQueuedCommandAttachment that consumes it changed.
+func queuedCommandEligibility(chain []transcriptEntry) []bool {
+	eligible := make([]bool, len(chain))
+	const (
+		stateNone   = 0
+		stateReply  = 1
+		statePrompt = 2
+	)
+	state := stateNone
+	for i := len(chain) - 1; i >= 0; i-- {
+		eligible[i] = state == stateReply
+		e := chain[i]
+		entryType, _ := e["type"].(string)
+		switch {
+		case entryType == "assistant" || isToolResultUserEntry(e) || isInterruptOrSkipUserEntry(e):
+			state = stateReply
+		case entryType == "user" && !boolField(e, "isMeta") && !boolField(e, "isCompactSummary"):
+			state = statePrompt
+		}
+	}
+	return eligible
+}
+
+// hasValidForwardedIntent reports whether a queued_command attachment's
+// forwardedIntent field is well-formed (an object with a non-empty
+// "lineage" string). TS SDK skips the synthetic-message conversion entirely
+// for these — a forwarded command is surfaced through a different mechanism
+// — mirroring "K3"/"lZ" (byte-identical between v0.3.274 and v0.3.275).
+func hasValidForwardedIntent(v any) bool {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return false
+	}
+	lineage, ok := m["lineage"].(string)
+	return ok && lineage != ""
+}
+
+// convertQueuedCommandAttachment turns a "queued_command"-shaped
+// "attachment" transcript entry into a synthetic, visible "user" message
+// when eligible is true — i.e. a message the person sent while an earlier
+// tool call was still running, which Claude read once that call settled.
+// Every other entry (including an ineligible or non-"queued_command"
+// attachment) is returned completely unchanged.
+//
+// This ports the conversion pass TS SDK v0.3.275 loosened, per its
+// CHANGELOG ("Fixed getSessionMessages() omitting a message the user sent
+// while Claude was running a tool; it now comes back as a user message
+// where Claude read it"): v0.3.274's equivalent ("lGe") additionally
+// required attachment.commandMode==="prompt" and an origin shaped like
+// {kind:"human"} or {kind:"auto-continuation"}; v0.3.275's ("FGe") dropped
+// both of those, accepting any commandMode and any origin shape, and marks
+// the result with isQueuedCommand. This function follows v0.3.275.
+//
+// seenUUIDs is the running set of uuids already used by the chain (plus any
+// added by earlier conversions in this same pass), so a synthetic message's
+// id — normally the attachment's own uuid, or its source_uuid when present —
+// never collides with something already there; on collision the entry is
+// left unconverted, same as upstream.
+func convertQueuedCommandAttachment(entry transcriptEntry, eligible bool, seenUUIDs map[string]bool) transcriptEntry {
+	if !eligible {
+		return entry
+	}
+	if t, _ := entry["type"].(string); t != "attachment" {
+		return entry
+	}
+	attachment, ok := entry["attachment"].(map[string]any)
+	if !ok {
+		return entry
+	}
+	if t, _ := attachment["type"].(string); t != "queued_command" {
+		return entry
+	}
+	if boolField(attachment, "isMeta") {
+		return entry
+	}
+	if hasValidForwardedIntent(attachment["forwardedIntent"]) {
+		return entry
+	}
+	prompt := attachment["prompt"]
+	promptStr, isStr := prompt.(string)
+	promptArr, isArr := prompt.([]any)
+	if !isStr && !isArr {
+		return entry
+	}
+
+	origUUID, _ := entry["uuid"].(string)
+	uuid := origUUID
+	if su, ok := attachment["source_uuid"].(string); ok && su != "" {
+		uuid = su
+	}
+	if uuid != origUUID && seenUUIDs[uuid] {
+		return entry
+	}
+	seenUUIDs[uuid] = true
+
+	var content any
+	if isStr {
+		content = promptStr
+	} else {
+		content = promptArr
+	}
+
+	return transcriptEntry{
+		"type":            "user",
+		"uuid":            uuid,
+		"parentUuid":      entry["parentUuid"],
+		"sessionId":       entry["sessionId"],
+		"timestamp":       entry["timestamp"],
+		"message":         map[string]any{"role": "user", "content": content},
+		"isMeta":          false,
+		"isQueuedCommand": true,
+		"isSidechain":     entry["isSidechain"],
+		"teamName":        entry["teamName"],
+	}
+}
+
+// convertQueuedCommandAttachments applies convertQueuedCommandAttachment
+// across an already-built conversation chain (see buildConversationChain),
+// turning eligible "queued_command" attachments into visible synthetic user
+// messages before the isVisibleMessage filter runs. This is the fix for
+// issue #722: without it, a walked-in "attachment" entry is always dropped
+// by isVisibleMessage, which only accepts "user"/"assistant" types, so a
+// message sent while a tool was running was silently lost even though it
+// was right there on the picked conversation chain.
+//
+// It leaves every other entry untouched — including an attachment that
+// isn't eligible, isn't "queued_command"-shaped, or that sits on a branch
+// buildConversationChain never walked in the first place (an abandoned edit
+// fork, a sidechain) — so it cannot resurrect anything the single-best-leaf
+// pick and parent-chain walk-back intentionally left out.
+func convertQueuedCommandAttachments(chain []transcriptEntry) []transcriptEntry {
+	if len(chain) == 0 {
+		return chain
+	}
+	eligible := queuedCommandEligibility(chain)
+	seenUUIDs := make(map[string]bool, len(chain))
+	for _, e := range chain {
+		if uuid, ok := e["uuid"].(string); ok {
+			seenUUIDs[uuid] = true
+		}
+	}
+	converted := make([]transcriptEntry, len(chain))
+	for i, e := range chain {
+		converted[i] = convertQueuedCommandAttachment(e, eligible[i], seenUUIDs)
+	}
+	return converted
 }
 
 func isVisibleMessage(entry transcriptEntry) bool {

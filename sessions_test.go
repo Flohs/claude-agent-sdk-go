@@ -1529,6 +1529,221 @@ func TestGetSessionMessages_OnlyProgressEntries(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Queued-command attachment tests (issue #722 / TS SDK v0.3.275)
+// ---------------------------------------------------------------------------
+
+// makeToolResultUserLine creates a "user"-typed transcript line carrying a
+// tool_result content block — the shape the CLI uses to feed a tool call's
+// output back into the conversation, as opposed to a fresh user prompt.
+func makeToolResultUserLine(uuid, parentUUID string, extra ...map[string]any) string {
+	m := map[string]any{
+		"type":       "user",
+		"uuid":       uuid,
+		"parentUuid": parentUUID,
+		"message": map[string]any{
+			"content": []any{
+				map[string]any{"type": "tool_result", "tool_use_id": "tool-1", "content": "done"},
+			},
+		},
+	}
+	for _, e := range extra {
+		for k, v := range e {
+			m[k] = v
+		}
+	}
+	return makeSessionLine(m)
+}
+
+// makeQueuedCommandAttachmentLine creates an "attachment" transcript line
+// shaped like a command the person sent while a tool call was still
+// running — the shape GetSessionMessages must surface as a synthetic user
+// message once that call settles (issue #722).
+func makeQueuedCommandAttachmentLine(uuid, parentUUID, prompt string, extra ...map[string]any) string {
+	m := map[string]any{
+		"type":       "attachment",
+		"uuid":       uuid,
+		"parentUuid": parentUUID,
+		"attachment": map[string]any{
+			"type":        "queued_command",
+			"commandMode": "prompt",
+			"prompt":      prompt,
+		},
+	}
+	for _, e := range extra {
+		for k, v := range e {
+			m[k] = v
+		}
+	}
+	return makeSessionLine(m)
+}
+
+func TestGetSessionMessages_QueuedCommandAttachmentSurfacedMidTool(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/queued-command")
+
+	// u1 -> a1 (tool_use) -> tr1 (tool_result) -> att1 (queued command sent
+	// while a1's tool call was running) -> a2 (assistant reads it and
+	// replies). att1 must come back as a visible synthetic user message,
+	// in place, instead of being silently dropped.
+	content := strings.Join([]string{
+		makeUserLine("u1", "", "Run the build"),
+		makeAssistantLine("a1", "u1", "Running the build tool..."),
+		makeToolResultUserLine("tr1", "a1"),
+		makeQueuedCommandAttachmentLine("att1", "tr1", "Also run the linter"),
+		makeAssistantLine("a2", "att1", "Build finished; running the linter now."),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, testUUID1, content)
+
+	messages, err := GetSessionMessages(testUUID1, GetSessionMessagesOptions{
+		Directory: "/test/queued-command",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []string
+	for _, m := range messages {
+		got = append(got, m.UUID)
+	}
+	expected := []string{"u1", "a1", "tr1", "att1", "a2"}
+	if len(got) != len(expected) {
+		t.Fatalf("expected message UUIDs %v, got %v", expected, got)
+	}
+	for i := range expected {
+		if got[i] != expected[i] {
+			t.Fatalf("expected message UUIDs %v, got %v", expected, got)
+		}
+	}
+
+	queued := messages[3]
+	if queued.Type != "user" {
+		t.Errorf("expected queued-command message type 'user', got %q", queued.Type)
+	}
+	msg, ok := queued.Message.(map[string]any)
+	if !ok {
+		t.Fatalf("expected queued-command message to be a map, got %T", queued.Message)
+	}
+	if msg["content"] != "Also run the linter" {
+		t.Errorf("expected queued-command content %q, got %v", "Also run the linter", msg["content"])
+	}
+}
+
+func TestGetSessionMessages_QueuedCommandAttachmentSupersededStaysHidden(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/queued-command-superseded")
+
+	// The queued command (att1) is never addressed: the person instead sent
+	// an unrelated fresh prompt (u3) before any reply read it, so scanning
+	// backward from the final reply (a3), the nearest state-setting event
+	// before att1 is u3's fresh "prompt", not a "reply" — att1 is not
+	// eligible and must stay hidden, exactly as before this fix.
+	content := strings.Join([]string{
+		makeUserLine("u1", "", "Run the build"),
+		makeAssistantLine("a1", "u1", "Running the build tool..."),
+		makeToolResultUserLine("tr1", "a1"),
+		makeQueuedCommandAttachmentLine("att1", "tr1", "Also run the linter"),
+		makeUserLine("u3", "att1", "Actually, forget it — do something else"),
+		makeAssistantLine("a3", "u3", "Sure, doing something else."),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, testUUID1, content)
+
+	messages, err := GetSessionMessages(testUUID1, GetSessionMessagesOptions{
+		Directory: "/test/queued-command-superseded",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []string
+	for _, m := range messages {
+		got = append(got, m.UUID)
+		if m.UUID == "att1" {
+			t.Error("superseded queued-command attachment should stay hidden")
+		}
+	}
+	expected := []string{"u1", "a1", "tr1", "u3", "a3"}
+	if len(got) != len(expected) {
+		t.Fatalf("expected message UUIDs %v, got %v", expected, got)
+	}
+	for i := range expected {
+		if got[i] != expected[i] {
+			t.Fatalf("expected message UUIDs %v, got %v", expected, got)
+		}
+	}
+}
+
+func TestGetSessionMessages_NonQueuedCommandAttachmentStaysHidden(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/plain-attachment")
+
+	// An ordinary (non-"queued_command") attachment must never be converted,
+	// regardless of its position relative to a later reply.
+	content := strings.Join([]string{
+		makeUserLine("u1", "", "Here is a file"),
+		makeSessionLine(map[string]any{
+			"type":       "attachment",
+			"uuid":       "at1",
+			"parentUuid": "u1",
+			"attachment": map[string]any{"type": "file", "path": "/tmp/foo.txt"},
+		}),
+		makeAssistantLine("a1", "at1", "Got it"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, testUUID1, content)
+
+	messages, err := GetSessionMessages(testUUID1, GetSessionMessagesOptions{
+		Directory: "/test/plain-attachment",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 visible messages (u1, a1), got %d: %v", len(messages), messages)
+	}
+	for _, m := range messages {
+		if m.UUID == "at1" {
+			t.Error("non-queued_command attachment should stay hidden")
+		}
+	}
+}
+
+func TestGetSessionMessages_QueuedCommandInSidechainNotResurrected(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/queued-command-sidechain")
+
+	// A queued_command attachment sitting on an abandoned/sidechain branch
+	// must never be surfaced: buildConversationChain's single-best-leaf pick
+	// never walks that branch in the first place (it isn't sidechain/team/
+	// meta-filtered ancestry of the picked main leaf), so the new conversion
+	// pass never even sees it. This guards against the exact regression the
+	// original issue warned about: a loosened gate resurrecting an
+	// abandoned branch instead of just a genuine queued command.
+	content := strings.Join([]string{
+		makeUserLine("u1", "", "Root question"),
+		makeAssistantLine("a1", "u1", "Root answer"),
+		makeSessionLine(map[string]any{
+			"type": "user", "uuid": "sc-u1", "parentUuid": "a1", "isSidechain": true,
+			"message": map[string]any{"content": "side"},
+		}),
+		makeAssistantLine("sc-a1", "sc-u1", "side reply", map[string]any{"isSidechain": true}),
+		makeToolResultUserLine("sc-tr1", "sc-a1", map[string]any{"isSidechain": true}),
+		makeQueuedCommandAttachmentLine("sc-att1", "sc-tr1", "Sidechain queued command", map[string]any{"isSidechain": true}),
+		makeAssistantLine("sc-a2", "sc-att1", "Sidechain final reply", map[string]any{"isSidechain": true}),
+		// Main branch continues.
+		makeUserLine("u2", "a1", "Follow up"),
+		makeAssistantLine("a2", "u2", "Follow up answer"),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, testUUID1, content)
+
+	messages, err := GetSessionMessages(testUUID1, GetSessionMessagesOptions{
+		Directory: "/test/queued-command-sidechain",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range messages {
+		if strings.HasPrefix(m.UUID, "sc-") {
+			t.Errorf("sidechain queued-command message %q should not be resurrected", m.UUID)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // readSessionLite tests
 // ---------------------------------------------------------------------------
 
