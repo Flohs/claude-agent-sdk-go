@@ -1940,6 +1940,147 @@ func TestParseMessage_ResultMessage_UserMessageUUIDAndRequestSentWallMs_Absent(t
 	}
 }
 
+func TestParseMessage_ResultMessage_TimingFields(t *testing.T) {
+	// Covers every timing/latency field added for issue #727, present.
+	data := map[string]any{
+		"type":                            "result",
+		"subtype":                         "success",
+		"is_error":                        false,
+		"session_id":                      "s",
+		"ttft_ms":                         float64(120),
+		"ttft_stream_ms":                  float64(150),
+		"time_to_request_ms":              float64(5),
+		"time_to_request_from_spawn_ms":   float64(300),
+		"time_origin_ms":                  float64(1700000000000),
+		"first_content_frame_ms":          float64(200),
+		"first_stream_post_ms":            float64(210),
+		"first_stream_post_ack_ms":        float64(220),
+		"first_stream_post_queue_wait_ms": float64(10),
+		"first_stream_post_queued_behind": "retry_backoff",
+		"first_stream_post_wall_ms":       float64(1700000000210),
+		"first_text_post_ms":              float64(230),
+		"first_text_post_wall_ms":         float64(1700000000230),
+		"warm_spare_claimed":              true,
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+
+	intChecks := []struct {
+		name string
+		got  *int
+		want int
+	}{
+		{"TTFTMs", r.TTFTMs, 120},
+		{"TTFTStreamMs", r.TTFTStreamMs, 150},
+		{"TimeToRequestMs", r.TimeToRequestMs, 5},
+		{"TimeToRequestFromSpawnMs", r.TimeToRequestFromSpawnMs, 300},
+		{"FirstContentFrameMs", r.FirstContentFrameMs, 200},
+		{"FirstStreamPostMs", r.FirstStreamPostMs, 210},
+		{"FirstStreamPostAckMs", r.FirstStreamPostAckMs, 220},
+		{"FirstStreamPostQueueWaitMs", r.FirstStreamPostQueueWaitMs, 10},
+		{"FirstTextPostMs", r.FirstTextPostMs, 230},
+	}
+	for _, c := range intChecks {
+		if c.got == nil {
+			t.Errorf("%s is nil, want %d", c.name, c.want)
+			continue
+		}
+		if *c.got != c.want {
+			t.Errorf("%s = %d, want %d", c.name, *c.got, c.want)
+		}
+	}
+
+	int64Checks := []struct {
+		name string
+		got  *int64
+		want int64
+	}{
+		{"TimeOriginMs", r.TimeOriginMs, 1700000000000},
+		{"FirstStreamPostWallMs", r.FirstStreamPostWallMs, 1700000000210},
+		{"FirstTextPostWallMs", r.FirstTextPostWallMs, 1700000000230},
+	}
+	for _, c := range int64Checks {
+		if c.got == nil {
+			t.Errorf("%s is nil, want %d", c.name, c.want)
+			continue
+		}
+		if *c.got != c.want {
+			t.Errorf("%s = %d, want %d", c.name, *c.got, c.want)
+		}
+	}
+
+	if r.FirstStreamPostQueuedBehind != FirstStreamPostQueuedBehindRetryBackoff {
+		t.Errorf("FirstStreamPostQueuedBehind = %q, want %q", r.FirstStreamPostQueuedBehind, FirstStreamPostQueuedBehindRetryBackoff)
+	}
+	if r.WarmSpareClaimed == nil {
+		t.Fatal("WarmSpareClaimed is nil, want a present true")
+	}
+	if !*r.WarmSpareClaimed {
+		t.Error("*WarmSpareClaimed = false, want true")
+	}
+}
+
+func TestParseMessage_ResultMessage_TimingFields_Absent(t *testing.T) {
+	// Non-success subtypes (and older CLIs) omit these fields; they stay nil.
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "error_max_turns",
+		"is_error":   true,
+		"session_id": "s",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+
+	if r.TTFTMs != nil {
+		t.Errorf("TTFTMs = %v, want nil when absent", *r.TTFTMs)
+	}
+	if r.TTFTStreamMs != nil {
+		t.Errorf("TTFTStreamMs = %v, want nil when absent", *r.TTFTStreamMs)
+	}
+	if r.TimeToRequestMs != nil {
+		t.Errorf("TimeToRequestMs = %v, want nil when absent", *r.TimeToRequestMs)
+	}
+	if r.TimeToRequestFromSpawnMs != nil {
+		t.Errorf("TimeToRequestFromSpawnMs = %v, want nil when absent", *r.TimeToRequestFromSpawnMs)
+	}
+	if r.TimeOriginMs != nil {
+		t.Errorf("TimeOriginMs = %v, want nil when absent", *r.TimeOriginMs)
+	}
+	if r.FirstContentFrameMs != nil {
+		t.Errorf("FirstContentFrameMs = %v, want nil when absent", *r.FirstContentFrameMs)
+	}
+	if r.FirstStreamPostMs != nil {
+		t.Errorf("FirstStreamPostMs = %v, want nil when absent", *r.FirstStreamPostMs)
+	}
+	if r.FirstStreamPostAckMs != nil {
+		t.Errorf("FirstStreamPostAckMs = %v, want nil when absent", *r.FirstStreamPostAckMs)
+	}
+	if r.FirstStreamPostQueueWaitMs != nil {
+		t.Errorf("FirstStreamPostQueueWaitMs = %v, want nil when absent", *r.FirstStreamPostQueueWaitMs)
+	}
+	if r.FirstStreamPostQueuedBehind != "" {
+		t.Errorf("FirstStreamPostQueuedBehind = %q, want empty when absent", r.FirstStreamPostQueuedBehind)
+	}
+	if r.FirstStreamPostWallMs != nil {
+		t.Errorf("FirstStreamPostWallMs = %v, want nil when absent", *r.FirstStreamPostWallMs)
+	}
+	if r.FirstTextPostMs != nil {
+		t.Errorf("FirstTextPostMs = %v, want nil when absent", *r.FirstTextPostMs)
+	}
+	if r.FirstTextPostWallMs != nil {
+		t.Errorf("FirstTextPostWallMs = %v, want nil when absent", *r.FirstTextPostWallMs)
+	}
+	if r.WarmSpareClaimed != nil {
+		t.Errorf("WarmSpareClaimed = %v, want nil when absent", *r.WarmSpareClaimed)
+	}
+}
+
 func TestParseMessage_ResultMessage_UserMessageUUIDs(t *testing.T) {
 	data := map[string]any{
 		"type":               "result",

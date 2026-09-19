@@ -1196,6 +1196,23 @@ const (
 	FastModeDisabledReasonPending FastModeDisabledReason = "pending"
 )
 
+// FirstStreamPostQueuedBehind identifies what ResultMessage's first remote-
+// session stream post was queued behind. Port of TypeScript SDK v0.3.277.
+type FirstStreamPostQueuedBehind string
+
+const (
+	// FirstStreamPostQueuedBehindDurablePost means the post waited behind a durable post.
+	FirstStreamPostQueuedBehindDurablePost FirstStreamPostQueuedBehind = "durable_post"
+	// FirstStreamPostQueuedBehindEphemeralPost means the post waited behind an ephemeral post.
+	FirstStreamPostQueuedBehindEphemeralPost FirstStreamPostQueuedBehind = "ephemeral_post"
+	// FirstStreamPostQueuedBehindRetryBackoff means the post waited behind a retry backoff.
+	FirstStreamPostQueuedBehindRetryBackoff FirstStreamPostQueuedBehind = "retry_backoff"
+	// FirstStreamPostQueuedBehindHold means the post waited behind a hold.
+	FirstStreamPostQueuedBehindHold FirstStreamPostQueuedBehind = "hold"
+	// FirstStreamPostQueuedBehindNone means the post was not queued behind anything.
+	FirstStreamPostQueuedBehindNone FirstStreamPostQueuedBehind = "none"
+)
+
 // ModelFallbackMessage is emitted when the CLI falls back to a different model.
 // Received for all fallback triggers: model_not_found, permission_denied,
 // overloaded, server_error, and last_resort. Port of TypeScript SDK v0.3.174.
@@ -1555,6 +1572,67 @@ type ResultMessage struct {
 	// sent, for cross-host request-latency correlation. Nil when not
 	// provided by the CLI.
 	RequestSentWallMs *int64 `json:"request_sent_wall_ms,omitempty"`
+	// TTFTMs is the time to first token in milliseconds: how long the main
+	// model call took, from request start, until the first token of its
+	// response arrived. Nil when not provided by the CLI. Already present by
+	// TypeScript SDK v0.3.274 (the version it was introduced in was not
+	// pinned down further).
+	TTFTMs *int `json:"ttft_ms,omitempty"`
+	// TTFTStreamMs is the time to first token in milliseconds as measured on
+	// the streaming transport layer, distinct from TTFTMs's model-call
+	// framing. Nil when not provided by the CLI. Already present by
+	// TypeScript SDK v0.3.274.
+	TTFTStreamMs *int `json:"ttft_stream_ms,omitempty"`
+	// TimeToRequestMs is the elapsed milliseconds from turn start until the
+	// outbound API request was sent. Nil when not provided by the CLI.
+	// Already present by TypeScript SDK v0.3.274.
+	TimeToRequestMs *int `json:"time_to_request_ms,omitempty"`
+	// TimeToRequestFromSpawnMs is the elapsed milliseconds from process/worker
+	// spawn until the outbound API request was sent, so it includes CLI
+	// startup overhead that TimeToRequestMs excludes. Nil when not provided
+	// by the CLI. Already present by TypeScript SDK v0.3.274.
+	TimeToRequestFromSpawnMs *int `json:"time_to_request_from_spawn_ms,omitempty"`
+	// TimeOriginMs is the wall-clock timestamp (ms since epoch) that the
+	// other *Ms latency fields on this result are measured relative to. Nil
+	// when not provided by the CLI. Already present by TypeScript SDK
+	// v0.3.274.
+	TimeOriginMs *int64 `json:"time_origin_ms,omitempty"`
+	// FirstContentFrameMs is the elapsed milliseconds until the first content
+	// frame of the response was received. Nil when not provided by the CLI.
+	// Already present by TypeScript SDK v0.3.274.
+	FirstContentFrameMs *int `json:"first_content_frame_ms,omitempty"`
+	// FirstStreamPostMs is the elapsed milliseconds until the first frame was
+	// posted to the remote-session stream. Nil when not provided by the CLI.
+	// Already present by TypeScript SDK v0.3.274.
+	FirstStreamPostMs *int `json:"first_stream_post_ms,omitempty"`
+	// FirstStreamPostAckMs is the elapsed milliseconds until that first
+	// stream post was acknowledged by the remote endpoint. Nil when not
+	// provided by the CLI. Already present by TypeScript SDK v0.3.274.
+	FirstStreamPostAckMs *int `json:"first_stream_post_ack_ms,omitempty"`
+	// FirstStreamPostQueueWaitMs is the milliseconds the first stream post
+	// spent waiting in the send queue before it went out. Nil when not
+	// provided by the CLI. Port of TypeScript SDK v0.3.277.
+	FirstStreamPostQueueWaitMs *int `json:"first_stream_post_queue_wait_ms,omitempty"`
+	// FirstStreamPostQueuedBehind identifies what the first stream post was
+	// queued behind. Empty when not provided by the CLI. Port of TypeScript
+	// SDK v0.3.277.
+	FirstStreamPostQueuedBehind FirstStreamPostQueuedBehind `json:"first_stream_post_queued_behind,omitempty"`
+	// FirstStreamPostWallMs is the wall-clock timestamp (ms since epoch) when
+	// the first stream post was sent. Nil when not provided by the CLI.
+	// Already present by TypeScript SDK v0.3.274.
+	FirstStreamPostWallMs *int64 `json:"first_stream_post_wall_ms,omitempty"`
+	// FirstTextPostMs is the elapsed milliseconds until the first
+	// text-bearing post was sent to the remote-session stream. Nil when not
+	// provided by the CLI. Port of TypeScript SDK v0.3.277.
+	FirstTextPostMs *int `json:"first_text_post_ms,omitempty"`
+	// FirstTextPostWallMs is the wall-clock timestamp (ms since epoch) when
+	// that first text post was sent. Nil when not provided by the CLI. Port
+	// of TypeScript SDK v0.3.277.
+	FirstTextPostWallMs *int64 `json:"first_text_post_wall_ms,omitempty"`
+	// WarmSpareClaimed reports whether this turn was served by a pre-warmed
+	// spare worker rather than one spawned fresh for the request. Nil when
+	// not provided by the CLI. Already present by TypeScript SDK v0.3.274.
+	WarmSpareClaimed *bool `json:"warm_spare_claimed,omitempty"`
 	// QueuedTurnCount is the number of user sends still queued when this
 	// result was produced. Nil when not provided by the CLI; 0 is a
 	// meaningful value (nothing queued), distinct from absent.
