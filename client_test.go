@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -265,5 +266,96 @@ func TestSetPermissionMode_RejectsInvalidModeWithoutSendingRequest(t *testing.T)
 	mt.mu.Unlock()
 	if written != 0 {
 		t.Errorf("expected no control request to be written, got %d write(s): %v", written, mt.written)
+	}
+}
+
+// lastWrittenMessage decodes the most recent line mt has recorded as a JSON
+// object, for asserting on an outgoing user message's shape.
+func lastWrittenMessage(t *testing.T, mt *mockTransport) map[string]any {
+	t.Helper()
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+	if len(mt.written) == 0 {
+		t.Fatal("expected at least one write, got none")
+	}
+	var msg map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(mt.written[len(mt.written)-1])), &msg); err != nil {
+		t.Fatalf("failed to unmarshal written message: %v", err)
+	}
+	return msg
+}
+
+// TestSendQueryWithContent_VerbatimPrompts verifies that Options.VerbatimPrompts
+// stamps "client_composed": true on the outgoing user message and delivers a
+// slash-prefixed string prompt without escapeSlashCommand's leading-space
+// workaround. Port of Python SDK v0.2.157 (anthropics/claude-agent-sdk-python#1269).
+func TestSendQueryWithContent_VerbatimPrompts(t *testing.T) {
+	mt := newMockTransport()
+	c := &Client{
+		options:   &Options{VerbatimPrompts: true},
+		transport: mt,
+		q:         newQuery(queryConfig{transport: mt}),
+	}
+
+	if err := c.SendQueryWithContent(context.Background(), "/ add tests"); err != nil {
+		t.Fatalf("SendQueryWithContent failed: %v", err)
+	}
+
+	msg := lastWrittenMessage(t, mt)
+	if msg["client_composed"] != true {
+		t.Errorf("expected client_composed: true, got %v", msg["client_composed"])
+	}
+	inner, _ := msg["message"].(map[string]any)
+	if inner["content"] != "/ add tests" {
+		t.Errorf("expected verbatim content %q (no escapeSlashCommand), got %v", "/ add tests", inner["content"])
+	}
+}
+
+// TestSendQueryWithContent_VerbatimPromptsDefaultOff verifies that the
+// default (VerbatimPrompts unset) leaves the message unstamped and still
+// applies the escapeSlashCommand workaround, matching pre-existing behavior.
+func TestSendQueryWithContent_VerbatimPromptsDefaultOff(t *testing.T) {
+	mt := newMockTransport()
+	c := &Client{
+		options:   &Options{},
+		transport: mt,
+		q:         newQuery(queryConfig{transport: mt}),
+	}
+
+	if err := c.SendQueryWithContent(context.Background(), "/ add tests"); err != nil {
+		t.Fatalf("SendQueryWithContent failed: %v", err)
+	}
+
+	msg := lastWrittenMessage(t, mt)
+	if _, ok := msg["client_composed"]; ok {
+		t.Errorf("expected no client_composed key, got %v", msg)
+	}
+	inner, _ := msg["message"].(map[string]any)
+	if inner["content"] != " / add tests" {
+		t.Errorf("expected escapeSlashCommand-escaped content %q, got %v", " / add tests", inner["content"])
+	}
+}
+
+// TestAppendMessage_VerbatimPrompts verifies that Options.VerbatimPrompts
+// also stamps "client_composed": true on a context-injection message sent
+// via AppendMessage.
+func TestAppendMessage_VerbatimPrompts(t *testing.T) {
+	mt := newMockTransport()
+	c := &Client{
+		options:   &Options{VerbatimPrompts: true},
+		transport: mt,
+		q:         newQuery(queryConfig{transport: mt}),
+	}
+
+	if err := c.AppendMessage(context.Background(), "some tool result text"); err != nil {
+		t.Fatalf("AppendMessage failed: %v", err)
+	}
+
+	msg := lastWrittenMessage(t, mt)
+	if msg["client_composed"] != true {
+		t.Errorf("expected client_composed: true, got %v", msg["client_composed"])
+	}
+	if msg["shouldQuery"] != false {
+		t.Errorf("expected shouldQuery: false to be preserved, got %v", msg["shouldQuery"])
 	}
 }

@@ -206,7 +206,7 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	}
 
 	if os.Getenv("CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK") == "" {
-		checkClaudeVersion(t.cliPath)
+		checkClaudeVersion(t.cliPath, t.options)
 	}
 
 	args := t.buildCommand()
@@ -1159,7 +1159,13 @@ func rejectWindowsCmdMetacharactersForGOOS(goos, optionName, value string) error
 
 var versionRegexp = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+)`)
 
-func checkClaudeVersion(cliPath string) {
+// verbatimPromptsMinimumClaudeCodeVersion is the first Claude Code CLI
+// version that recognizes "client_composed" on an outgoing user message.
+// Older CLIs ignore the field, so prompts sent with Options.VerbatimPrompts
+// are still expanded there.
+const verbatimPromptsMinimumClaudeCodeVersion = "2.1.248"
+
+func checkClaudeVersion(cliPath string, opts *Options) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -1179,6 +1185,14 @@ func checkClaudeVersion(cliPath string) {
 			"Warning: Claude Code version %s is unsupported in the Agent SDK. "+
 				"Minimum required version is %s. Some features may not work correctly.\n",
 			version, minimumClaudeCodeVersion)
+	}
+
+	if opts != nil && opts.VerbatimPrompts && compareVersions(version, verbatimPromptsMinimumClaudeCodeVersion) < 0 {
+		fmt.Fprintf(os.Stderr,
+			"Warning: VerbatimPrompts is enabled, but Claude Code version %s ignores it: "+
+				"prompts will still have @path mentions expanded and slash commands dispatched. "+
+				"Claude Code %s or later is required.\n",
+			version, verbatimPromptsMinimumClaudeCodeVersion)
 	}
 }
 

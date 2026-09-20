@@ -781,6 +781,25 @@ type Options struct {
 	// nested transcript. Matches the TypeScript SDK's forwardSubagentText.
 	// Port of Python SDK commit c97420c (anthropics/claude-agent-sdk-python#1206).
 	ForwardSubagentText bool
+	// VerbatimPrompts, when true, marks every outgoing user message (a string
+	// prompt or a message from a streamed prompt, including AppendMessage)
+	// "client_composed" so Claude Code delivers the text exactly as given: no
+	// "@path" file-mention expansion and no slash-command dispatch. Use this
+	// when the prompt text is assembled from content the end user did not
+	// type (prior turns, tool results, third-party text), so a stray
+	// "@/absolute/path" inside it cannot make Claude Code read a local file.
+	//
+	// On current Claude Code versions a turn delivered this way also skips
+	// the turn-start attachment pass as a whole: "@server:resource" MCP
+	// mentions are not expanded either, and the prompt is sent without the
+	// context Claude Code normally attaches alongside it (nested CLAUDE.md
+	// and rules files, skill and tool listings, other per-turn reminders).
+	// The pass Claude Code runs between tool calls is unaffected.
+	//
+	// Requires Claude Code 2.1.248 or later; older versions ignore the
+	// field, so prompts are still expanded there and a warning is logged.
+	// Port of Python SDK v0.2.157 (anthropics/claude-agent-sdk-python#1269).
+	VerbatimPrompts bool
 	// ForkSession forks resumed sessions to a new session ID.
 	ForkSession bool
 	// Agents defines custom agent configurations.
