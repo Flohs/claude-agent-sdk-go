@@ -179,19 +179,21 @@ func (c *Client) SendQueryWithContent(ctx context.Context, content any) error {
 
 	switch v := content.(type) {
 	case string:
-		content = escapeSlashCommand(v)
+		if !c.options.VerbatimPrompts {
+			content = escapeSlashCommand(v)
+		}
 	case []any:
 		// ok
 	default:
 		return &SDKError{Message: fmt.Sprintf("content must be a string or []any, got %T", content)}
 	}
 
-	message := map[string]any{
+	message := stampUserMessage(map[string]any{
 		"type":               "user",
 		"message":            map[string]any{"role": "user", "content": content},
 		"parent_tool_use_id": nil,
 		"session_id":         "default",
-	}
+	}, c.options.VerbatimPrompts)
 
 	data, _ := json.Marshal(message)
 	return c.transport.Write(string(data) + "\n")
@@ -223,13 +225,13 @@ func (c *Client) AppendMessage(ctx context.Context, content any) error {
 		return &SDKError{Message: fmt.Sprintf("content must be a string or []any, got %T", content)}
 	}
 
-	message := map[string]any{
+	message := stampUserMessage(map[string]any{
 		"type":               "user",
 		"message":            map[string]any{"role": "user", "content": content},
 		"parent_tool_use_id": nil,
 		"session_id":         "default",
 		"shouldQuery":        false,
-	}
+	}, c.options.VerbatimPrompts)
 
 	data, _ := json.Marshal(message)
 	return c.transport.Write(string(data) + "\n")

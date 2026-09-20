@@ -55,6 +55,19 @@ func escapeSlashCommand(s string) string {
 	return s
 }
 
+// stampUserMessage applies Options.VerbatimPrompts to an outgoing user
+// message envelope, forcing "client_composed": true so the CLI delivers the
+// prompt exactly as written. The map is returned unchanged when
+// verbatimPrompts is false.
+// Port of Python SDK v0.2.157 (anthropics/claude-agent-sdk-python#1269).
+func stampUserMessage(message map[string]any, verbatimPrompts bool) map[string]any {
+	if !verbatimPrompts {
+		return message
+	}
+	message["client_composed"] = true
+	return message
+}
+
 // Query sends a one-shot prompt to Claude Code and returns messages via channel.
 //
 // This is the simplest way to interact with Claude Code. For interactive
@@ -139,12 +152,16 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 		}
 
 		// Send the user message
-		userMessage := map[string]any{
+		promptContent := prompt
+		if !configuredOpts.VerbatimPrompts {
+			promptContent = escapeSlashCommand(promptContent)
+		}
+		userMessage := stampUserMessage(map[string]any{
 			"type":               "user",
 			"session_id":         "",
-			"message":            map[string]any{"role": "user", "content": escapeSlashCommand(prompt)},
+			"message":            map[string]any{"role": "user", "content": promptContent},
 			"parent_tool_use_id": nil,
-		}
+		}, configuredOpts.VerbatimPrompts)
 		data, _ := json.Marshal(userMessage)
 		if err := transport.Write(string(data) + "\n"); err != nil {
 			errs <- err
@@ -190,8 +207,9 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 //
 // Port of TypeScript SDK v0.2.89 `startup()` / `WarmQuery`.
 type WarmQuery struct {
-	transport Transport
-	q         *query
+	transport       Transport
+	q               *query
+	verbatimPrompts bool
 }
 
 // Close terminates the pre-warmed subprocess. Call this if [WarmQuery.Query]
@@ -214,12 +232,16 @@ func (w *WarmQuery) Query(ctx context.Context, prompt string) (<-chan Message, <
 		defer close(messages)
 		defer close(errs)
 
-		userMessage := map[string]any{
+		promptContent := prompt
+		if !w.verbatimPrompts {
+			promptContent = escapeSlashCommand(promptContent)
+		}
+		userMessage := stampUserMessage(map[string]any{
 			"type":               "user",
 			"session_id":         "",
-			"message":            map[string]any{"role": "user", "content": escapeSlashCommand(prompt)},
+			"message":            map[string]any{"role": "user", "content": promptContent},
 			"parent_tool_use_id": nil,
-		}
+		}, w.verbatimPrompts)
 		data, _ := json.Marshal(userMessage)
 		if err := w.transport.Write(string(data) + "\n"); err != nil {
 			errs <- err
@@ -325,7 +347,7 @@ func Startup(ctx context.Context, opts *Options) (*WarmQuery, error) {
 		return nil, err
 	}
 
-	return &WarmQuery{transport: transport, q: q}, nil
+	return &WarmQuery{transport: transport, q: q, verbatimPrompts: configuredOpts.VerbatimPrompts}, nil
 }
 
 // extractSdkMcpServers extracts SDK MCP server configs from the McpServers option.
