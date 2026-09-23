@@ -196,6 +196,25 @@ type McpStatusResponse struct {
 	McpServers []McpServerStatus `json:"mcpServers"`
 }
 
+// McpReadResourceResponse is the response from Client.ReadMcpResource,
+// mirroring the Model Context Protocol's standard ReadResourceResult shape.
+//
+// WARNING: This API is alpha/experimental and may change or be removed
+// without notice. Port of TypeScript SDK v0.3.280 (readMcpResource, alpha).
+type McpReadResourceResponse struct {
+	Contents []McpResourceContent `json:"contents"`
+}
+
+// McpResourceContent is one item of McpReadResourceResponse.Contents: either
+// text (Text set) or binary (Blob set, base64-encoded), per the MCP spec.
+type McpResourceContent struct {
+	URI      string         `json:"uri"`
+	MimeType string         `json:"mimeType,omitempty"`
+	Text     string         `json:"text,omitempty"`
+	Blob     string         `json:"blob,omitempty"`
+	Meta     map[string]any `json:"_meta,omitempty"`
+}
+
 // SdkMcpToolHandler is the handler function for an SDK MCP tool.
 type SdkMcpToolHandler func(ctx context.Context, arguments map[string]any) (map[string]any, error)
 

@@ -591,6 +591,22 @@ func (c *Client) ReconnectMcpServer(ctx context.Context, name string) error {
 	return c.q.reconnectMcpServer(name)
 }
 
+// ReadMcpResource reads an MCP Apps "ui://" resource from an MCP server that
+// Claude Code has connected, returning its contents (text or base64-encoded
+// binary, per the MCP ReadResourceResult shape). The named server must be
+// connected and must itself expose MCP Apps UI resources; servers without
+// that capability, or one that is disconnected/unknown, return an error.
+//
+// WARNING: This method is alpha/experimental and may change or be removed
+// without notice. Port of TypeScript SDK v0.3.280 (readMcpResource, alpha;
+// no Python SDK equivalent as of this port).
+func (c *Client) ReadMcpResource(ctx context.Context, serverName, uri string) (*McpReadResourceResponse, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.readMcpResource(serverName, uri)
+}
+
 // ToggleMcpServer enables or disables an MCP server.
 func (c *Client) ToggleMcpServer(ctx context.Context, name string, enabled bool) error {
 	if c.q == nil {

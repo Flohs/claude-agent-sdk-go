@@ -1444,6 +1444,28 @@ func (q *query) reconnectMcpServer(serverName string) error {
 	return err
 }
 
+func (q *query) readMcpResource(serverName, uri string) (*McpReadResourceResponse, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype":    "mcp_read_resource",
+		"serverName": serverName,
+		"uri":        uri,
+	}, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var result McpReadResourceResponse
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (q *query) toggleMcpServer(serverName string, enabled bool) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype":    "mcp_toggle",
