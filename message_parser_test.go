@@ -118,6 +118,57 @@ func TestParseMessage_UserMessage_PastedContent_Absent(t *testing.T) {
 	}
 }
 
+func TestParseMessage_UserMessage_InlinePastes(t *testing.T) {
+	data := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"content": "typed prompt with inline paste",
+		},
+		"inline_pastes": []any{
+			"inline paste one",
+			"inline paste two",
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	user, ok := msg.(*UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+	if len(user.InlinePastes) != 2 {
+		t.Fatalf("expected 2 inline paste entries, got %d", len(user.InlinePastes))
+	}
+	if user.InlinePastes[0] != "inline paste one" || user.InlinePastes[1] != "inline paste two" {
+		t.Fatalf("unexpected InlinePastes content: %#v", user.InlinePastes)
+	}
+}
+
+func TestParseMessage_UserMessage_InlinePastes_Absent(t *testing.T) {
+	data := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"content": "typed prompt",
+		},
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	user, ok := msg.(*UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+	if user.InlinePastes != nil {
+		t.Fatalf("expected nil InlinePastes when absent, got %#v", user.InlinePastes)
+	}
+}
+
 func TestParseMessage_UserMessage_IsMeta(t *testing.T) {
 	data := map[string]any{
 		"type": "user",

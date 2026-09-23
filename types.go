@@ -162,6 +162,11 @@ type UserMessage struct {
 	// the turn had no pasted content or the CLI omits the field. Port of
 	// TypeScript SDK v0.3.277.
 	PastedContent []any `json:"pasted_content,omitempty"`
+	// InlinePastes holds text that is still standing inline in Content,
+	// as opposed to PastedContent, which is appended after the typed
+	// prompt. Nil when the turn had no inline paste or the CLI omits the
+	// field. Port of TypeScript SDK v0.3.277.
+	InlinePastes []string `json:"inline_pastes,omitempty"`
 }
 
 func (UserMessage) messageMarker() {}
