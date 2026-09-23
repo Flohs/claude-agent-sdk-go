@@ -148,6 +148,13 @@ type McpToolInfo struct {
 	Name        string              `json:"name"`
 	Description string              `json:"description,omitempty"`
 	Annotations *McpToolAnnotations `json:"annotations,omitempty"`
+	// Meta carries a tool's MCP Apps "ui" metadata so a host can find its
+	// ui:// resource: the "ui" key holds ResourceUri (a "ui://" string) and
+	// Visibility (an array), and some servers still send the deprecated
+	// flat "ui/resourceUri" variant instead. Gated behind CLI capability
+	// mcp_tool_ui_meta_v1; nil/omitted on older CLIs or tools without UI
+	// metadata. Port of TypeScript SDK v0.3.280.
+	Meta map[string]any `json:"_meta,omitempty"`
 }
 
 // McpServerInfo contains server info from the MCP initialize handshake.
