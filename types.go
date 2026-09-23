@@ -1138,6 +1138,42 @@ type MirrorErrorMessage struct {
 	SessionID string      `json:"session_id,omitempty"`
 }
 
+// SessionStateChangedState is the reported state of a session in a
+// [SessionStateChangedMessage].
+// Port of TypeScript SDK v0.3.280.
+type SessionStateChangedState string
+
+const (
+	// SessionStateChangedStateIdle means the session is not currently running
+	// a turn and is not waiting on the user.
+	SessionStateChangedStateIdle SessionStateChangedState = "idle"
+	// SessionStateChangedStateRunning means the session is actively running a
+	// turn.
+	SessionStateChangedStateRunning SessionStateChangedState = "running"
+	// SessionStateChangedStateRequiresAction means the session is waiting on
+	// the user, either for a permission prompt or for an MCP elicitation.
+	SessionStateChangedStateRequiresAction SessionStateChangedState = "requires_action"
+)
+
+// SessionStateChangedMessage is emitted as a system/session_state_changed
+// event reporting the session's coarse-grained state: idle, running, or
+// (as of TypeScript SDK v0.3.280) requires_action while the session is
+// blocked on a permission prompt or an MCP elicitation waiting on the user.
+//
+// This event is opt-in: the CLI only emits it when the SDK host launches the
+// CLI subprocess with CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1 in its
+// environment, e.g. via [Options.Env].
+// Port of TypeScript SDK v0.3.280.
+type SessionStateChangedMessage struct {
+	SystemMessage
+	// State is the session's reported state.
+	State SessionStateChangedState `json:"state"`
+	// UUID uniquely identifies this event.
+	UUID string `json:"uuid,omitempty"`
+	// SessionID is the session this event belongs to.
+	SessionID string `json:"session_id,omitempty"`
+}
+
 // ModelFallbackTrigger is the reason why the CLI fell back to a different model.
 // Port of TypeScript SDK v0.3.174.
 type ModelFallbackTrigger string

@@ -1326,6 +1326,62 @@ func TestParseMessage_MirrorErrorMessage_NullKey(t *testing.T) {
 	}
 }
 
+func TestParseMessage_SessionStateChangedMessage(t *testing.T) {
+	data := map[string]any{
+		"type":       "system",
+		"subtype":    "session_state_changed",
+		"state":      "requires_action",
+		"uuid":       "state-uuid-1",
+		"session_id": "sess-1",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	sc, ok := msg.(*SessionStateChangedMessage)
+	if !ok {
+		t.Fatalf("expected *SessionStateChangedMessage, got %T", msg)
+	}
+	if sc.State != SessionStateChangedStateRequiresAction {
+		t.Errorf("State = %q, want %q", sc.State, SessionStateChangedStateRequiresAction)
+	}
+	if sc.UUID != "state-uuid-1" {
+		t.Errorf("UUID = %q", sc.UUID)
+	}
+	if sc.SessionID != "sess-1" {
+		t.Errorf("SessionID = %q", sc.SessionID)
+	}
+	if sc.Subtype != "session_state_changed" {
+		t.Errorf("Subtype = %q", sc.Subtype)
+	}
+}
+
+func TestParseMessage_SessionStateChangedMessage_IdleAndRunning(t *testing.T) {
+	states := []SessionStateChangedState{
+		SessionStateChangedStateIdle,
+		SessionStateChangedStateRunning,
+	}
+	for _, state := range states {
+		data := map[string]any{
+			"type":    "system",
+			"subtype": "session_state_changed",
+			"state":   string(state),
+		}
+		msg, err := ParseMessage(data)
+		if err != nil {
+			t.Fatalf("unexpected error for state %q: %v", state, err)
+		}
+		sc, ok := msg.(*SessionStateChangedMessage)
+		if !ok {
+			t.Fatalf("expected *SessionStateChangedMessage, got %T", msg)
+		}
+		if sc.State != state {
+			t.Errorf("State = %q, want %q", sc.State, state)
+		}
+	}
+}
+
 func TestParseMessage_BackgroundTasksChangedMessage(t *testing.T) {
 	data := map[string]any{
 		"type":       "system",

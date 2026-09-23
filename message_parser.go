@@ -267,6 +267,14 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 		}
 		return msg, nil
 
+	case "session_state_changed":
+		return &SessionStateChangedMessage{
+			SystemMessage: base,
+			State:         SessionStateChangedState(stringField(data, "state")),
+			UUID:          stringField(data, "uuid"),
+			SessionID:     stringField(data, "session_id"),
+		}, nil
+
 	case "task_updated":
 		msg := &TaskUpdatedMessage{
 			SystemMessage: base,
