@@ -756,6 +756,7 @@ func parseMessageOrigin(data map[string]any) *MessageOrigin {
 		Body:         stringField(origin, "body"),
 		FromMode:     stringField(origin, "fromMode"),
 		Subkind:      stringField(origin, "subkind"),
+		FireReason:   stringField(origin, "fireReason"),
 	}
 }
 

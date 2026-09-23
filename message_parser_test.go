@@ -1551,6 +1551,37 @@ func TestParseMessage_ResultMessage_Origin(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ResultMessage_Origin_ScheduledTrigger_FireReason(t *testing.T) {
+	data := map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"is_error":   false,
+		"session_id": "s",
+		"origin": map[string]any{
+			"kind":       "task-notification",
+			"subkind":    "scheduled-trigger",
+			"fireReason": "cron",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.Origin == nil {
+		t.Fatal("Origin = nil, want non-nil")
+	}
+	if r.Origin.Kind != MessageOriginKindTaskNotification {
+		t.Errorf("Origin.Kind = %q, want %q", r.Origin.Kind, MessageOriginKindTaskNotification)
+	}
+	if r.Origin.Subkind != MessageOriginSubkindScheduledTrigger {
+		t.Errorf("Origin.Subkind = %q, want %q", r.Origin.Subkind, MessageOriginSubkindScheduledTrigger)
+	}
+	if r.Origin.FireReason != "cron" {
+		t.Errorf("Origin.FireReason = %q, want cron", r.Origin.FireReason)
+	}
+}
+
 func TestParseMessage_ResultMessage_Origin_PeerSendMessage(t *testing.T) {
 	data := map[string]any{
 		"type":       "result",
