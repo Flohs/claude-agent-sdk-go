@@ -88,6 +88,16 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		msg.PastedContent = pasted
 	}
 
+	if raw, ok := data["inline_pastes"].([]any); ok {
+		inline := make([]string, 0, len(raw))
+		for _, item := range raw {
+			if s, ok := item.(string); ok {
+				inline = append(inline, s)
+			}
+		}
+		msg.InlinePastes = inline
+	}
+
 	return msg, nil
 }
 
