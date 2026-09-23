@@ -2567,6 +2567,77 @@ func TestReloadOutputStyles_SendsSubtypeAndParsesResponse(t *testing.T) {
 	}
 }
 
+// TestReadMcpResource_SendsRequestAndParsesResponse verifies that
+// query.readMcpResource (the path used by Client.ReadMcpResource) sends a
+// mcp_read_resource control_request with serverName/uri fields, and decodes
+// the response's "contents" array into typed McpResourceContent values,
+// covering both a text and a binary (blob) entry. Port of TypeScript SDK
+// v0.3.280 (readMcpResource, alpha).
+func TestReadMcpResource_SendsRequestAndParsesResponse(t *testing.T) {
+	mt := newStubResponseTransport(map[string]any{
+		"contents": []any{
+			map[string]any{
+				"uri":      "ui://example/widget",
+				"mimeType": "text/html",
+				"text":     "<div>hello</div>",
+			},
+			map[string]any{
+				"uri":      "ui://example/image",
+				"mimeType": "image/png",
+				"blob":     "YmluYXJ5ZGF0YQ==",
+			},
+		},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	resp, err := q.readMcpResource("my-server", "ui://example/widget")
+	if err != nil {
+		t.Fatalf("readMcpResource failed: %v", err)
+	}
+
+	if len(resp.Contents) != 2 {
+		t.Fatalf("Contents = %v, want 2 entries", resp.Contents)
+	}
+	if resp.Contents[0].URI != "ui://example/widget" || resp.Contents[0].MimeType != "text/html" || resp.Contents[0].Text != "<div>hello</div>" {
+		t.Fatalf("Contents[0] = %+v, unexpected", resp.Contents[0])
+	}
+	if resp.Contents[1].URI != "ui://example/image" || resp.Contents[1].MimeType != "image/png" || resp.Contents[1].Blob != "YmluYXJ5ZGF0YQ==" {
+		t.Fatalf("Contents[1] = %+v, unexpected", resp.Contents[1])
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+
+	var found map[string]any
+	for _, w := range written {
+		var msg map[string]any
+		if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+			continue
+		}
+		if msg["type"] != "control_request" {
+			continue
+		}
+		req, ok := msg["request"].(map[string]any)
+		if !ok || req["subtype"] != "mcp_read_resource" {
+			continue
+		}
+		found = req
+		break
+	}
+	if found == nil {
+		t.Fatalf("expected a written control_request with subtype mcp_read_resource, got %v", written)
+	}
+	if found["serverName"] != "my-server" {
+		t.Fatalf("serverName = %v, want %q", found["serverName"], "my-server")
+	}
+	if found["uri"] != "ui://example/widget" {
+		t.Fatalf("uri = %v, want %q", found["uri"], "ui://example/widget")
+	}
+}
+
 // TestHandleHookCallback_TimesOutHungCallback verifies that a hook callback
 // which never returns is bounded by its configured per-callback timeout
 // instead of wedging the control request forever.

@@ -246,6 +246,22 @@ func TestReloadPluginsWithOptions_NotConnectedReturnsConnectionError(t *testing.
 	}
 }
 
+// TestReadMcpResource_NotConnectedReturnsConnectionError verifies that
+// Client.ReadMcpResource fails fast with a ConnectionError when called
+// before Connect(), mirroring the nil-query guard used by the other control
+// methods. Port of TypeScript SDK v0.3.280 (readMcpResource, alpha).
+func TestReadMcpResource_NotConnectedReturnsConnectionError(t *testing.T) {
+	c := &Client{}
+
+	_, err := c.ReadMcpResource(context.Background(), "my-server", "ui://example/widget")
+	if err == nil {
+		t.Fatal("expected an error when not connected, got nil")
+	}
+	if _, ok := err.(*ConnectionError); !ok {
+		t.Fatalf("expected a *ConnectionError, got %T: %v", err, err)
+	}
+}
+
 // TestSetPermissionMode_RejectsInvalidModeWithoutSendingRequest verifies
 // that Client.SetPermissionMode validates the mode before dispatching a
 // set_permission_mode control request, so a typo never reaches the CLI.
