@@ -44,6 +44,52 @@ func TestMcpServerStatus_Source(t *testing.T) {
 	}
 }
 
+func TestMcpToolInfo_Meta(t *testing.T) {
+	data := []byte(`{"mcpServers":[{"name":"widgets","status":"connected","tools":[
+		{"name":"render_widget","annotations":{"readOnly":true},"_meta":{"ui":{"resourceUri":"ui://widgets/render","visibility":["assistant"]}}},
+		{"name":"legacy_widget","_meta":{"ui/resourceUri":"ui://widgets/legacy"}},
+		{"name":"plain_tool"}
+	]}]}`)
+
+	var status McpStatusResponse
+	if err := json.Unmarshal(data, &status); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if len(status.McpServers) != 1 {
+		t.Fatalf("expected 1 server, got %d", len(status.McpServers))
+	}
+	tools := status.McpServers[0].Tools
+	if len(tools) != 3 {
+		t.Fatalf("expected 3 tools, got %d", len(tools))
+	}
+
+	if tools[0].Meta == nil {
+		t.Fatalf("Meta = nil, want populated map")
+	}
+	ui, ok := tools[0].Meta["ui"].(map[string]any)
+	if !ok {
+		t.Fatalf("Meta[\"ui\"] = %v, want map", tools[0].Meta["ui"])
+	}
+	if ui["resourceUri"] != "ui://widgets/render" {
+		t.Errorf("Meta[\"ui\"][\"resourceUri\"] = %v, want %q", ui["resourceUri"], "ui://widgets/render")
+	}
+	visibility, ok := ui["visibility"].([]any)
+	if !ok || len(visibility) != 1 || visibility[0] != "assistant" {
+		t.Errorf("Meta[\"ui\"][\"visibility\"] = %v, want [\"assistant\"]", ui["visibility"])
+	}
+
+	if tools[1].Meta == nil {
+		t.Fatalf("Meta = nil for legacy flat variant, want populated map")
+	}
+	if tools[1].Meta["ui/resourceUri"] != "ui://widgets/legacy" {
+		t.Errorf("Meta[\"ui/resourceUri\"] = %v, want %q", tools[1].Meta["ui/resourceUri"], "ui://widgets/legacy")
+	}
+
+	if tools[2].Meta != nil {
+		t.Errorf("Meta = %v, want nil when absent", tools[2].Meta)
+	}
+}
+
 func TestMcpStdioServerConfig_RequestTimeoutMs_OmitEmpty(t *testing.T) {
 	cfg := McpStdioServerConfig{Command: "my-server"}
 
