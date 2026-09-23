@@ -1483,6 +1483,13 @@ type MessageOrigin struct {
 	// MessageOriginSubkindProjectsRelay. Absent on webhook, PR-steward,
 	// plugin, and background-event deliveries.
 	Subkind string `json:"subkind,omitempty"`
+	// FireReason explains why a scheduled task fired. Populated for
+	// MessageOriginKindTaskNotification with
+	// Subkind == MessageOriginSubkindScheduledTrigger. A local host's
+	// declared scheduled-task fire is honored only in a process it started
+	// with CLAUDE_CODE_HOST_SCHEDULED_RUN=1 (Port of TypeScript SDK
+	// v0.3.280).
+	FireReason string `json:"fireReason,omitempty"`
 }
 
 // ResultMessage contains cost and usage information for a completed query.
