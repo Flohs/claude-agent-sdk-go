@@ -608,6 +608,9 @@ func parseConversationResetMessage(data map[string]any) (*ConversationResetMessa
 		NewConversationID: stringField(data, "new_conversation_id"),
 		UUID:              stringField(data, "uuid"),
 		SessionID:         stringField(data, "session_id"),
+		Trigger:           ConversationResetTrigger(stringField(data, "trigger")),
+		UserMessageUUID:   stringField(data, "user_message_uuid"),
+		Timestamp:         stringField(data, "timestamp"),
 	}, nil
 }
 

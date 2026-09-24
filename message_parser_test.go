@@ -924,6 +924,9 @@ func TestParseMessage_ConversationReset(t *testing.T) {
 		"new_conversation_id": "d2f4a573-ca99-42a2-bb7a-905b40c908e8",
 		"uuid":                "msg-1",
 		"session_id":          "66694129-ce74-4ee1-9b0f-994155ac97ba",
+		"trigger":             "clear",
+		"user_message_uuid":   "msg-0",
+		"timestamp":           "2026-09-24T00:00:00Z",
 	}
 
 	msg, err := ParseMessage(data)
@@ -944,10 +947,47 @@ func TestParseMessage_ConversationReset(t *testing.T) {
 	if event.SessionID != "66694129-ce74-4ee1-9b0f-994155ac97ba" {
 		t.Errorf("SessionID = %q, want %q", event.SessionID, "66694129-ce74-4ee1-9b0f-994155ac97ba")
 	}
+	if event.Trigger != ConversationResetTriggerClear {
+		t.Errorf("Trigger = %q, want %q", event.Trigger, ConversationResetTriggerClear)
+	}
+	if event.UserMessageUUID != "msg-0" {
+		t.Errorf("UserMessageUUID = %q, want %q", event.UserMessageUUID, "msg-0")
+	}
+	if event.Timestamp != "2026-09-24T00:00:00Z" {
+		t.Errorf("Timestamp = %q, want %q", event.Timestamp, "2026-09-24T00:00:00Z")
+	}
 
 	// Verify it can be used as a Message interface.
 	if Message(msg) == nil {
 		t.Errorf("expected non-nil Message interface")
+	}
+}
+
+func TestParseMessage_ConversationReset_OptionalFieldsAbsent(t *testing.T) {
+	data := map[string]any{
+		"type":                "conversation_reset",
+		"new_conversation_id": "d2f4a573-ca99-42a2-bb7a-905b40c908e8",
+		"uuid":                "msg-1",
+		"session_id":          "66694129-ce74-4ee1-9b0f-994155ac97ba",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	event, ok := msg.(*ConversationResetMessage)
+	if !ok {
+		t.Fatalf("expected *ConversationResetMessage, got %T", msg)
+	}
+	if event.Trigger != "" {
+		t.Errorf("Trigger = %q, want empty", event.Trigger)
+	}
+	if event.UserMessageUUID != "" {
+		t.Errorf("UserMessageUUID = %q, want empty", event.UserMessageUUID)
+	}
+	if event.Timestamp != "" {
+		t.Errorf("Timestamp = %q, want empty", event.Timestamp)
 	}
 }
 

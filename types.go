@@ -1794,7 +1794,8 @@ func (RateLimitEvent) messageMarker() {}
 // caller accumulates those totals across a long-lived session, it should
 // snapshot them when this message arrives.
 //
-// Port of Python SDK commit 54dd3b4 (anthropics/claude-agent-sdk-python#1196).
+// Port of Python SDK commit 54dd3b4 (anthropics/claude-agent-sdk-python#1196);
+// Trigger/UserMessageUUID/Timestamp are a port of TypeScript SDK v0.3.281.
 type ConversationResetMessage struct {
 	// NewConversationID is an opaque identifier for the fresh conversation,
 	// for UIs to key an empty transcript on (and discard any cached session
@@ -1806,9 +1807,45 @@ type ConversationResetMessage struct {
 	// SessionID is the ID of the session that was reset (the outgoing
 	// session; messages after the reset carry a new session ID).
 	SessionID string `json:"session_id"`
+	// Trigger is what discarded the conversation. Informational: a caller
+	// should reset on every ConversationResetMessage regardless of this
+	// value, and treat an empty (older CLI) or unrecognized value as an
+	// unspecified reset. Empty from older CLIs.
+	Trigger ConversationResetTrigger `json:"trigger,omitempty"`
+	// UserMessageUUID is, only when Trigger is
+	// [ConversationResetTriggerClear], the UUID of the user message whose
+	// "/clear" was executed — letting a caller match this frame to a
+	// "/clear" message it has already seen, whichever arrives first,
+	// instead of relying on arrival order. Empty for other triggers and
+	// from older CLIs.
+	UserMessageUUID string `json:"user_message_uuid,omitempty"`
+	// Timestamp is when the reset happened, as an ISO 8601 string in UTC
+	// read from the clock of the process that performed it. Meant for
+	// display, not for ordering frames. Empty from older CLIs; a caller can
+	// fall back to the time it received the frame.
+	Timestamp string `json:"timestamp,omitempty"`
 }
 
 func (ConversationResetMessage) messageMarker() {}
+
+// ConversationResetTrigger identifies what discarded the conversation on a
+// [ConversationResetMessage].
+type ConversationResetTrigger string
+
+const (
+	// ConversationResetTriggerClear is the "/clear" command, or its
+	// "/reset"/"/new" aliases.
+	ConversationResetTriggerClear ConversationResetTrigger = "clear"
+	// ConversationResetTriggerPlanModeExit is leaving plan mode with the
+	// clear-context option.
+	ConversationResetTriggerPlanModeExit ConversationResetTrigger = "plan_mode_exit"
+	// ConversationResetTriggerFreshSession is a flow that starts a fresh
+	// session to implement an approved plan.
+	ConversationResetTriggerFreshSession ConversationResetTrigger = "fresh_session"
+	// ConversationResetTriggerOnboarding is an onboarding flow re-run
+	// inside an existing session.
+	ConversationResetTriggerOnboarding ConversationResetTrigger = "onboarding"
+)
 
 // SubagentRetryInfo carries retry-attempt bookkeeping for a subagent that is
 // being retried after a failure. Populated on ToolProgressMessage.SubagentRetry
