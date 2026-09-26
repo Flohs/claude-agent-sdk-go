@@ -1091,69 +1091,122 @@ func buildConversationChain(entries []transcriptEntry) []transcriptEntry {
 		}
 	}
 
-	// Find leaves (walk back from terminals to user/assistant)
-	var leaves []transcriptEntry
-	for _, terminal := range terminals {
+	// walkToLeaf walks a branch backward from terminal via parentUuid,
+	// returning the nearest ancestor (the terminal itself, or further back)
+	// that satisfies accept, or nil if the branch has none.
+	walkToLeaf := func(terminal transcriptEntry, accept func(transcriptEntry) bool) transcriptEntry {
 		seen := make(map[string]bool)
 		cur := terminal
 		for {
 			uuid, _ := cur["uuid"].(string)
 			if seen[uuid] {
-				break
+				return nil
 			}
 			seen[uuid] = true
-			entryType, _ := cur["type"].(string)
-			if entryType == "user" || entryType == "assistant" {
-				leaves = append(leaves, cur)
-				break
+			if accept(cur) {
+				return cur
 			}
 			parent, _ := cur["parentUuid"].(string)
 			if parent == "" {
-				break
+				return nil
 			}
 			next, ok := byUUID[parent]
 			if !ok {
-				break
+				return nil
 			}
 			cur = next
 		}
 	}
 
-	if len(leaves) == 0 {
-		return nil
+	isUserOrAssistant := func(e transcriptEntry) bool {
+		entryType, _ := e["type"].(string)
+		return entryType == "user" || entryType == "assistant"
 	}
 
-	// Pick best leaf (not sidechain/team/meta, highest index)
-	var mainLeaves []transcriptEntry
-	for _, leaf := range leaves {
-		isSidechain, _ := leaf["isSidechain"].(bool)
-		_, hasTeam := leaf["teamName"].(string)
-		isMeta, _ := leaf["isMeta"].(bool)
-		if !isSidechain && !hasTeam && !isMeta {
-			mainLeaves = append(mainLeaves, leaf)
+	// isRealContent additionally excludes sidechain/team/meta entries, so
+	// walking with it skips *past* a trailing meta row (a local command's
+	// echoed output, or other CLI bookkeeping recorded as a "user"/
+	// "assistant" entry) to the real content behind it, instead of treating
+	// the meta row itself as the leaf.
+	isRealContent := func(e transcriptEntry) bool {
+		if !isUserOrAssistant(e) {
+			return false
+		}
+		if isSidechain, _ := e["isSidechain"].(bool); isSidechain {
+			return false
+		}
+		if _, hasTeam := e["teamName"].(string); hasTeam {
+			return false
+		}
+		if isMeta, _ := e["isMeta"].(bool); isMeta {
+			return false
+		}
+		return true
+	}
+
+	// Pick the leaf by ranking *branches* (terminals) by recency, not by
+	// where each branch's nearest user/assistant entry happens to land.
+	// A branch's terminal — the entry nothing else points to as a parent —
+	// can itself be a meta row without the branch being abandoned; it may
+	// simply be the currently active branch's most recent write (e.g. a
+	// local command run right after the last real reply). Ranking on the
+	// leaf's own position instead, as this used to, would let an older,
+	// already-rewound-away branch outrank the real newest one merely
+	// because the newest branch's terminal is a meta row that gets excluded
+	// wholesale. See the fix ported from TS SDK v0.3.283: "getSessionMessages()
+	// returning...a rewound-away branch when the newest branch ends at a
+	// meta row or a local command's rows".
+	//
+	// Only terminals that are themselves main-line (not a sidechain, not a
+	// team conversation) compete here; walking from such a terminal skips
+	// over meta rows to find that branch's real content.
+	var leaf transcriptEntry
+	bestTerminalIdx := -1
+	for _, terminal := range terminals {
+		if isSidechain, _ := terminal["isSidechain"].(bool); isSidechain {
+			continue
+		}
+		if _, hasTeam := terminal["teamName"].(string); hasTeam {
+			continue
+		}
+		content := walkToLeaf(terminal, isRealContent)
+		if content == nil {
+			continue
+		}
+		termUUID, _ := terminal["uuid"].(string)
+		idx := entryIndex[termUUID]
+		if idx > bestTerminalIdx {
+			bestTerminalIdx = idx
+			leaf = content
 		}
 	}
 
-	pickBest := func(candidates []transcriptEntry) transcriptEntry {
-		best := candidates[0]
-		bestUUID, _ := best["uuid"].(string)
-		bestIdx := entryIndex[bestUUID]
-		for _, c := range candidates[1:] {
+	if leaf == nil {
+		// No branch has any real, non-sidechain/team, non-meta content at
+		// all (e.g. every branch is a sidechain, or is meta end-to-end).
+		// Fall back to the nearest user/assistant entry from any terminal,
+		// regardless of isMeta/isSidechain/teamName, preferring whichever
+		// sits latest in the file.
+		var leaves []transcriptEntry
+		for _, terminal := range terminals {
+			if l := walkToLeaf(terminal, isUserOrAssistant); l != nil {
+				leaves = append(leaves, l)
+			}
+		}
+		if len(leaves) == 0 {
+			return nil
+		}
+		leaf = leaves[0]
+		leafUUID, _ := leaf["uuid"].(string)
+		bestIdx := entryIndex[leafUUID]
+		for _, c := range leaves[1:] {
 			cUUID, _ := c["uuid"].(string)
 			cIdx := entryIndex[cUUID]
 			if cIdx > bestIdx {
-				best = c
+				leaf = c
 				bestIdx = cIdx
 			}
 		}
-		return best
-	}
-
-	var leaf transcriptEntry
-	if len(mainLeaves) > 0 {
-		leaf = pickBest(mainLeaves)
-	} else {
-		leaf = pickBest(leaves)
 	}
 
 	// Walk from leaf to root
