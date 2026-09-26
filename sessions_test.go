@@ -1503,6 +1503,66 @@ func TestGetSessionMessages_BranchedConversation(t *testing.T) {
 	}
 }
 
+// TestGetSessionMessages_NewestBranchEndingInMetaRowWins is a regression test
+// for the bug fixed upstream in TS SDK v0.3.283: "getSessionMessages()
+// returning...a rewound-away branch when the newest branch ends at a meta row
+// or a local command's rows".
+//
+// u2/a2 is an older, rewound-away branch off a1 that ends in real content.
+// u3/a3 is the newer branch off a1 — the currently active conversation — but
+// its terminal is a trailing isMeta row (e.g. a local command's echoed
+// output) appended after a3. Despite the newer branch's terminal being a
+// meta row, GetSessionMessages must still return the newer branch's real
+// content (u1, a1, u3, a3), not fall back to the older, abandoned branch
+// (u2, a2) just because the meta row got excluded from consideration.
+func TestGetSessionMessages_NewestBranchEndingInMetaRowWins(t *testing.T) {
+	projDir := setupTestProjectDir(t, "/test/newest-branch-meta-tip")
+
+	content := strings.Join([]string{
+		makeUserLine("u1", "", "Root question"),
+		makeAssistantLine("a1", "u1", "Root answer"),
+		// Older, rewound-away branch: ends in real (non-meta) content.
+		makeUserLine("u2", "a1", "Old branch prompt"),
+		makeAssistantLine("a2", "u2", "Old branch answer"),
+		// Newer, currently active branch: ends in a meta row (e.g. a local
+		// command's echoed output) appended after the real reply.
+		makeUserLine("u3", "a1", "New branch prompt"),
+		makeAssistantLine("a3", "u3", "New branch answer"),
+		makeUserLine("meta1", "a3", "<local-command-stdout>ok</local-command-stdout>", map[string]any{"isMeta": true}),
+	}, "\n") + "\n"
+	writeSessionFile(t, projDir, testUUID1, content)
+
+	messages, err := GetSessionMessages(testUUID1, GetSessionMessagesOptions{
+		Directory: "/test/newest-branch-meta-tip",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var uuids []string
+	for _, m := range messages {
+		uuids = append(uuids, m.UUID)
+	}
+	expected := []string{"u1", "a1", "u3", "a3"}
+	if len(uuids) != len(expected) {
+		t.Fatalf("expected messages %v, got %v", expected, uuids)
+	}
+	for i, want := range expected {
+		if uuids[i] != want {
+			t.Errorf("expected messages %v, got %v", expected, uuids)
+			break
+		}
+	}
+	for _, m := range messages {
+		if m.UUID == "u2" || m.UUID == "a2" {
+			t.Errorf("rewound-away branch message %q should not have been returned", m.UUID)
+		}
+		if m.UUID == "meta1" {
+			t.Error("meta message should have been filtered from visible output")
+		}
+	}
+}
+
 func TestGetSessionMessages_OnlyProgressEntries(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/progress-only")
 
@@ -1908,6 +1968,62 @@ func TestBuildConversationChain_PreferMainOverSidechain(t *testing.T) {
 		if strings.HasPrefix(uuid, "sc-") {
 			t.Errorf("sidechain entry %q should not be in main chain", uuid)
 		}
+	}
+}
+
+// TestBuildConversationChain_NewestBranchEndingInMetaRowWins is a direct
+// unit-level regression test for the bug fixed upstream in TS SDK v0.3.283:
+// a branch whose terminal is a meta row must still be recognized as the
+// newest branch (ranked by the terminal's own file position), with the walk
+// skipping past the meta row to the real content behind it — rather than
+// being disqualified in favor of an older, already-abandoned branch whose
+// terminal happens not to be meta.
+func TestBuildConversationChain_NewestBranchEndingInMetaRowWins(t *testing.T) {
+	entries := []transcriptEntry{
+		{"type": "user", "uuid": "u1", "message": "root"},
+		{"type": "assistant", "uuid": "a1", "parentUuid": "u1", "message": "root-r"},
+		// Older, rewound-away branch: ends in real (non-meta) content.
+		{"type": "user", "uuid": "u2", "parentUuid": "a1", "message": "old"},
+		{"type": "assistant", "uuid": "a2", "parentUuid": "u2", "message": "old-r"},
+		// Newer, currently active branch: ends in a meta row.
+		{"type": "user", "uuid": "u3", "parentUuid": "a1", "message": "new"},
+		{"type": "assistant", "uuid": "a3", "parentUuid": "u3", "message": "new-r"},
+		{"type": "user", "uuid": "meta1", "parentUuid": "a3", "isMeta": true, "message": "<local-command-stdout>ok</local-command-stdout>"},
+	}
+
+	chain := buildConversationChain(entries)
+	var uuids []string
+	for _, e := range chain {
+		uuid, _ := e["uuid"].(string)
+		uuids = append(uuids, uuid)
+	}
+	expected := []string{"u1", "a1", "u3", "a3"}
+	if len(uuids) != len(expected) {
+		t.Fatalf("expected chain %v, got %v", expected, uuids)
+	}
+	for i, want := range expected {
+		if uuids[i] != want {
+			t.Fatalf("expected chain %v, got %v", expected, uuids)
+		}
+	}
+}
+
+// TestBuildConversationChain_AllTerminalsMetaFallsBackToNearestUserAssistant
+// covers the rare edge case where every branch's terminal walk finds no
+// non-meta, non-sidechain/team content at all: the chain builder must still
+// return *something* (falling back to the nearest user/assistant entry from
+// any terminal) rather than an empty chain.
+func TestBuildConversationChain_AllTerminalsMetaFallsBackToNearestUserAssistant(t *testing.T) {
+	entries := []transcriptEntry{
+		{"type": "user", "uuid": "meta1", "isMeta": true, "message": "only meta entry"},
+	}
+
+	chain := buildConversationChain(entries)
+	if len(chain) != 1 {
+		t.Fatalf("expected fallback chain of 1 entry, got %d: %v", len(chain), chain)
+	}
+	if uuid, _ := chain[0]["uuid"].(string); uuid != "meta1" {
+		t.Errorf("expected fallback leaf %q, got %q", "meta1", uuid)
 	}
 }
 
