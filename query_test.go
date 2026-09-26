@@ -233,6 +233,121 @@ func TestWaitForResultAndEndInput_ContextCancellation(t *testing.T) {
 	}
 }
 
+// TestWaitForResultAndEndInput_WaitsForIdleState verifies the Python SDK
+// v0.2.160 (#1190, #1279) fix: once a CLI has ever sent a
+// session_state_changed message, waitForResultAndEndInput must not call
+// EndInput on the main-session result alone — it must also wait for the
+// CLI to report state "idle", even if the last reported state before the
+// result was "running" (e.g. a background task still finishing its own
+// control-channel handshake).
+func TestWaitForResultAndEndInput_WaitsForIdleState(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{
+		transport: mt,
+		mcpServers: map[string]*McpSdkServerConfig{
+			"test-server": {Name: "test"},
+		},
+	})
+
+	// CLI reports it's still running before the result arrives.
+	q.trackSessionState(map[string]any{"state": "running"})
+
+	done := make(chan struct{})
+	go func() {
+		q.waitForResultAndEndInput()
+		close(done)
+	}()
+
+	// The main-session result arrives, but the CLI hasn't reported idle yet.
+	q.mainResultOnce.Do(func() { close(q.mainResultCh) })
+
+	time.Sleep(50 * time.Millisecond)
+	if mt.getEndInputCalled() {
+		t.Fatal("EndInput must not be called while the CLI still reports a non-idle session state")
+	}
+
+	// CLI finally reports idle.
+	q.trackSessionState(map[string]any{"state": "idle"})
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("waitForResultAndEndInput did not return after the CLI reported idle")
+	}
+
+	if !mt.getEndInputCalled() {
+		t.Fatal("expected EndInput to be called once the CLI reported idle")
+	}
+}
+
+// TestWaitForResultAndEndInput_NoSessionStateChanged_ClosesImmediately
+// verifies the fallback for CLIs older than TS SDK v0.3.280, which never
+// send session_state_changed: EndInput must fire right on the main-session
+// result, exactly as before this fix, rather than waiting for an idle
+// signal that will never arrive.
+func TestWaitForResultAndEndInput_NoSessionStateChanged_ClosesImmediately(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{
+		transport: mt,
+		mcpServers: map[string]*McpSdkServerConfig{
+			"test-server": {Name: "test"},
+		},
+	})
+
+	done := make(chan struct{})
+	go func() {
+		q.waitForResultAndEndInput()
+		close(done)
+	}()
+
+	q.mainResultOnce.Do(func() { close(q.mainResultCh) })
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("waitForResultAndEndInput did not return after main-session result")
+	}
+
+	if !mt.getEndInputCalled() {
+		t.Fatal("expected EndInput to be called after main-session result when the CLI never reports session state")
+	}
+}
+
+// TestWaitForResultAndEndInput_IdleWaitBounded verifies the idle wait is
+// bounded by streamCloseTimeout: a CLI that reports a non-idle state and
+// then goes silent (never reports idle, and never sends another state
+// update) must not hang waitForResultAndEndInput forever.
+func TestWaitForResultAndEndInput_IdleWaitBounded(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{
+		transport: mt,
+		mcpServers: map[string]*McpSdkServerConfig{
+			"test-server": {Name: "test"},
+		},
+	})
+	q.streamCloseTimeout = 0.05 // 50ms, instead of the 60s default
+
+	q.trackSessionState(map[string]any{"state": "running"})
+
+	done := make(chan struct{})
+	go func() {
+		q.waitForResultAndEndInput()
+		close(done)
+	}()
+
+	q.mainResultOnce.Do(func() { close(q.mainResultCh) })
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("waitForResultAndEndInput did not return once streamCloseTimeout elapsed")
+	}
+
+	if !mt.getEndInputCalled() {
+		t.Fatal("expected EndInput to be called once the idle wait timed out")
+	}
+}
+
 func TestStreamInput_UsesWaitForResultAndEndInput(t *testing.T) {
 	// Verify streamInput still works correctly with the refactored method.
 	mt := newMockTransport()

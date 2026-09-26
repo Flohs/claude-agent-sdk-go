@@ -54,6 +54,25 @@ type query struct {
 	// e6e07f1 (#1103, fixing #1088).
 	inFlightTasks map[string]struct{}
 
+	// stateMu guards sawSessionState/lastSessionState, updated from the
+	// readMessages goroutine and read from waitForIdleState (called from
+	// whichever goroutine ends the input stream), so — unlike inFlightTasks —
+	// it needs real synchronization rather than single-writer access.
+	stateMu sync.Mutex
+	// sawSessionState is true once any system/session_state_changed message
+	// has been observed. CLIs older than TS SDK v0.3.280 never send this
+	// message; waitForIdleState treats sawSessionState == false as "this CLI
+	// has no idle signal" and returns immediately, preserving the previous
+	// close-on-result behavior for them.
+	sawSessionState bool
+	// lastSessionState is the state from the most recently observed
+	// session_state_changed message.
+	lastSessionState SessionStateChangedState
+	// stateChangedCh is signalled (non-blocking, best-effort) on every
+	// session_state_changed message so waitForIdleState can wake up and
+	// re-check lastSessionState instead of polling.
+	stateChangedCh chan struct{}
+
 	// commandsMu guards latestCommands, the slash-command list from the most
 	// recent commands_changed system message (a fire-and-forget push the CLI
 	// sends after a mid-session change, e.g. skills discovered dynamically as
@@ -210,6 +229,7 @@ func newQuery(cfg queryConfig) *query {
 		initTimeout:             initTimeout,
 		firstResultCh:           make(chan struct{}),
 		mainResultCh:            make(chan struct{}),
+		stateChangedCh:          make(chan struct{}, 1),
 		streamCloseTimeout:      streamCloseTimeoutMs / 1000.0,
 		excludeDynamicSections:  cfg.excludeDynamicSections,
 		systemPromptSnapshot:    cfg.systemPromptSnapshot,
@@ -413,6 +433,25 @@ func (q *query) trackTaskLifecycle(msg map[string]any) {
 	}
 }
 
+// trackSessionState records the state from a session_state_changed system
+// message and wakes any goroutine blocked in waitForIdleState. Must only be
+// called from the readMessages goroutine (the write side of stateMu), same
+// as trackTaskLifecycle's inFlightTasks.
+func (q *query) trackSessionState(msg map[string]any) {
+	state, _ := msg["state"].(string)
+	if state == "" {
+		return
+	}
+	q.stateMu.Lock()
+	q.sawSessionState = true
+	q.lastSessionState = SessionStateChangedState(state)
+	q.stateMu.Unlock()
+	select {
+	case q.stateChangedCh <- struct{}{}:
+	default:
+	}
+}
+
 // handleCommandsChanged updates q.latestCommands from a commands_changed
 // system message — the CLI's fire-and-forget push of the full slash-command
 // list after a mid-session change (e.g. skills discovered dynamically as the
@@ -541,8 +580,11 @@ func (q *query) readMessages() {
 		// doesn't prematurely close stdin (see inFlightTasks doc comment).
 		if msgType == "system" {
 			q.trackTaskLifecycle(msg)
-			if subtype, _ := msg["subtype"].(string); subtype == "commands_changed" {
+			switch subtype, _ := msg["subtype"].(string); subtype {
+			case "commands_changed":
 				q.handleCommandsChanged(msg)
+			case "session_state_changed":
+				q.trackSessionState(msg)
 			}
 		}
 
@@ -1652,14 +1694,48 @@ func (q *query) waitForResultAndEndInput() {
 	hasCanUseTool := q.canUseTool != nil
 
 	if hasMcpServers || hasHooks || hasCanUseTool {
+		deadline := time.After(time.Duration(q.streamCloseTimeout * float64(time.Second)))
 		select {
 		case <-q.mainResultCh:
-		case <-time.After(time.Duration(q.streamCloseTimeout * float64(time.Second))):
+			q.waitForIdleState(deadline)
+		case <-deadline:
 		case <-q.ctx.Done():
 		}
 	}
 
 	_ = q.transport.EndInput()
+}
+
+// waitForIdleState blocks until the CLI's most recently reported
+// session_state_changed state is idle, deadline fires, or the query's
+// context is cancelled. A CLI that has never sent a session_state_changed
+// message (older than TS SDK v0.3.280) makes sawSessionState permanently
+// false, so this returns immediately and callers keep the previous
+// close-on-result behavior.
+//
+// Port of Python SDK v0.2.160 (#1190, #1279): mainResultCh already accounts
+// for inFlightTasks (Python SDK e6e07f1, #1103), but that counter and the
+// CLI's own idle signal are two separate approximations of "the run is
+// really over" and can still diverge — a background task can still be
+// finishing its own control-channel handshake with the CLI just as the
+// counter drops to zero. Waiting for the CLI's own idle report closes that
+// last race instead of guessing from local bookkeeping alone.
+func (q *query) waitForIdleState(deadline <-chan time.Time) {
+	for {
+		q.stateMu.Lock()
+		seen, state := q.sawSessionState, q.lastSessionState
+		q.stateMu.Unlock()
+		if !seen || state == SessionStateChangedStateIdle {
+			return
+		}
+		select {
+		case <-q.stateChangedCh:
+		case <-deadline:
+			return
+		case <-q.ctx.Done():
+			return
+		}
+	}
 }
 
 func (q *query) close() error {
