@@ -1473,6 +1473,83 @@ func TestParseMessage_SessionStateChangedMessage_IdleAndRunning(t *testing.T) {
 	}
 }
 
+func TestParseMessage_InformationalMessage(t *testing.T) {
+	data := map[string]any{
+		"type":                 "system",
+		"subtype":              "informational",
+		"content":              "Stop hook blocked continuation: outstanding TODOs",
+		"level":                "warning",
+		"tool_use_id":          "tool-1",
+		"prevent_continuation": true,
+		"uuid":                 "info-uuid-1",
+		"session_id":           "sess-1",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	im, ok := msg.(*InformationalMessage)
+	if !ok {
+		t.Fatalf("expected *InformationalMessage, got %T", msg)
+	}
+	if im.Content != "Stop hook blocked continuation: outstanding TODOs" {
+		t.Errorf("Content = %q", im.Content)
+	}
+	if im.Level != InformationalLevelWarning {
+		t.Errorf("Level = %q, want %q", im.Level, InformationalLevelWarning)
+	}
+	if im.ToolUseID != "tool-1" {
+		t.Errorf("ToolUseID = %q", im.ToolUseID)
+	}
+	if !im.PreventContinuation {
+		t.Errorf("PreventContinuation = false, want true")
+	}
+	if im.UUID != "info-uuid-1" {
+		t.Errorf("UUID = %q", im.UUID)
+	}
+	if im.SessionID != "sess-1" {
+		t.Errorf("SessionID = %q", im.SessionID)
+	}
+	if im.Subtype != "informational" {
+		t.Errorf("Subtype = %q", im.Subtype)
+	}
+}
+
+func TestParseMessage_InformationalMessage_Levels(t *testing.T) {
+	levels := []InformationalLevel{
+		InformationalLevelInfo,
+		InformationalLevelNotice,
+		InformationalLevelSuggestion,
+		InformationalLevelWarning,
+	}
+	for _, level := range levels {
+		data := map[string]any{
+			"type":    "system",
+			"subtype": "informational",
+			"content": "banner",
+			"level":   string(level),
+		}
+		msg, err := ParseMessage(data)
+		if err != nil {
+			t.Fatalf("unexpected error for level %q: %v", level, err)
+		}
+		im, ok := msg.(*InformationalMessage)
+		if !ok {
+			t.Fatalf("expected *InformationalMessage, got %T", msg)
+		}
+		if im.Level != level {
+			t.Errorf("Level = %q, want %q", im.Level, level)
+		}
+		if im.ToolUseID != "" {
+			t.Errorf("ToolUseID = %q, want empty", im.ToolUseID)
+		}
+		if im.PreventContinuation {
+			t.Errorf("PreventContinuation = true, want false")
+		}
+	}
+}
+
 func TestParseMessage_BackgroundTasksChangedMessage(t *testing.T) {
 	data := map[string]any{
 		"type":       "system",
