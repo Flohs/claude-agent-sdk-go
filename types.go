@@ -1179,6 +1179,47 @@ type SessionStateChangedMessage struct {
 	SessionID string `json:"session_id,omitempty"`
 }
 
+// InformationalLevel is the render level of an [InformationalMessage].
+// Port of TypeScript SDK v0.3.283.
+type InformationalLevel string
+
+const (
+	// InformationalLevelInfo shows only in transcript mode.
+	InformationalLevelInfo InformationalLevel = "info"
+	// InformationalLevelNotice renders in inactive gray.
+	InformationalLevelNotice InformationalLevel = "notice"
+	// InformationalLevelSuggestion is a more prominent render level.
+	InformationalLevelSuggestion InformationalLevel = "suggestion"
+	// InformationalLevelWarning is a more prominent render level.
+	InformationalLevelWarning InformationalLevel = "warning"
+)
+
+// InformationalMessage is a generic text banner emitted by the CLI loop:
+// non-error status lines, hook feedback (e.g. a UserPromptSubmit hook's
+// block reason), slash-command output, or a warning/notice raised during a
+// turn that would previously have been dropped from stream-json output.
+// Render Content as plaintext at Level.
+// Port of TypeScript SDK v0.3.283.
+type InformationalMessage struct {
+	SystemMessage
+	// Content is the banner text to render as plaintext.
+	Content string `json:"content"`
+	// Level is the render level: "info" shows only in transcript mode;
+	// "notice" renders in inactive gray; "suggestion" and "warning" are more
+	// prominent.
+	Level InformationalLevel `json:"level"`
+	// ToolUseID dedupes progress messages for the same tool use. Empty when
+	// not associated with a tool use.
+	ToolUseID string `json:"tool_use_id,omitempty"`
+	// PreventContinuation is true when execution stops after this message,
+	// e.g. a Stop hook denied continuation.
+	PreventContinuation bool `json:"prevent_continuation,omitempty"`
+	// UUID uniquely identifies this event.
+	UUID string `json:"uuid,omitempty"`
+	// SessionID is the session this event belongs to.
+	SessionID string `json:"session_id,omitempty"`
+}
+
 // ModelFallbackTrigger is the reason why the CLI fell back to a different model.
 // Port of TypeScript SDK v0.3.174.
 type ModelFallbackTrigger string

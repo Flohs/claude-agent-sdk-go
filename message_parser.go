@@ -285,6 +285,17 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			SessionID:     stringField(data, "session_id"),
 		}, nil
 
+	case "informational":
+		return &InformationalMessage{
+			SystemMessage:       base,
+			Content:             stringField(data, "content"),
+			Level:               InformationalLevel(stringField(data, "level")),
+			ToolUseID:           stringField(data, "tool_use_id"),
+			PreventContinuation: boolField(data, "prevent_continuation"),
+			UUID:                stringField(data, "uuid"),
+			SessionID:           stringField(data, "session_id"),
+		}, nil
+
 	case "task_updated":
 		msg := &TaskUpdatedMessage{
 			SystemMessage: base,
