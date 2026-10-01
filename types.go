@@ -1605,7 +1605,10 @@ type ResultMessage struct {
 	APIErrorStatus *int `json:"api_error_status,omitempty"`
 	// StartupFailureReason explains why a stream-json run exited before
 	// producing a normal result, e.g. a known CLI startup failure. Empty
-	// when not provided by the CLI. Port of TypeScript SDK v0.3.274.
+	// when not provided by the CLI. Known values include
+	// "provider_not_allowed" (the configured API provider is rejected by
+	// the allowedProviders setting; TypeScript SDK v0.3.285). Port of
+	// TypeScript SDK v0.3.274.
 	StartupFailureReason string `json:"startup_failure_reason,omitempty"`
 	// Origin forwards the triggering message's origin so consumers can
 	// distinguish user-prompted results from task-notification followups.
@@ -2396,7 +2399,11 @@ type ServerCapabilities struct {
 	// control response's success payload carries a still_queued list of
 	// uuids) and "interrupt_cancel_queued_v1" ([Client.InterruptCancelQueued]
 	// is honored; cancelled commands are listed under the response's
-	// cancelled field). Empty on CLIs that predate this field. Port of
+	// cancelled field), "sdk_mcp_manifests" and
+	// "sdk_mcp_tools_list_changed" (SDK MCP server tool manifests; TypeScript
+	// SDK v0.3.286, which also adds an initialize response field
+	// "sdk_mcp_manifests_parked" readable from the raw initialization
+	// result). Empty on CLIs that predate this field. Port of
 	// TypeScript SDK v0.3.205 / v0.3.219.
 	Capabilities []string `json:"capabilities,omitempty"`
 }
