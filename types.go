@@ -2475,3 +2475,16 @@ type SessionListSubkeysKey struct {
 	ProjectKey string `json:"project_key"`
 	SessionID  string `json:"session_id"`
 }
+
+// TaskOutput is the response from Client.GetTaskOutput: the tail of a
+// background shell or Monitor task's output. Port of TypeScript SDK v0.3.287
+// (SDKControlGetTaskOutputResponse).
+type TaskOutput struct {
+	// Output is the end of the output (at most the last 8 KiB), decoded as
+	// UTF-8; empty when the command has written nothing yet.
+	Output string `json:"output"`
+	// TotalBytes is the size of the whole output in bytes.
+	TotalBytes int `json:"total_bytes"`
+	// Truncated reports whether Output holds only the end of a longer output.
+	Truncated bool `json:"truncated"`
+}
