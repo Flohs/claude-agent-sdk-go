@@ -375,3 +375,15 @@ func TestAppendMessage_VerbatimPrompts(t *testing.T) {
 		t.Errorf("expected shouldQuery: false to be preserved, got %v", msg["shouldQuery"])
 	}
 }
+
+// TestGetTaskOutput_NotConnectedReturnsConnectionError verifies that
+// Client.GetTaskOutput fails fast with a ConnectionError before Connect().
+// Port of TypeScript SDK v0.3.287.
+func TestGetTaskOutput_NotConnectedReturnsConnectionError(t *testing.T) {
+	c := &Client{}
+
+	_, err := c.GetTaskOutput(context.Background(), "task-1")
+	if _, ok := err.(*ConnectionError); !ok {
+		t.Fatalf("expected a *ConnectionError, got %T: %v", err, err)
+	}
+}

@@ -3033,3 +3033,53 @@ func TestListPermissionRules_MinimalResponseUnmarshalsWithoutError(t *testing.T)
 		t.Errorf("Errors = %v, want nil", state.Errors)
 	}
 }
+
+// TestGetTaskOutput_SendsRequestAndParsesResponse verifies that
+// query.getTaskOutput (the path used by Client.GetTaskOutput) sends a
+// get_task_output control_request carrying task_id and decodes the response.
+// Port of TypeScript SDK v0.3.287.
+func TestGetTaskOutput_SendsRequestAndParsesResponse(t *testing.T) {
+	mt := newStubResponseTransport(map[string]any{
+		"output":      "tail of output\n",
+		"total_bytes": float64(20000),
+		"truncated":   true,
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	resp, err := q.getTaskOutput("task-1")
+	if err != nil {
+		t.Fatalf("getTaskOutput failed: %v", err)
+	}
+	if resp.Output != "tail of output\n" || resp.TotalBytes != 20000 || !resp.Truncated {
+		t.Fatalf("response = %+v, unexpected", resp)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+
+	var found map[string]any
+	for _, w := range written {
+		var msg map[string]any
+		if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+			continue
+		}
+		if msg["type"] != "control_request" {
+			continue
+		}
+		req, ok := msg["request"].(map[string]any)
+		if !ok || req["subtype"] != "get_task_output" {
+			continue
+		}
+		found = req
+		break
+	}
+	if found == nil {
+		t.Fatalf("expected a written control_request with subtype get_task_output, got %v", written)
+	}
+	if found["task_id"] != "task-1" {
+		t.Fatalf("task_id = %v, want %q", found["task_id"], "task-1")
+	}
+}

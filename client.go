@@ -636,6 +636,21 @@ func (c *Client) StopTask(ctx context.Context, taskID string) error {
 	return c.q.stopTask(taskID)
 }
 
+// GetTaskOutput reads the end of one background shell or Monitor task's
+// output: at most the last 8 KiB the command wrote, the same tail the
+// terminal's /tasks detail view reads. Read-only and starts no model turn, so
+// a host can poll it while the task runs and read it once more after the task
+// ends. taskID is the task_id from a task_started message or a
+// background_tasks_changed update. The output is whatever the command
+// printed, escape sequences included; render it as plain text. Port of
+// TypeScript SDK v0.3.287 (get_task_output; no Python SDK equivalent).
+func (c *Client) GetTaskOutput(ctx context.Context, taskID string) (*TaskOutput, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.getTaskOutput(taskID)
+}
+
 // RewindFiles rewinds tracked files to their state at a specific user message.
 // Requires EnableFileCheckpointing to be set in Options.
 func (c *Client) RewindFiles(ctx context.Context, userMessageID string) (*RewindFilesResult, error) {
