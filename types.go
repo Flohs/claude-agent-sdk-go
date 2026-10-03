@@ -1717,6 +1717,14 @@ type ResultMessage struct {
 	// text-bearing post was sent to the remote-session stream. Nil when not
 	// provided by the CLI. Port of TypeScript SDK v0.3.277.
 	FirstTextPostMs *int `json:"first_text_post_ms,omitempty"`
+	// FirstTextPostQueueWaitMs is the milliseconds the first text-bearing post
+	// spent waiting in the send queue before it went out. Nil when not
+	// provided by the CLI. Port of TypeScript SDK v0.3.287.
+	FirstTextPostQueueWaitMs *int `json:"first_text_post_queue_wait_ms,omitempty"`
+	// FirstTextPostQueuedBehind identifies what the first text-bearing post
+	// was queued behind. Empty when not provided by the CLI. Port of
+	// TypeScript SDK v0.3.287.
+	FirstTextPostQueuedBehind FirstStreamPostQueuedBehind `json:"first_text_post_queued_behind,omitempty"`
 	// FirstTextPostWallMs is the wall-clock timestamp (ms since epoch) when
 	// that first text post was sent. Nil when not provided by the CLI. Port
 	// of TypeScript SDK v0.3.277.

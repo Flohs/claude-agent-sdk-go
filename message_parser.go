@@ -533,9 +533,13 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 	msg.FirstStreamPostAckMs = optionalIntField(data, "first_stream_post_ack_ms")
 	msg.FirstStreamPostQueueWaitMs = optionalIntField(data, "first_stream_post_queue_wait_ms")
 	msg.FirstTextPostMs = optionalIntField(data, "first_text_post_ms")
+	msg.FirstTextPostQueueWaitMs = optionalIntField(data, "first_text_post_queue_wait_ms")
 	msg.WarmSpareClaimed = optionalBoolField(data, "warm_spare_claimed")
 	if v := stringField(data, "first_stream_post_queued_behind"); v != "" {
 		msg.FirstStreamPostQueuedBehind = FirstStreamPostQueuedBehind(v)
+	}
+	if v := stringField(data, "first_text_post_queued_behind"); v != "" {
+		msg.FirstTextPostQueuedBehind = FirstStreamPostQueuedBehind(v)
 	}
 
 	msg.QueuedTurnCount = optionalIntField(data, "queued_turn_count")

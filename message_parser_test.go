@@ -3529,3 +3529,37 @@ func TestParseMessage_NonDictContentBlock_UserReturnsError(t *testing.T) {
 		t.Fatalf("expected *MessageParseError, got %T: %v", err, err)
 	}
 }
+
+// TestParseResultMessage_FirstTextPostQueueFields verifies the
+// first_text_post_queue_wait_ms / first_text_post_queued_behind fields parse,
+// and stay nil/empty when absent. Port of TypeScript SDK v0.3.287.
+func TestParseResultMessage_FirstTextPostQueueFields(t *testing.T) {
+	base := map[string]any{"type": "result", "subtype": "success", "session_id": "s"}
+
+	with := map[string]any{}
+	for k, v := range base {
+		with[k] = v
+	}
+	with["first_text_post_queue_wait_ms"] = float64(12)
+	with["first_text_post_queued_behind"] = "durable_post"
+	msg, err := ParseMessage(with)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+	r := msg.(*ResultMessage)
+	if r.FirstTextPostQueueWaitMs == nil || *r.FirstTextPostQueueWaitMs != 12 {
+		t.Errorf("FirstTextPostQueueWaitMs = %v, want 12", r.FirstTextPostQueueWaitMs)
+	}
+	if r.FirstTextPostQueuedBehind != FirstStreamPostQueuedBehindDurablePost {
+		t.Errorf("FirstTextPostQueuedBehind = %q, want durable_post", r.FirstTextPostQueuedBehind)
+	}
+
+	msg, err = ParseMessage(base)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+	r = msg.(*ResultMessage)
+	if r.FirstTextPostQueueWaitMs != nil || r.FirstTextPostQueuedBehind != "" {
+		t.Errorf("expected nil/empty when absent, got %v / %q", r.FirstTextPostQueueWaitMs, r.FirstTextPostQueuedBehind)
+	}
+}
