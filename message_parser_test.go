@@ -1481,6 +1481,7 @@ func TestParseMessage_InformationalMessage(t *testing.T) {
 		"level":                "warning",
 		"tool_use_id":          "tool-1",
 		"prevent_continuation": true,
+		"tag":                  "feature-x",
 		"uuid":                 "info-uuid-1",
 		"session_id":           "sess-1",
 	}
@@ -1504,6 +1505,9 @@ func TestParseMessage_InformationalMessage(t *testing.T) {
 	}
 	if !im.PreventContinuation {
 		t.Errorf("PreventContinuation = false, want true")
+	}
+	if im.Tag != "feature-x" {
+		t.Errorf("Tag = %q, want %q", im.Tag, "feature-x")
 	}
 	if im.UUID != "info-uuid-1" {
 		t.Errorf("UUID = %q", im.UUID)

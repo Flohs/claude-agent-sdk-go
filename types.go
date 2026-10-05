@@ -1214,6 +1214,9 @@ type InformationalMessage struct {
 	// PreventContinuation is true when execution stops after this message,
 	// e.g. a Stop hook denied continuation.
 	PreventContinuation bool `json:"prevent_continuation,omitempty"`
+	// Tag is an opaque feature tag on a line a host may treat specially;
+	// empty on ordinary lines. Hosts should ignore values they do not know.
+	Tag string `json:"tag,omitempty"`
 	// UUID uniquely identifies this event.
 	UUID string `json:"uuid,omitempty"`
 	// SessionID is the session this event belongs to.

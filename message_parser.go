@@ -292,6 +292,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Level:               InformationalLevel(stringField(data, "level")),
 			ToolUseID:           stringField(data, "tool_use_id"),
 			PreventContinuation: boolField(data, "prevent_continuation"),
+			Tag:                 stringField(data, "tag"),
 			UUID:                stringField(data, "uuid"),
 			SessionID:           stringField(data, "session_id"),
 		}, nil
