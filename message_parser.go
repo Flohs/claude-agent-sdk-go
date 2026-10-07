@@ -242,6 +242,8 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			IsBackgrounded:  optionalBoolField(data, "is_backgrounded"),
 			SpawnDepth:      optionalIntField(data, "spawn_depth"),
 			Ambient:         optionalBoolField(data, "ambient"),
+			RunID:           stringField(data, "run_id"),
+			ParentTaskID:    stringField(data, "parent_task_id"),
 		}, nil
 
 	case "task_progress":
@@ -259,6 +261,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			SubagentType:    stringField(data, "subagent_type"),
 			TaskDescription: stringField(data, "task_description"),
 			Blocked:         boolField(data, "blocked"),
+			RunID:           stringField(data, "run_id"),
 		}, nil
 
 	case "mirror_error":
@@ -303,6 +306,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			TaskID:        stringField(data, "task_id"),
 			SessionID:     stringField(data, "session_id"),
 			UUID:          stringField(data, "uuid"),
+			RunID:         stringField(data, "run_id"),
 		}
 		if patch, ok := data["patch"].(map[string]any); ok {
 			msg.Patch = patch
@@ -334,10 +338,12 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 					continue
 				}
 				msg.Tasks = append(msg.Tasks, BackgroundTaskInfo{
-					TaskID:      stringField(taskMap, "task_id"),
-					TaskType:    stringField(taskMap, "task_type"),
-					Description: stringField(taskMap, "description"),
-					Ambient:     optionalBoolField(taskMap, "ambient"),
+					TaskID:       stringField(taskMap, "task_id"),
+					TaskType:     stringField(taskMap, "task_type"),
+					Description:  stringField(taskMap, "description"),
+					Ambient:      optionalBoolField(taskMap, "ambient"),
+					RunID:        stringField(taskMap, "run_id"),
+					ParentTaskID: stringField(taskMap, "parent_task_id"),
 				})
 			}
 		}
@@ -364,6 +370,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			TaskDescription: stringField(data, "task_description"),
 			Ambient:         optionalBoolField(data, "ambient"),
 			ResourceLinks:   parseMcpResourceLinks(data["resource_links"]),
+			RunID:           stringField(data, "run_id"),
 		}, nil
 
 	case "api_retry":
@@ -794,6 +801,7 @@ func parseMessageOrigin(data map[string]any) *MessageOrigin {
 		FromMode:     stringField(origin, "fromMode"),
 		Subkind:      stringField(origin, "subkind"),
 		FireReason:   stringField(origin, "fireReason"),
+		RunID:        stringField(origin, "runId"),
 	}
 }
 

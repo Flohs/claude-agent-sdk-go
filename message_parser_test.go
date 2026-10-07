@@ -3567,3 +3567,57 @@ func TestParseResultMessage_FirstTextPostQueueFields(t *testing.T) {
 		t.Errorf("expected nil/empty when absent, got %v / %q", r.FirstTextPostQueueWaitMs, r.FirstTextPostQueuedBehind)
 	}
 }
+
+func TestParseMessage_TaskRunIDAndParentTaskID(t *testing.T) {
+	sys := func(subtype string, extra map[string]any) map[string]any {
+		d := map[string]any{"type": "system", "subtype": subtype, "task_id": "t1", "run_id": "r1", "uuid": "u1", "session_id": "s1"}
+		for k, v := range extra {
+			d[k] = v
+		}
+		return d
+	}
+	started, err := ParseMessage(sys("task_started", map[string]any{"parent_task_id": "p1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := started.(*TaskStartedMessage); m.RunID != "r1" || m.ParentTaskID != "p1" {
+		t.Errorf("task_started RunID/ParentTaskID = %q/%q", m.RunID, m.ParentTaskID)
+	}
+	progress, _ := ParseMessage(sys("task_progress", nil))
+	if m := progress.(*TaskProgressMessage); m.RunID != "r1" {
+		t.Errorf("task_progress RunID = %q", m.RunID)
+	}
+	notif, _ := ParseMessage(sys("task_notification", map[string]any{"status": "completed"}))
+	if m := notif.(*TaskNotificationMessage); m.RunID != "r1" {
+		t.Errorf("task_notification RunID = %q", m.RunID)
+	}
+	updated, _ := ParseMessage(sys("task_updated", map[string]any{"patch": map[string]any{"status": "completed"}}))
+	if m := updated.(*TaskUpdatedMessage); m.RunID != "r1" {
+		t.Errorf("task_updated RunID = %q", m.RunID)
+	}
+	bg, _ := ParseMessage(map[string]any{
+		"type": "system", "subtype": "background_tasks_changed",
+		"tasks": []any{map[string]any{"task_id": "t1", "task_type": "local_agent", "run_id": "r1", "parent_task_id": "p1"}},
+	})
+	if m := bg.(*BackgroundTasksChangedMessage); len(m.Tasks) != 1 || m.Tasks[0].RunID != "r1" || m.Tasks[0].ParentTaskID != "p1" {
+		t.Errorf("background_tasks_changed tasks = %+v", m.Tasks)
+	}
+	absent, _ := ParseMessage(sys("task_started", nil))
+	if m := absent.(*TaskStartedMessage); m.ParentTaskID != "" {
+		t.Errorf("ParentTaskID = %q, want empty when absent", m.ParentTaskID)
+	}
+}
+
+func TestParseMessage_UserMessageOriginRunID(t *testing.T) {
+	msg, err := ParseMessage(map[string]any{
+		"type":    "user",
+		"message": map[string]any{"role": "user", "content": "done"},
+		"origin":  map[string]any{"kind": "task-notification", "runId": "r1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o := msg.(*UserMessage).Origin; o == nil || o.RunID != "r1" {
+		t.Errorf("Origin = %+v, want RunID r1", o)
+	}
+}
