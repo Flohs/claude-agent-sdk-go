@@ -49,6 +49,7 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		IsMeta:          boolField(data, "isMeta"),
 		Origin:          parseMessageOrigin(data),
 		ToolResultMeta:  parseToolResultMeta(data),
+		AgentID:         stringField(data, "agent_id"),
 	}
 
 	if tr, ok := data["tool_use_result"].(map[string]any); ok {
@@ -168,6 +169,7 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		UserMessageUUID:  stringField(data, "user_message_uuid"),
 		UserMessageUUIDs: stringSliceField(data, "user_message_uuids"),
 		ResumeReason:     stringField(data, "resume_reason"),
+		AgentID:          stringField(data, "agent_id"),
 	}
 
 	if errStr := stringField(data, "error"); errStr != "" {

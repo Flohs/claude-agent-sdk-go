@@ -3567,3 +3567,32 @@ func TestParseResultMessage_FirstTextPostQueueFields(t *testing.T) {
 		t.Errorf("expected nil/empty when absent, got %v / %q", r.FirstTextPostQueueWaitMs, r.FirstTextPostQueuedBehind)
 	}
 }
+
+func TestParseMessage_AgentID(t *testing.T) {
+	a, err := ParseMessage(map[string]any{
+		"type":     "assistant",
+		"agent_id": "agent-1",
+		"message":  map[string]any{"model": "m", "content": []any{map[string]any{"type": "text", "text": "hi"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := a.(*AssistantMessage).AgentID; got != "agent-1" {
+		t.Errorf("AssistantMessage.AgentID = %q", got)
+	}
+	u, err := ParseMessage(map[string]any{
+		"type":     "user",
+		"agent_id": "agent-1",
+		"message":  map[string]any{"role": "user", "content": "hi"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := u.(*UserMessage).AgentID; got != "agent-1" {
+		t.Errorf("UserMessage.AgentID = %q", got)
+	}
+	main, _ := ParseMessage(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": "hi"}})
+	if got := main.(*UserMessage).AgentID; got != "" {
+		t.Errorf("AgentID = %q, want empty when absent", got)
+	}
+}
