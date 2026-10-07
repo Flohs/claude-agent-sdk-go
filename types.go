@@ -553,6 +553,18 @@ type TaskStartedMessage struct {
 	// live-update watchers); hosts should exclude these from activity
 	// indicators. Port of TypeScript SDK v0.3.247.
 	Ambient *bool `json:"ambient,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
+	// ParentTaskID is the TaskID of the subagent (local_agent) task whose
+	// agent launched this subagent, shell, monitor, or workflow task. Empty
+	// when the launcher is the main thread, has no task ID of its own, or is
+	// no longer tracked. Port of TypeScript SDK v0.3.290.
+	ParentTaskID string `json:"parent_task_id,omitempty"`
 }
 
 // TaskProgressMessage is emitted while a task is in progress.
@@ -575,6 +587,13 @@ type TaskProgressMessage struct {
 	// Blocked indicates the agent was blocked by the auto-mode safety
 	// classifier. Port of TypeScript SDK v0.3.199.
 	Blocked bool `json:"blocked,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // McpResourceLink is a resource_link content block an MCP tool result
@@ -624,6 +643,13 @@ type TaskNotificationMessage struct {
 	// most 50 links, 64 KiB serialized). Nil when the result had none or the
 	// task is any other type. Port of TypeScript SDK v0.3.257.
 	ResourceLinks []McpResourceLink `json:"resource_links,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // TaskUpdatedStatus represents the lifecycle status reported in a task_updated patch.
@@ -672,6 +698,13 @@ type TaskUpdatedMessage struct {
 	SessionID string `json:"session_id,omitempty"`
 	// UUID uniquely identifies this event.
 	UUID string `json:"uuid,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // CommandLifecycleState is the lifecycle state of a queued command reported
@@ -719,6 +752,18 @@ type BackgroundTaskInfo struct {
 	// live-update watchers); hosts should exclude these from activity
 	// indicators. Port of TypeScript SDK v0.3.247.
 	Ambient *bool `json:"ambient,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
+	// ParentTaskID is the TaskID of the subagent (local_agent) task whose
+	// agent launched this subagent, shell, monitor, or workflow task. Empty
+	// when the launcher is the main thread, has no task ID of its own, or is
+	// no longer tracked. Port of TypeScript SDK v0.3.290.
+	ParentTaskID string `json:"parent_task_id,omitempty"`
 }
 
 // BackgroundTasksChangedMessage is emitted as a system/background_tasks_changed
@@ -1575,6 +1620,10 @@ type MessageOrigin struct {
 	// with CLAUDE_CODE_HOST_SCHEDULED_RUN=1 (Port of TypeScript SDK
 	// v0.3.280).
 	FireReason string `json:"fireReason,omitempty"`
+	// RunID is, on a background task's own notification, the run_id its
+	// task_* events carried as of when the notification was queued. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"runId,omitempty"`
 }
 
 // ResultMessage contains cost and usage information for a completed query.
