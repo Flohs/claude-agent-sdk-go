@@ -167,6 +167,11 @@ type UserMessage struct {
 	// prompt. Nil when the turn had no inline paste or the CLI omits the
 	// field. Port of TypeScript SDK v0.3.277.
 	InlinePastes []string `json:"inline_pastes,omitempty"`
+	// AgentID is the ID of the subagent that produced this message: the
+	// task_id of its task events, unchanged when the subagent is resumed.
+	// Empty on main-thread messages and from older CLIs. Port of TypeScript
+	// SDK v0.3.290.
+	AgentID string `json:"agent_id,omitempty"`
 }
 
 func (UserMessage) messageMarker() {}
@@ -305,6 +310,11 @@ type AssistantMessage struct {
 	// RawData contains the full raw message data for forward compatibility
 	// with fields not yet modeled by the SDK.
 	RawData map[string]any `json:"-"`
+	// AgentID is the ID of the subagent that produced this message: the
+	// task_id of its task events, unchanged when the subagent is resumed.
+	// Empty on main-thread messages and from older CLIs. Port of TypeScript
+	// SDK v0.3.290.
+	AgentID string `json:"agent_id,omitempty"`
 }
 
 // AssistantContextUsageOverLimit describes how far current usage exceeds the
