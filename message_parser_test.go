@@ -3621,3 +3621,17 @@ func TestParseMessage_UserMessageOriginRunID(t *testing.T) {
 		t.Errorf("Origin = %+v, want RunID r1", o)
 	}
 }
+
+func TestParseMessage_BackgroundTasksChangedSubagentType(t *testing.T) {
+	msg, err := ParseMessage(map[string]any{
+		"type": "system", "subtype": "background_tasks_changed", "uuid": "u1", "session_id": "s1",
+		"tasks": []any{map[string]any{"task_id": "t1", "task_type": "local_agent", "description": "d", "subagent_type": "general-purpose"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := msg.(*BackgroundTasksChangedMessage)
+	if len(m.Tasks) != 1 || m.Tasks[0].SubagentType != "general-purpose" {
+		t.Errorf("Tasks = %+v", m.Tasks)
+	}
+}

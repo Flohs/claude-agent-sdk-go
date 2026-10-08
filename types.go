@@ -764,6 +764,11 @@ type BackgroundTaskInfo struct {
 	// when the launcher is the main thread, has no task ID of its own, or is
 	// no longer tracked. Port of TypeScript SDK v0.3.290.
 	ParentTaskID string `json:"parent_task_id,omitempty"`
+	// SubagentType is the agent type of a local_agent task, such as
+	// "general-purpose" or a custom agent's name; "main-session" for a
+	// backgrounded main session. Empty on other tasks and from older CLIs.
+	// Port of TypeScript SDK v0.3.293.
+	SubagentType string `json:"subagent_type,omitempty"`
 }
 
 // BackgroundTasksChangedMessage is emitted as a system/background_tasks_changed
@@ -1659,7 +1664,12 @@ type ResultMessage struct {
 	// producing a normal result, e.g. a known CLI startup failure. Empty
 	// when not provided by the CLI. Known values include
 	// "provider_not_allowed" (the configured API provider is rejected by
-	// the allowedProviders setting; TypeScript SDK v0.3.285). Port of
+	// the allowedProviders setting; TypeScript SDK v0.3.285),
+	// "org_config_required_unavailable" (the organization requires its
+	// policy limits and managed settings and they could not be loaded;
+	// retrying may succeed) and "org_config_refused" (Anthropic refused
+	// them for this sign-in; signing in again or an admin change is the
+	// fix, not a retry) (both TypeScript SDK v0.3.293). Port of
 	// TypeScript SDK v0.3.274.
 	StartupFailureReason string `json:"startup_failure_reason,omitempty"`
 	// Origin forwards the triggering message's origin so consumers can
