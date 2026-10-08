@@ -344,6 +344,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 					Ambient:      optionalBoolField(taskMap, "ambient"),
 					RunID:        stringField(taskMap, "run_id"),
 					ParentTaskID: stringField(taskMap, "parent_task_id"),
+					SubagentType: stringField(taskMap, "subagent_type"),
 				})
 			}
 		}
