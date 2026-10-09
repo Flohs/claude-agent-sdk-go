@@ -1886,6 +1886,10 @@ type RateLimitInfo struct {
 	// like the member's own monthly cap). Nil on a plain member denial and
 	// from older CLIs. Port of TypeScript SDK v0.3.268.
 	LimitScope *string `json:"limit_scope,omitempty"`
+	// OverageEnabled reports, on usage-limit warnings, whether the account
+	// has extra usage turned on. Nil when absent and from older CLIs. Port
+	// of TypeScript SDK v0.3.295.
+	OverageEnabled *bool `json:"overage_enabled,omitempty"`
 }
 
 // RateLimitEvent represents a rate limit status change from the CLI.

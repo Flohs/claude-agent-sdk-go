@@ -1036,6 +1036,7 @@ func TestParseMessage_RateLimitEvent(t *testing.T) {
 			"utilization":     utilization,
 			"overage_status":  "active",
 			"limit_scope":     "group_pool",
+			"overage_enabled": true,
 		},
 	}
 
@@ -1077,6 +1078,9 @@ func TestParseMessage_RateLimitEvent(t *testing.T) {
 	}
 	if event.RateLimitInfo.LimitScope == nil || *event.RateLimitInfo.LimitScope != "group_pool" {
 		t.Errorf("expected limit_scope 'group_pool', got %v", event.RateLimitInfo.LimitScope)
+	}
+	if event.RateLimitInfo.OverageEnabled == nil || !*event.RateLimitInfo.OverageEnabled {
+		t.Errorf("expected overage_enabled true, got %v", event.RateLimitInfo.OverageEnabled)
 	}
 }
 
