@@ -680,6 +680,7 @@ func parseRateLimitInfo(m map[string]any) RateLimitInfo {
 	if v, ok := m["has_chargeable_saved_payment_method"].(bool); ok {
 		info.HasChargeableSavedPaymentMethod = &v
 	}
+	info.OverageEnabled = optionalBoolField(m, "overage_enabled")
 	return info
 }
 
