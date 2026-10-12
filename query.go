@@ -318,6 +318,9 @@ func newQuery(cfg queryConfig) *query {
 			if def.InitialPrompt != "" {
 				m["initialPrompt"] = def.InitialPrompt
 			}
+			if def.AutoCompactWindow != nil {
+				m["autoCompactWindow"] = *def.AutoCompactWindow
+			}
 			q.agents[name] = m
 		}
 	}

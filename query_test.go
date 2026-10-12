@@ -3083,3 +3083,17 @@ func TestGetTaskOutput_SendsRequestAndParsesResponse(t *testing.T) {
 		t.Fatalf("task_id = %v, want %q", found["task_id"], "task-1")
 	}
 }
+
+func TestNewQuery_AgentAutoCompactWindow(t *testing.T) {
+	window := 50000
+	q := newQuery(queryConfig{agents: map[string]AgentDefinition{
+		"a": {Description: "d", Prompt: "p", AutoCompactWindow: &window},
+		"b": {Description: "d", Prompt: "p"},
+	}})
+	if got := q.agents["a"]["autoCompactWindow"]; got != window {
+		t.Errorf("autoCompactWindow = %v, want %d", got, window)
+	}
+	if _, ok := q.agents["b"]["autoCompactWindow"]; ok {
+		t.Error("autoCompactWindow should be omitted when nil")
+	}
+}

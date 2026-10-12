@@ -331,6 +331,11 @@ type AgentDefinition struct {
 	DisallowedTools []string `json:"disallowedTools,omitempty"`
 	MaxTurns        *int     `json:"maxTurns,omitempty"`
 	InitialPrompt   string   `json:"initialPrompt,omitempty"`
+	// AutoCompactWindow is the token count at which this agent compacts its
+	// own conversation when it runs as a subagent. It only lowers the window
+	// the subagent would otherwise inherit. No effect on the main session
+	// agent.
+	AutoCompactWindow *int `json:"autoCompactWindow,omitempty"`
 	// Advisor enables the advisor tool for this agent definition.
 	// Set to true to enable with default config, or provide an *AdvisorToolConfig
 	// for fine-grained control. When nil (default), the field is omitted.
