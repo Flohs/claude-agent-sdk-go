@@ -459,3 +459,14 @@ func TestNewSubprocessTransport_RejectsInvalidSkills(t *testing.T) {
 		t.Errorf("error message = %q, want it to contain %q", err.Error(), "bad,name")
 	}
 }
+
+func TestSandboxIgnoreViolationsMarshal(t *testing.T) {
+	s := SandboxSettings{IgnoreViolations: SandboxIgnoreViolations{"*": {"/etc/hosts"}}}
+	b, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"ignoreViolations":{"*":["/etc/hosts"]}`; !strings.Contains(string(b), want) {
+		t.Errorf("got %s, want substring %s", b, want)
+	}
+}
