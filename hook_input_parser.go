@@ -31,6 +31,7 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			ToolResponse:    input["tool_response"],
 			ToolUseID:       stringField(input, "tool_use_id"),
 			McpServer:       parseToolMcpServerRef(input),
+			DurationMs:      optionalIntField(input, "duration_ms"),
 		}, nil
 
 	case HookEventPostToolUseFailure:
@@ -42,6 +43,7 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			ToolUseID:       stringField(input, "tool_use_id"),
 			Error:           stringField(input, "error"),
 			IsInterrupt:     boolField(input, "is_interrupt"),
+			DurationMs:      optionalIntField(input, "duration_ms"),
 		}, nil
 
 	case HookEventPermissionRequest:
@@ -321,7 +323,16 @@ func parseBaseHookInput(m map[string]any) BaseHookInput {
 		PermissionMode: stringField(m, "permission_mode"),
 		HookEventName:  stringField(m, "hook_event_name"),
 		PromptID:       stringField(m, "prompt_id"),
+		Effort:         parseHookEffort(m),
 	}
+}
+
+func parseHookEffort(m map[string]any) *HookEffort {
+	e, ok := m["effort"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return &HookEffort{Level: stringField(e, "level")}
 }
 
 func parseSubagentContext(m map[string]any) SubagentContext {

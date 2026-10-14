@@ -1779,3 +1779,36 @@ func TestBaseHookInput_PromptID_OmittedWhenEmpty(t *testing.T) {
 		t.Error("prompt_id should be omitted from JSON when empty")
 	}
 }
+
+func TestParseHookInput_EffortAndDurationMs(t *testing.T) {
+	post, err := ParseHookInput(HookInput{
+		"hook_event_name": "PostToolUse",
+		"tool_name":       "Bash",
+		"duration_ms":     float64(42),
+		"effort":          map[string]any{"level": "high"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := post.(*PostToolUseHookInput)
+	if p.DurationMs == nil || *p.DurationMs != 42 {
+		t.Errorf("DurationMs = %v, want 42", p.DurationMs)
+	}
+	if p.Effort == nil || p.Effort.Level != "high" {
+		t.Errorf("Effort = %v, want level high", p.Effort)
+	}
+
+	fail, _ := ParseHookInput(HookInput{"hook_event_name": "PostToolUseFailure", "duration_ms": float64(7)})
+	f := fail.(*PostToolUseFailureHookInput)
+	if f.DurationMs == nil || *f.DurationMs != 7 {
+		t.Errorf("failure DurationMs = %v, want 7", f.DurationMs)
+	}
+	if f.Effort != nil {
+		t.Errorf("Effort = %v, want nil when absent", f.Effort)
+	}
+
+	none, _ := ParseHookInput(HookInput{"hook_event_name": "PostToolUse"})
+	if none.(*PostToolUseHookInput).DurationMs != nil {
+		t.Error("DurationMs should be nil when absent")
+	}
+}
