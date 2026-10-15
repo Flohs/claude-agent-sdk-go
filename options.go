@@ -432,11 +432,18 @@ type SandboxNetworkConfig struct {
 	AllowMachLookup *bool `json:"allowMachLookup,omitempty"`
 }
 
-// SandboxIgnoreViolations specifies violations to ignore in sandbox.
-type SandboxIgnoreViolations struct {
-	File    []string `json:"file,omitempty"`
-	Network []string `json:"network,omitempty"`
-}
+// SandboxIgnoreViolations specifies sandbox violations to leave unreported.
+// It maps a command pattern ("*" matches every command) to substrings of the
+// violation text: a violation is left unreported when the command's text
+// contains the pattern and the violation's text contains one of the strings.
+// Both checks are plain substring matches, not globs. Example:
+//
+//	SandboxIgnoreViolations{"*": {"/etc/hosts"}}
+//
+// This only affects which violations are reported, not what the sandbox
+// blocks. Matches Python SDK v0.2.166 and the TypeScript SDK's
+// SandboxSettings.ignoreViolations.
+type SandboxIgnoreViolations map[string][]string
 
 // SandboxFilesystemConfig configures filesystem access restrictions for sandboxed commands.
 type SandboxFilesystemConfig struct {
@@ -609,7 +616,7 @@ type SandboxSettings struct {
 	ExcludedCommands          []string                 `json:"excludedCommands,omitempty"`
 	AllowUnsandboxedCommands  *bool                    `json:"allowUnsandboxedCommands,omitempty"`
 	Network                   *SandboxNetworkConfig    `json:"network,omitempty"`
-	IgnoreViolations          *SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
+	IgnoreViolations          SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
 	EnableWeakerNestedSandbox *bool                    `json:"enableWeakerNestedSandbox,omitempty"`
 	// FailIfUnavailable controls behavior when sandboxing is requested but the
 	// platform's sandbox mechanism is unavailable (no bwrap on Linux, no
