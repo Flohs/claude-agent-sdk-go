@@ -1343,11 +1343,18 @@ func (q *query) updateSettings(source string, settings map[string]any) error {
 }
 
 func (q *query) reloadPlugins(holdOnCacheImpact bool) (map[string]any, error) {
+	return q.reloadPluginsAdding(holdOnCacheImpact, nil)
+}
+
+func (q *query) reloadPluginsAdding(holdOnCacheImpact bool, addPlugins []SdkPluginConfig) (map[string]any, error) {
 	req := map[string]any{
 		"subtype": "reload_plugins",
 	}
 	if holdOnCacheImpact {
 		req["hold_on_cache_impact"] = true
+	}
+	if len(addPlugins) > 0 {
+		req["add_plugins"] = addPlugins
 	}
 	resp, err := q.sendControlRequest(req, 60*time.Second)
 	return resp, err
