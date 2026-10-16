@@ -497,6 +497,21 @@ func (c *Client) ReloadPluginsWithOptions(ctx context.Context, holdOnCacheImpact
 	return c.q.reloadPlugins(holdOnCacheImpact)
 }
 
+// ReloadPluginsAdding is like [Client.ReloadPluginsWithOptions], but the
+// reload also loads addPlugins, as if each had been in
+// [Options.Plugins] at launch. Plugins already loaded stay; nothing is
+// removed. Each plugin Path must be absolute. The CLI refuses the request for
+// a malformed list or relative path, when managed settings set
+// disableSideloadFlags, in a cloud-hosted session, and over a connection
+// whose frames persist server-side. Port of TypeScript SDK
+// reloadPlugins({addPlugins}) (v0.3.297-v0.3.301).
+func (c *Client) ReloadPluginsAdding(ctx context.Context, holdOnCacheImpact bool, addPlugins []SdkPluginConfig) (map[string]any, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.reloadPluginsAdding(holdOnCacheImpact, addPlugins)
+}
+
 // ReloadOutputStyles re-reads the output-style directories from disk and
 // returns the refreshed style names. A style file written while the session
 // runs is otherwise invisible to it until the next session. This also drops

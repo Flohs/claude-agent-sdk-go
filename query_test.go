@@ -2529,6 +2529,41 @@ func TestReloadPlugins_HoldOnCacheImpactSendsKey(t *testing.T) {
 	}
 }
 
+// TestReloadPluginsAdding_SendsAddPlugins verifies that add_plugins carries
+// the plugin configs on the wire, and is omitted when none are given. Port of
+// TypeScript SDK v0.3.297-v0.3.301.
+func TestReloadPluginsAdding_SendsAddPlugins(t *testing.T) {
+	mt := newAutoRespondTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	if _, err := q.reloadPluginsAdding(false, []SdkPluginConfig{{Type: "local", Path: "/abs/plug"}}); err != nil {
+		t.Fatalf("reloadPluginsAdding failed: %v", err)
+	}
+	if _, err := q.reloadPlugins(false); err != nil {
+		t.Fatalf("reloadPlugins failed: %v", err)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	var with, without int
+	for _, w := range written {
+		if !strings.Contains(w, `"reload_plugins"`) {
+			continue
+		}
+		if strings.Contains(w, `"add_plugins":[{"type":"local","path":"/abs/plug"}]`) {
+			with++
+		} else if !strings.Contains(w, "add_plugins") {
+			without++
+		}
+	}
+	if with != 1 || without != 1 {
+		t.Fatalf("with=%d without=%d, written=%v", with, without, written)
+	}
+}
+
 // TestUpdateSettings_SendsSubtypeSourceAndSettings verifies that
 // query.updateSettings sends a control request with subtype
 // "update_settings" carrying the given source and settings map on the wire.
