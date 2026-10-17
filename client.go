@@ -772,6 +772,9 @@ func (c *Client) GetServerCapabilities() *ServerCapabilities {
 			}
 		}
 	}
+	if v, ok := c.q.initializationResult["claude_code_version"].(string); ok {
+		caps.ClaudeCodeVersion = v
+	}
 	if values, ok := c.q.initializationResult["capabilities"].([]any); ok {
 		for _, v := range values {
 			if s, ok := v.(string); ok {

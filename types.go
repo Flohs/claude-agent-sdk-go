@@ -2466,6 +2466,10 @@ type ServerCapabilities struct {
 	// MemoryPaths is the list of memory file paths loaded at session initialization.
 	// Empty when no memory files are configured.
 	MemoryPaths []string `json:"memoryPaths,omitempty"`
+	// ClaudeCodeVersion is the version of the Claude Code CLI serving the
+	// session, known before the first turn. Empty on CLIs that predate this
+	// field. Port of TypeScript SDK v0.3.296.
+	ClaudeCodeVersion string `json:"claude_code_version,omitempty"`
 	// Capabilities lists protocol capabilities the CLI supports, letting
 	// callers feature-detect instead of version-sniffing. This is an open
 	// set: ignore unknown values and check only for the specific values you
