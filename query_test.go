@@ -1087,6 +1087,68 @@ func TestInitialize_SdkMcpServerManifests(t *testing.T) {
 	})
 }
 
+func TestInitialize_SdkMcpServerToolPolicies(t *testing.T) {
+	initRequest := func(t *testing.T, servers map[string]*McpSdkServerConfig) map[string]any {
+		t.Helper()
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{transport: mt, mcpServers: servers})
+		q.start()
+		if _, err := q.initialize(); err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+		_ = q.close()
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			if req, _ := msg["request"].(map[string]any); req != nil && req["subtype"] == "initialize" {
+				return req
+			}
+		}
+		t.Fatal("no initialize request written")
+		return nil
+	}
+
+	t.Run("sends sdkMcpServers and sdkMcpServerConfigs tools", func(t *testing.T) {
+		server := NewSdkMcpServer("calc", "1.0.0", nil)
+		server.Tools = []McpServerToolPolicy{
+			{Name: "add", PermissionPolicy: McpToolPolicyAlwaysAsk},
+			{Name: "drop", PermissionPolicy: McpToolPolicyAlwaysDeny},
+		}
+		req := initRequest(t, map[string]*McpSdkServerConfig{"calc": server})
+
+		names, _ := req["sdkMcpServers"].([]any)
+		if len(names) != 1 || names[0] != "calc" {
+			t.Fatalf("sdkMcpServers = %v, want [calc]", names)
+		}
+		configs, _ := req["sdkMcpServerConfigs"].(map[string]any)
+		entry, _ := configs["calc"].(map[string]any)
+		tools, _ := entry["tools"].([]any)
+		if len(tools) != 2 {
+			t.Fatalf("tools = %v, want 2 entries", tools)
+		}
+		first, _ := tools[0].(map[string]any)
+		if first["name"] != "add" || first["permission_policy"] != "always_ask" {
+			t.Errorf("tools[0] = %v", first)
+		}
+	})
+
+	t.Run("omits both fields when no server declares a policy", func(t *testing.T) {
+		req := initRequest(t, map[string]*McpSdkServerConfig{"calc": NewSdkMcpServer("calc", "1.0.0", nil)})
+		if _, ok := req["sdkMcpServers"]; ok {
+			t.Error("sdkMcpServers should be omitted")
+		}
+		if _, ok := req["sdkMcpServerConfigs"]; ok {
+			t.Error("sdkMcpServerConfigs should be omitted")
+		}
+	})
+}
+
 func TestInitialize_ForwardSubagentText(t *testing.T) {
 	t.Run("sends forwardSubagentText when true", func(t *testing.T) {
 		mt := newAutoRespondTransport()
