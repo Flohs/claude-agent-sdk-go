@@ -1002,6 +1002,11 @@ func (q *query) initialize() (map[string]any, error) {
 		request["sdkMcpServerManifests"] = manifests
 	}
 
+	if names, configs := q.mcpRouter.buildToolPolicies(); len(configs) > 0 {
+		request["sdkMcpServers"] = names
+		request["sdkMcpServerConfigs"] = configs
+	}
+
 	response, err := q.sendControlRequest(request, time.Duration(q.initTimeout*float64(time.Second)))
 	if err != nil {
 		// A second initialize call returns "Already initialized" — treat as success.
@@ -1565,6 +1570,9 @@ func (q *query) setMcpServers(servers map[string]McpServerConfig) error {
 				"type":         "sdk",
 				"name":         sdkCfg.Name,
 				"capabilities": capabilities,
+			}
+			if len(sdkCfg.Tools) > 0 {
+				serialized[name].(map[string]any)["tools"] = sdkCfg.Tools
 			}
 			// Register the server in the router so subsequent mcp_message
 			// control requests for it are routed correctly.
