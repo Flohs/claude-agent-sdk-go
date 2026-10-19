@@ -4,6 +4,10 @@
 
 ### Changed
 
+- `Options.IncludeHookEvents` doc comment now states that the `SessionStart` and `Setup` hook events are emitted regardless of the setting. Documentation only. Port of Python SDK aada024 (#1336). ([#784](https://github.com/Flohs/claude-agent-sdk-go/issues/784))
+
+### Changed
+
 - **Breaking:** `SandboxIgnoreViolations` is now `map[string][]string` (command pattern, `"*"` for every command, to substrings of the violation text left unreported) instead of a `{File, Network}` struct, and `SandboxSettings.IgnoreViolations` is the map type rather than a pointer to the struct. The old struct did not match the CLI's `ignoreViolations` schema. Port of Python SDK v0.2.166 (matches the TypeScript SDK's `SandboxSettings.ignoreViolations`). ([#774](https://github.com/Flohs/claude-agent-sdk-go/issues/774))
 
 ### Fixed

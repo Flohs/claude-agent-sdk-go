@@ -774,6 +774,8 @@ type Options struct {
 	IncludePartialMessages bool
 	// IncludeHookEvents enables hook lifecycle system messages
 	// (hook_started, hook_progress, hook_response) for all hook event types.
+	// The SessionStart and Setup hook events are emitted regardless of this
+	// setting.
 	IncludeHookEvents bool
 	// AgentProgressSummaries enables periodic AI-generated progress summaries
 	// on task_progress messages. When set, task progress messages carry a
