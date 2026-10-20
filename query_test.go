@@ -3194,3 +3194,30 @@ func TestNewQuery_AgentAutoCompactWindow(t *testing.T) {
 		t.Error("autoCompactWindow should be omitted when nil")
 	}
 }
+
+// TestContextUsage_UnmarshalsCamelCaseResponse verifies ContextUsage decodes
+// the CLI's camelCase get_context_usage response, including the stable row
+// ids, plugin ids, paths and MCP instruction shares added in TS SDK v0.3.304.
+func TestContextUsage_UnmarshalsCamelCaseResponse(t *testing.T) {
+	raw := `{"categories":[{"id":"mcp_instructions","name":"MCP instructions","tokens":12,"color":"x","kind":"used"}],
+"totalTokens":100,"maxTokens":200,"rawMaxTokens":250,"percentage":50.5,"model":"m",
+"mcpInstructions":[{"serverName":"srv","tokens":12}],
+"agents":[{"agentType":"a","source":"plugin","pluginId":"p@mk","path":"/x/a.md","tokens":3}],
+"skills":{"totalSkills":1,"includedSkills":1,"tokens":4,"skillFrontmatter":[{"name":"s","source":"plugin","pluginName":"p","pluginId":"p@mk","path":"/x/s/SKILL.md","tokens":4}]}}`
+	var u ContextUsage
+	if err := json.Unmarshal([]byte(raw), &u); err != nil {
+		t.Fatal(err)
+	}
+	if u.TotalTokens != 100 || u.Categories[0].ID != "mcp_instructions" || u.Categories[0].Kind != "used" {
+		t.Errorf("unexpected categories/totals: %+v", u)
+	}
+	if u.MCPInstructions[0].ServerName != "srv" || u.MCPInstructions[0].Tokens != 12 {
+		t.Errorf("unexpected mcpInstructions: %+v", u.MCPInstructions)
+	}
+	if a := u.Agents[0]; a.PluginID != "p@mk" || a.Path != "/x/a.md" {
+		t.Errorf("unexpected agent: %+v", a)
+	}
+	if s := u.Skills.SkillFrontmatter[0]; s.PluginName != "p" || s.PluginID != "p@mk" || s.Path != "/x/s/SKILL.md" {
+		t.Errorf("unexpected skill: %+v", s)
+	}
+}
