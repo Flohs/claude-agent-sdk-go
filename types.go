@@ -2061,9 +2061,104 @@ var (
 	}
 )
 
-// ContextUsage contains context window utilization broken down by category.
+// ContextUsageCategory is one row of the [ContextUsage] breakdown.
+type ContextUsageCategory struct {
+	// ID identifies which row this is. Stable where Name is not: match a
+	// particular row on this (e.g. "system_prompt", "mcp_instructions",
+	// "messages", "free_space"). Empty from a CLI that predates it; treat an
+	// unknown value as absent.
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name"`
+	Tokens     int    `json:"tokens"`
+	Color      string `json:"color,omitempty"`
+	IsDeferred bool   `json:"isDeferred,omitempty"`
+	// Kind classifies the row: "used", "free", "buffer" or "deferred".
+	Kind string `json:"kind,omitempty"`
+}
+
+// ContextUsageMemoryFile is one memory file's share of [ContextUsage].
+type ContextUsageMemoryFile struct {
+	Path   string `json:"path"`
+	Type   string `json:"type"`
+	Tokens int    `json:"tokens"`
+}
+
+// ContextUsageMCPTool is one MCP tool's share of [ContextUsage].
+type ContextUsageMCPTool struct {
+	Name       string `json:"name"`
+	ServerName string `json:"serverName"`
+	Tokens     int    `json:"tokens"`
+	IsLoaded   *bool  `json:"isLoaded,omitempty"`
+}
+
+// ContextUsageMCPInstructions is one MCP server's estimated share of the
+// "mcp_instructions" row. Only present where the CLI answers on its own
+// stdio and no server stores or forwards the reply.
+type ContextUsageMCPInstructions struct {
+	// ServerName is as mcp_status reports it and mcp_toggle takes it (not
+	// normalized, unlike [ContextUsageMCPTool.ServerName]).
+	ServerName string `json:"serverName"`
+	Tokens     int    `json:"tokens"`
+}
+
+// ContextUsageAgent is one subagent definition's share of [ContextUsage].
+type ContextUsageAgent struct {
+	AgentType string `json:"agentType"`
+	Source    string `json:"source"`
+	// PluginID is the providing plugin's id (name and marketplace), when
+	// there is one and the CLI answers on its own stdio.
+	PluginID string `json:"pluginId,omitempty"`
+	// Path is the absolute path of the agent's file on the machine the CLI
+	// runs on; absent for an agent with no file or where the reply is
+	// forwarded.
+	Path   string `json:"path,omitempty"`
+	Tokens int    `json:"tokens"`
+}
+
+// ContextUsageSkill is one skill's frontmatter share of [ContextUsage].
+type ContextUsageSkill struct {
+	Name   string `json:"name"`
+	Source string `json:"source"`
+	// PluginName is the providing plugin's name; not unique across
+	// marketplaces ([ContextUsageSkill.PluginID] is).
+	PluginName string `json:"pluginName,omitempty"`
+	// PluginID is the providing plugin's id (name and marketplace), when
+	// there is one and the CLI answers on its own stdio.
+	PluginID string `json:"pluginId,omitempty"`
+	// Path is the absolute path of the skill's file on the machine the CLI
+	// runs on; absent for a skill with no file or where the reply is
+	// forwarded.
+	Path   string `json:"path,omitempty"`
+	Tokens int    `json:"tokens"`
+}
+
+// ContextUsageSkills groups the skills row of [ContextUsage].
+type ContextUsageSkills struct {
+	TotalSkills      int                 `json:"totalSkills"`
+	IncludedSkills   int                 `json:"includedSkills"`
+	Tokens           int                 `json:"tokens"`
+	SkillFrontmatter []ContextUsageSkill `json:"skillFrontmatter"`
+}
+
+// ContextUsage contains context window utilization broken down by category,
+// as returned by [Client.GetContextUsage]. Port of TypeScript SDK
+// SDKControlGetContextUsageResponse (stable row IDs, plugin IDs, file paths
+// and MCP instruction shares: v0.3.304). Only the commonly used fields of
+// the response are modeled.
 type ContextUsage struct {
-	TotalTokens     int            `json:"total_tokens"`
+	Categories      []ContextUsageCategory        `json:"categories,omitempty"`
+	TotalTokens     int                           `json:"totalTokens"`
+	MaxTokens       int                           `json:"maxTokens,omitempty"`
+	RawMaxTokens    int                           `json:"rawMaxTokens,omitempty"`
+	Percentage      float64                       `json:"percentage,omitempty"`
+	Model           string                        `json:"model,omitempty"`
+	MemoryFiles     []ContextUsageMemoryFile      `json:"memoryFiles,omitempty"`
+	MCPTools        []ContextUsageMCPTool         `json:"mcpTools,omitempty"`
+	MCPInstructions []ContextUsageMCPInstructions `json:"mcpInstructions,omitempty"`
+	Agents          []ContextUsageAgent           `json:"agents,omitempty"`
+	Skills          *ContextUsageSkills           `json:"skills,omitempty"`
+
+	// Legacy fields; the CLI does not send them under these names.
 	UsedTokens      int            `json:"used_tokens"`
 	UsageByCategory map[string]int `json:"usage_by_category,omitempty"`
 }
