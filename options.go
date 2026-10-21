@@ -618,6 +618,15 @@ type SandboxSettings struct {
 	Network                   *SandboxNetworkConfig    `json:"network,omitempty"`
 	IgnoreViolations          SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
 	EnableWeakerNestedSandbox *bool                    `json:"enableWeakerNestedSandbox,omitempty"`
+	// AllowNestedUserNamespaces (Linux/WSL only) lets sandboxed commands create
+	// user namespaces of their own, which the sandbox refuses by default.
+	// Needed by tools that sandbox themselves that way (Chromium/Electron,
+	// rootless podman or buildah, a nested bubblewrap, unshare). Removes
+	// code-execution isolation: a hostile command can then bypass the
+	// filesystem deny lists and write-protected paths. Default false. Only
+	// honored from user, managed/policy or CLI settings; true from project
+	// settings is ignored. Port of TypeScript SDK v0.3.305.
+	AllowNestedUserNamespaces *bool `json:"allowNestedUserNamespaces,omitempty"`
 	// FailIfUnavailable controls behavior when sandboxing is requested but the
 	// platform's sandbox mechanism is unavailable (no bwrap on Linux, no
 	// Seatbelt on macOS, etc). When true (the CLI default when Enabled is

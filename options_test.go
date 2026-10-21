@@ -470,3 +470,18 @@ func TestSandboxIgnoreViolationsMarshal(t *testing.T) {
 		t.Errorf("got %s, want substring %s", b, want)
 	}
 }
+
+func TestSandboxAllowNestedUserNamespacesMarshal(t *testing.T) {
+	on := true
+	b, err := json.Marshal(SandboxSettings{AllowNestedUserNamespaces: &on})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"allowNestedUserNamespaces":true`; !strings.Contains(string(b), want) {
+		t.Errorf("got %s, want substring %s", b, want)
+	}
+	b, _ = json.Marshal(SandboxSettings{})
+	if strings.Contains(string(b), "allowNestedUserNamespaces") {
+		t.Errorf("unset field should be omitted, got %s", b)
+	}
+}
