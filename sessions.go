@@ -1235,7 +1235,282 @@ func buildConversationChain(entries []transcriptEntry) []transcriptEntry {
 	for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
 		chain[i], chain[j] = chain[j], chain[i]
 	}
-	return chain
+	return recoverOrphanedParallelToolResults(entries, byUUID, chain, seen)
+}
+
+func entryUUID(e transcriptEntry) string {
+	u, _ := e["uuid"].(string)
+	return u
+}
+
+// assistantMessageID returns the API message.id of an assistant entry, or ""
+// when it has none.
+func assistantMessageID(e transcriptEntry) string {
+	if t, _ := e["type"].(string); t != "assistant" {
+		return ""
+	}
+	msg, _ := e["message"].(map[string]any)
+	id, _ := msg["id"].(string)
+	return id
+}
+
+// contentBlockIDs returns idField of each blockType content block in e.
+func contentBlockIDs(e transcriptEntry, blockType, idField string) []string {
+	msg, _ := e["message"].(map[string]any)
+	content, _ := msg["content"].([]any)
+	var ids []string
+	for _, item := range content {
+		block, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if bt, _ := block["type"].(string); bt != blockType {
+			continue
+		}
+		if id, ok := block[idField].(string); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// sameTranscriptWriter reports whether two entries were written by the same
+// (sub)agent.
+func sameTranscriptWriter(a, b transcriptEntry) bool {
+	sa, _ := a["isSidechain"].(bool)
+	sb, _ := b["isSidechain"].(bool)
+	aa, _ := a["agentId"].(string)
+	ab, _ := b["agentId"].(string)
+	return sa == sb && aa == ab
+}
+
+func entryTimestamp(e transcriptEntry) string {
+	ts, _ := e["timestamp"].(string)
+	return ts
+}
+
+// recoverOrphanedParallelToolResults puts back the tool calls and results a
+// parallel turn left off the chain.
+//
+// The CLI writes one assistant entry per content block, so a response with N
+// parallel tool calls is N assistant entries sharing message.id and chained
+// one after another. Each tool_result entry's parentUuid is its own call's
+// assistant entry, so the results fan out from different parents and the
+// transcript forks. The parentUuid walk follows only the branch the next turn
+// continued from: it keeps one result and drops every call written after the
+// one that result answers.
+//
+// For each response on the chain, this collects its assistant entries and
+// their tool results that the walk did not reach and inserts them right after
+// the response's last entry on the chain, so the response stays in one piece
+// and every result follows its call. Port of Python SDK v0.2.167-v0.2.170
+// (_recover_orphaned_parallel_tool_results), which mirrors the TypeScript
+// SDK's getSessionMessages.
+//
+// seen is the set of uuids on chain.
+func recoverOrphanedParallelToolResults(entries []transcriptEntry, byUUID map[string]transcriptEntry, chain []transcriptEntry, seen map[string]bool) []transcriptEntry {
+	var chainAssistants []transcriptEntry
+	for _, e := range chain {
+		if t, _ := e["type"].(string); t == "assistant" {
+			chainAssistants = append(chainAssistants, e)
+		}
+	}
+	if len(chainAssistants) == 0 {
+		return chain
+	}
+
+	// Anchor = the last on-chain entry of each response.
+	anchorByMessageID := make(map[string]transcriptEntry)
+	for _, e := range chainAssistants {
+		if id := assistantMessageID(e); id != "" {
+			anchorByMessageID[id] = e
+		}
+	}
+	if len(anchorByMessageID) == 0 {
+		return chain
+	}
+
+	// Group every assistant entry by response and record which entry made
+	// each tool call. A tool_use id claimed by two different responses is
+	// ambiguous (nil) and is never used to place a result. Iterates in file
+	// order, one visit per uuid, like the upstream dict.
+	siblingsByMessageID := make(map[string][]transcriptEntry)
+	callOwner := make(map[string]transcriptEntry) // nil value = ambiguous
+	var toolResultEntries []transcriptEntry
+	visited := make(map[string]bool, len(byUUID))
+	for _, raw := range entries {
+		uuid := entryUUID(raw)
+		if visited[uuid] {
+			continue
+		}
+		visited[uuid] = true
+		e := byUUID[uuid]
+		if id := assistantMessageID(e); id != "" {
+			siblingsByMessageID[id] = append(siblingsByMessageID[id], e)
+			for _, callID := range contentBlockIDs(e, "tool_use", "id") {
+				owner, exists := callOwner[callID]
+				if !exists {
+					callOwner[callID] = e
+					continue
+				}
+				if owner != nil && assistantMessageID(owner) == id {
+					callOwner[callID] = e
+				} else {
+					callOwner[callID] = nil
+				}
+			}
+		} else if isToolResultUserEntry(e) {
+			toolResultEntries = append(toolResultEntries, e)
+		}
+	}
+
+	// Index each tool result under the assistant entries it may belong to:
+	// its parent, its sourceToolAssistantUUID, and the owner of each call it
+	// answers. The last two only count when written by the same agent.
+	resultsByAssistant := make(map[string][]transcriptEntry)
+	for _, result := range toolResultEntries {
+		parent, _ := result["parentUuid"].(string)
+		resultsByAssistant[parent] = append(resultsByAssistant[parent], result)
+		if source, ok := result["sourceToolAssistantUUID"].(string); ok {
+			if se, found := byUUID[source]; found && sameTranscriptWriter(result, se) {
+				resultsByAssistant[source] = append(resultsByAssistant[source], result)
+			}
+		}
+		for _, callID := range contentBlockIDs(result, "tool_result", "tool_use_id") {
+			if owner := callOwner[callID]; owner != nil && sameTranscriptWriter(result, owner) {
+				ou := entryUUID(owner)
+				resultsByAssistant[ou] = append(resultsByAssistant[ou], result)
+			}
+		}
+	}
+
+	// Only needed to place strays, which are rare: built on first use.
+	var answeredOnChain map[string]bool
+	var filePosition map[string]int
+
+	processed := make(map[string]bool)
+	inserts := make(map[string][]transcriptEntry)
+	for _, assistant := range chainAssistants {
+		messageID := assistantMessageID(assistant)
+		if messageID == "" || processed[messageID] {
+			continue
+		}
+		processed[messageID] = true
+
+		group, ok := siblingsByMessageID[messageID]
+		if !ok {
+			group = []transcriptEntry{assistant}
+		}
+		memberUUIDs := make(map[string]bool, len(group))
+		for _, m := range group {
+			memberUUIDs[entryUUID(m)] = true
+		}
+		var orphanedSiblings, orphanedResults, strays []transcriptEntry
+		for _, m := range group {
+			if !seen[entryUUID(m)] {
+				orphanedSiblings = append(orphanedSiblings, m)
+			}
+		}
+		collected := make(map[string]bool)
+		for _, member := range group {
+			for _, result := range resultsByAssistant[entryUUID(member)] {
+				ru := entryUUID(result)
+				if seen[ru] || collected[ru] {
+					continue
+				}
+				collected[ru] = true
+				if parent, _ := result["parentUuid"].(string); memberUUIDs[parent] {
+					orphanedResults = append(orphanedResults, result)
+				} else {
+					strays = append(strays, result)
+				}
+			}
+		}
+
+		// Strays are recovered only if they answer a still-unanswered call.
+		if len(strays) > 0 {
+			if answeredOnChain == nil || filePosition == nil {
+				answeredOnChain = make(map[string]bool)
+				for _, e := range chain {
+					for _, id := range contentBlockIDs(e, "tool_result", "tool_use_id") {
+						answeredOnChain[id] = true
+					}
+				}
+				filePosition = make(map[string]int, len(byUUID))
+				pos := 0
+				order := make(map[string]bool, len(byUUID))
+				for _, raw := range entries {
+					u := entryUUID(raw)
+					if order[u] {
+						continue
+					}
+					order[u] = true
+					filePosition[u] = pos
+					pos++
+				}
+			}
+			answered := make(map[string]bool, len(answeredOnChain))
+			for id := range answeredOnChain {
+				answered[id] = true
+			}
+			for _, result := range orphanedResults {
+				for _, id := range contentBlockIDs(result, "tool_result", "tool_use_id") {
+					answered[id] = true
+				}
+			}
+			sort.SliceStable(strays, func(i, j int) bool {
+				return filePosition[entryUUID(strays[i])] < filePosition[entryUUID(strays[j])]
+			})
+			for _, result := range strays {
+				callIDs := contentBlockIDs(result, "tool_result", "tool_use_id")
+				answersOpenCall := false
+				for _, id := range callIDs {
+					owner := callOwner[id]
+					if !answered[id] && owner != nil && memberUUIDs[entryUUID(owner)] {
+						answersOpenCall = true
+						break
+					}
+				}
+				if !answersOpenCall {
+					continue
+				}
+				for _, id := range callIDs {
+					answered[id] = true
+				}
+				orphanedResults = append(orphanedResults, result)
+			}
+		}
+
+		if len(orphanedSiblings) == 0 && len(orphanedResults) == 0 {
+			continue
+		}
+
+		// Timestamp order keeps content-block and completion order. The
+		// sort is stable, so on a tie siblings keep file order and results
+		// keep the order of the calls they answer.
+		sort.SliceStable(orphanedSiblings, func(i, j int) bool {
+			return entryTimestamp(orphanedSiblings[i]) < entryTimestamp(orphanedSiblings[j])
+		})
+		sort.SliceStable(orphanedResults, func(i, j int) bool {
+			return entryTimestamp(orphanedResults[i]) < entryTimestamp(orphanedResults[j])
+		})
+		recovered := append(orphanedSiblings, orphanedResults...)
+		for _, e := range recovered {
+			seen[entryUUID(e)] = true
+		}
+		anchor := entryUUID(anchorByMessageID[messageID])
+		inserts[anchor] = recovered
+	}
+
+	if len(inserts) == 0 {
+		return chain
+	}
+	out := make([]transcriptEntry, 0, len(chain))
+	for _, e := range chain {
+		out = append(out, e)
+		out = append(out, inserts[entryUUID(e)]...)
+	}
+	return out
 }
 
 // queuedCommandInterruptPrefixes lists the exact synthetic "user"-authored
