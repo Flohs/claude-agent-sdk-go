@@ -2140,6 +2140,29 @@ type ContextUsageSkills struct {
 	SkillFrontmatter []ContextUsageSkill `json:"skillFrontmatter"`
 }
 
+// ContextUsageRecommendation is one recommended change in [ContextUsage].
+type ContextUsageRecommendation struct {
+	// Key is the behavior key, or "agent", "skill", "plugin" or "mcp_server"
+	// for a named source.
+	Key string `json:"key"`
+	// Pct is the share of the weighted local usage this touches, 0-100.
+	Pct float64 `json:"pct"`
+	// Title says what to do, verb first.
+	Title string `json:"title"`
+	// Detail is a few words: what the scan saw, or the command to run.
+	Detail string `json:"detail,omitempty"`
+}
+
+// ContextUsageFix is what one "fix" action does for [ContextUsage].
+type ContextUsageFix struct {
+	// Keys are the recommendations it covers.
+	Keys []string `json:"keys"`
+	// Messages are the user messages to send for the person, one each and in
+	// order, at priority "later" so a running turn cannot reorder them: any
+	// /effort commands first, then one prompt for the rest.
+	Messages []string `json:"messages"`
+}
+
 // ContextUsage contains context window utilization broken down by category,
 // as returned by [Client.GetContextUsage]. Port of TypeScript SDK
 // SDKControlGetContextUsageResponse (stable row IDs, plugin IDs, file paths
@@ -2157,6 +2180,13 @@ type ContextUsage struct {
 	MCPInstructions []ContextUsageMCPInstructions `json:"mcpInstructions,omitempty"`
 	Agents          []ContextUsageAgent           `json:"agents,omitempty"`
 	Skills          *ContextUsageSkills           `json:"skills,omitempty"`
+	// Recommendations lists one recommended change per notable behavior or
+	// source, largest share first, worded for display. Port of TypeScript
+	// SDK v0.3.305.
+	Recommendations []ContextUsageRecommendation `json:"recommendations,omitempty"`
+	// Fix describes what one "fix" action does; nil when nothing can be fixed
+	// in the session that answered.
+	Fix *ContextUsageFix `json:"fix,omitempty"`
 
 	// Legacy fields; the CLI does not send them under these names.
 	UsedTokens      int            `json:"used_tokens"`

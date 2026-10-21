@@ -3221,3 +3221,20 @@ func TestContextUsage_UnmarshalsCamelCaseResponse(t *testing.T) {
 		t.Errorf("unexpected skill: %+v", s)
 	}
 }
+
+// TestContextUsage_UnmarshalsRecommendationsAndFix verifies the
+// recommendations and fix fields added in TS SDK v0.3.305.
+func TestContextUsage_UnmarshalsRecommendationsAndFix(t *testing.T) {
+	raw := `{"totalTokens":1,"recommendations":[{"key":"agent","pct":42.5,"title":"Trim agent","detail":"/effort low"}],
+"fix":{"keys":["agent"],"messages":["/effort low","do the rest"]}}`
+	var u ContextUsage
+	if err := json.Unmarshal([]byte(raw), &u); err != nil {
+		t.Fatal(err)
+	}
+	if r := u.Recommendations[0]; r.Key != "agent" || r.Pct != 42.5 || r.Title != "Trim agent" || r.Detail != "/effort low" {
+		t.Errorf("unexpected recommendation: %+v", r)
+	}
+	if u.Fix == nil || len(u.Fix.Messages) != 2 || u.Fix.Keys[0] != "agent" {
+		t.Errorf("unexpected fix: %+v", u.Fix)
+	}
+}
