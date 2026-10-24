@@ -731,6 +731,15 @@ type Options struct {
 	Settings string
 	// ManagedSettings is a JSON string of policy-tier settings forwarded to the
 	// spawned CLI in-memory. Honored below IT-controlled managed sources.
+	// Two hook keys are filtered by value rather than kept as written:
+	// disableAllHooks (any value but false/"false") binds as
+	// allowManagedHooksOnly: true so the administrator's own hooks keep
+	// running, and allowedHttpHookUrls / httpHookAllowedEnvVars bind only as
+	// the empty list (a non-empty one is dropped, since these lists union
+	// across settings sources and would widen an admin's). An empty list
+	// binds only where no other source sets one; pair it with
+	// allowManagedHooksOnly to stop a project's HTTP hooks outright.
+	// Port of TypeScript SDK v0.3.309.
 	ManagedSettings string
 	// AddDirs adds additional directories.
 	AddDirs []string
