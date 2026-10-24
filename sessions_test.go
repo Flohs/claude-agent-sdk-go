@@ -4373,3 +4373,80 @@ func TestImportSessionToStore_VariadicDirectoryAcceptsZeroArgs(t *testing.T) {
 		t.Fatalf("ImportSessionToStore with no directory arg: %v", err)
 	}
 }
+
+func toolUseEntry(uuid, parent, msgID, callID, ts string) transcriptEntry {
+	return transcriptEntry{"type": "assistant", "uuid": uuid, "parentUuid": parent, "timestamp": ts,
+		"message": map[string]any{"id": msgID, "content": []any{
+			map[string]any{"type": "tool_use", "id": callID},
+		}}}
+}
+
+func toolResultEntry(uuid, parent, callID, ts string) transcriptEntry {
+	return transcriptEntry{"type": "user", "uuid": uuid, "parentUuid": parent, "timestamp": ts,
+		"message": map[string]any{"content": []any{
+			map[string]any{"type": "tool_result", "tool_use_id": callID},
+		}}}
+}
+
+func chainUUIDs(chain []transcriptEntry) []string {
+	var out []string
+	for _, e := range chain {
+		out = append(out, entryUUID(e))
+	}
+	return out
+}
+
+// A response with parallel tool calls forks the transcript; the parentUuid
+// walk keeps only one result, and the other results must be put back right
+// after the response's last entry. Port of Python SDK v0.2.167-v0.2.170.
+func TestBuildConversationChain_RecoversParallelToolResults(t *testing.T) {
+	entries := []transcriptEntry{
+		{"type": "user", "uuid": "u1", "message": "q"},
+		toolUseEntry("a1", "u1", "m1", "t1", "2026-01-01T00:00:01Z"),
+		toolUseEntry("a2", "a1", "m1", "t2", "2026-01-01T00:00:02Z"),
+		toolUseEntry("a3", "a2", "m1", "t3", "2026-01-01T00:00:03Z"),
+		toolResultEntry("r1", "a1", "t1", "2026-01-01T00:00:04Z"),
+		toolResultEntry("r2", "a2", "t2", "2026-01-01T00:00:05Z"),
+		toolResultEntry("r3", "a3", "t3", "2026-01-01T00:00:06Z"),
+		{"type": "assistant", "uuid": "a4", "parentUuid": "r3", "message": map[string]any{"id": "m2"}},
+	}
+
+	got := chainUUIDs(buildConversationChain(entries))
+	want := []string{"u1", "a1", "a2", "a3", "r1", "r2", "r3", "a4"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("chain = %v, want %v", got, want)
+	}
+}
+
+// Calls the walk skipped are recovered too (the branch continued from the
+// first result, so the later calls are off the chain).
+func TestBuildConversationChain_RecoversSkippedParallelCalls(t *testing.T) {
+	entries := []transcriptEntry{
+		{"type": "user", "uuid": "u1", "message": "q"},
+		toolUseEntry("a1", "u1", "m1", "t1", "2026-01-01T00:00:01Z"),
+		toolUseEntry("a2", "a1", "m1", "t2", "2026-01-01T00:00:02Z"),
+		toolResultEntry("r2", "a2", "t2", "2026-01-01T00:00:05Z"),
+		toolResultEntry("r1", "a1", "t1", "2026-01-01T00:00:04Z"),
+		{"type": "assistant", "uuid": "a3", "parentUuid": "r1", "message": map[string]any{"id": "m2"}},
+	}
+
+	got := chainUUIDs(buildConversationChain(entries))
+	want := []string{"u1", "a1", "a2", "r2", "r1", "a3"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("chain = %v, want %v", got, want)
+	}
+}
+
+// A linear transcript with no parallel calls is left untouched.
+func TestBuildConversationChain_NoParallelCallsUnchanged(t *testing.T) {
+	entries := []transcriptEntry{
+		{"type": "user", "uuid": "u1", "message": "q"},
+		toolUseEntry("a1", "u1", "m1", "t1", "2026-01-01T00:00:01Z"),
+		toolResultEntry("r1", "a1", "t1", "2026-01-01T00:00:02Z"),
+		{"type": "assistant", "uuid": "a2", "parentUuid": "r1", "message": map[string]any{"id": "m2"}},
+	}
+	got := chainUUIDs(buildConversationChain(entries))
+	if strings.Join(got, ",") != "u1,a1,r1,a2" {
+		t.Errorf("chain = %v", got)
+	}
+}
