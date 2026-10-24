@@ -4,6 +4,7 @@
 
 ### Changed
 
+- `SandboxSettings.AllowNestedUserNamespaces` doc comment no longer lists rootless podman or buildah among the tools that need nested user namespaces. Documentation only. Port of TypeScript SDK v0.3.308 `sdk.d.ts` wording. ([#794](https://github.com/Flohs/claude-agent-sdk-go/issues/794))
 - `Options.IncludeHookEvents` doc comment now states that the `SessionStart` and `Setup` hook events are emitted regardless of the setting. Documentation only. Port of Python SDK aada024 (#1336). ([#784](https://github.com/Flohs/claude-agent-sdk-go/issues/784))
 
 ### Changed
