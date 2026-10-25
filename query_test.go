@@ -1138,6 +1138,20 @@ func TestInitialize_SdkMcpServerToolPolicies(t *testing.T) {
 		}
 	})
 
+	t.Run("sends connectorId in sdkMcpServerConfigs", func(t *testing.T) {
+		server := NewSdkMcpServer("calc", "1.0.0", nil)
+		server.ConnectorID = "conn-123"
+		req := initRequest(t, map[string]*McpSdkServerConfig{"calc": server})
+		configs, _ := req["sdkMcpServerConfigs"].(map[string]any)
+		entry, _ := configs["calc"].(map[string]any)
+		if entry["connectorId"] != "conn-123" {
+			t.Errorf("connectorId = %v, want conn-123", entry["connectorId"])
+		}
+		if _, ok := entry["tools"]; ok {
+			t.Error("tools should be omitted")
+		}
+	})
+
 	t.Run("omits both fields when no server declares a policy", func(t *testing.T) {
 		req := initRequest(t, map[string]*McpSdkServerConfig{"calc": NewSdkMcpServer("calc", "1.0.0", nil)})
 		if _, ok := req["sdkMcpServers"]; ok {
