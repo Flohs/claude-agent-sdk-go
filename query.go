@@ -1574,6 +1574,9 @@ func (q *query) setMcpServers(servers map[string]McpServerConfig) error {
 			if len(sdkCfg.Tools) > 0 {
 				serialized[name].(map[string]any)["tools"] = sdkCfg.Tools
 			}
+			if sdkCfg.ConnectorID != "" {
+				serialized[name].(map[string]any)["connectorId"] = sdkCfg.ConnectorID
+			}
 			// Register the server in the router so subsequent mcp_message
 			// control requests for it are routed correctly.
 			q.mcpRouter.addServer(sdkCfg.Name, sdkCfg)
