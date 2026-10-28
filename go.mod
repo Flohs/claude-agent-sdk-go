@@ -1,4 +1,4 @@
-module github.com/Flohs/claude-agent-sdk-go/v3
+module github.com/Flohs/claude-agent-sdk-go/v4
 
 go 1.26.1
 

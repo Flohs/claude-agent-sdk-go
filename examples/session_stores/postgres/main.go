@@ -17,7 +17,7 @@ import (
 	"log"
 	"os"
 
-	claude "github.com/Flohs/claude-agent-sdk-go/v3"
+	claude "github.com/Flohs/claude-agent-sdk-go/v4"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

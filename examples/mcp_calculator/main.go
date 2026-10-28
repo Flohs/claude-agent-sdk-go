@@ -11,7 +11,7 @@ import (
 	"log"
 	"math"
 
-	claude "github.com/Flohs/claude-agent-sdk-go/v3"
+	claude "github.com/Flohs/claude-agent-sdk-go/v4"
 )
 
 func displayMessage(msg claude.Message) {
