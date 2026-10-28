@@ -718,11 +718,16 @@ const (
 	CommandLifecycleStateCompleted CommandLifecycleState = "completed"
 	CommandLifecycleStateCancelled CommandLifecycleState = "cancelled"
 	CommandLifecycleStateDiscarded CommandLifecycleState = "discarded"
+	// CommandLifecycleStateRefused is a command the CLI declined to run.
+	// Accepted by Claude Desktop 3.6556.2's lifecycle parser.
+	CommandLifecycleStateRefused CommandLifecycleState = "refused"
 )
 
-// CommandLifecycleMessage is emitted as a system/command_lifecycle event
-// reporting the lifecycle state of a previously-queued command. CommandUUID
-// identifies the queued message this event pertains to. A Cancelled state
+// CommandLifecycleMessage reports the lifecycle state of a previously-queued
+// command. Claude Code CLI 2.1.312 sends it as a top-level command_lifecycle
+// frame; older CLIs sent it as a system/command_lifecycle event, which is
+// still parsed. CommandUUID identifies the queued message this event pertains
+// to. A Cancelled state
 // may result from an explicit cancel or from the turn that would have
 // consumed the command dying (e.g. a ResultMessage with TerminalReason
 // "tool_deferred_unavailable", "turn_setup_failed", "api_error",
@@ -732,8 +737,12 @@ const (
 // Port of TypeScript SDK v0.3.204-v0.3.206.
 type CommandLifecycleMessage struct {
 	SystemMessage
-	// CommandUUID is the uuid of the queued command this event reports on.
-	CommandUUID string `json:"uuid"`
+	// CommandUUID is the uuid of the queued command this event reports on:
+	// the uuid the user message was sent with.
+	CommandUUID string `json:"command_uuid"`
+	// UUID is this event's own id. Empty from CLIs that sent the system
+	// subtype, where uuid carried the command's id instead.
+	UUID string `json:"uuid,omitempty"`
 	// State is the lifecycle state of the command.
 	State CommandLifecycleState `json:"state"`
 	// SessionID is the session this event belongs to.
