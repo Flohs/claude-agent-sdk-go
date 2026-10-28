@@ -32,6 +32,13 @@ func ParseMessage(data map[string]any) (Message, error) {
 		return parseRateLimitEvent(data)
 	case "tool_progress":
 		return parseToolProgressMessage(data)
+	case "tool_use_summary":
+		return &ToolUseSummaryMessage{
+			Summary:             stringField(data, "summary"),
+			PrecedingToolUseIDs: stringSliceField(data, "preceding_tool_use_ids"),
+			UUID:                stringField(data, "uuid"),
+			SessionID:           stringField(data, "session_id"),
+		}, nil
 	case "conversation_reset":
 		return parseConversationResetMessage(data)
 	case "command_lifecycle":

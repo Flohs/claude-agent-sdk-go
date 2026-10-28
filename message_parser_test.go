@@ -3713,3 +3713,45 @@ func TestParseMessage_UserMessageIsReplay(t *testing.T) {
 		t.Fatal("a user message without isReplay must not be marked as an echo")
 	}
 }
+
+// The CLI's label for a batch of tool calls, sent when it runs with
+// CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES=true. Captured from CLI 2.1.312.
+func TestParseToolUseSummaryMessage(t *testing.T) {
+	data := map[string]any{
+		"type":                   "tool_use_summary",
+		"summary":                "Listed files, counted a.txt lines",
+		"preceding_tool_use_ids": []any{"toolu_016wE3FBYnp2CJ2LLbv5v8Ks", "toolu_011uwe9g6vk82oSbktBiMEdy"},
+		"uuid":                   "8ec7ff7c-4e53-4906-ba50-af6ea47b0f93",
+		"session_id":             "95f3d083-94f4-44e6-ad85-7dd6f3f11a52",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ts, ok := msg.(*ToolUseSummaryMessage)
+	if !ok {
+		t.Fatalf("expected *ToolUseSummaryMessage, got %T", msg)
+	}
+	if ts.Summary != "Listed files, counted a.txt lines" {
+		t.Errorf("Summary = %q", ts.Summary)
+	}
+	if len(ts.PrecedingToolUseIDs) != 2 || ts.PrecedingToolUseIDs[0] != "toolu_016wE3FBYnp2CJ2LLbv5v8Ks" || ts.PrecedingToolUseIDs[1] != "toolu_011uwe9g6vk82oSbktBiMEdy" {
+		t.Errorf("PrecedingToolUseIDs = %v", ts.PrecedingToolUseIDs)
+	}
+	if ts.UUID != "8ec7ff7c-4e53-4906-ba50-af6ea47b0f93" || ts.SessionID != "95f3d083-94f4-44e6-ad85-7dd6f3f11a52" {
+		t.Errorf("UUID = %q, SessionID = %q", ts.UUID, ts.SessionID)
+	}
+}
+
+// A summary without ids still parses; the ids are simply empty.
+func TestParseToolUseSummaryMessageWithoutIDs(t *testing.T) {
+	msg, err := ParseMessage(map[string]any{"type": "tool_use_summary", "summary": "Read the config"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ts, ok := msg.(*ToolUseSummaryMessage)
+	if !ok || ts.Summary != "Read the config" || len(ts.PrecedingToolUseIDs) != 0 {
+		t.Fatalf("got %#v", msg)
+	}
+}

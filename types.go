@@ -2026,6 +2026,25 @@ type ToolProgressMessage struct {
 
 func (ToolProgressMessage) messageMarker() {}
 
+// ToolUseSummaryMessage is the CLI's short, model-written label for a batch
+// of tool calls, such as "Listed files, counted a.txt lines". The CLI emits
+// it only when started with CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES=true in its
+// environment (settable via Options.Env), and it arrives after the assistant
+// text that follows the calls, before the turn's ResultMessage. Claude
+// Desktop titles its collapsed tool groups with it. Its own top-level message
+// type; observed with Claude Code CLI 2.1.312. Matches the TypeScript SDK's
+// SDKToolUseSummaryMessage.
+type ToolUseSummaryMessage struct {
+	Summary string `json:"summary"`
+	// PrecedingToolUseIDs are the tool_use ids of the calls the summary
+	// covers, in the order they were made.
+	PrecedingToolUseIDs []string `json:"preceding_tool_use_ids"`
+	UUID                string   `json:"uuid"`
+	SessionID           string   `json:"session_id"`
+}
+
+func (ToolUseSummaryMessage) messageMarker() {}
+
 // The following prefix buckets classify a rate-limit-related message string
 // (e.g. surfaced in a ResultMessage or system message) by matching its
 // leading text with strings.HasPrefix, without hand-mirroring the literal
