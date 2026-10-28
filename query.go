@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -93,7 +94,7 @@ type query struct {
 	// State
 	initTimeout            float64
 	initialized            bool
-	closed                 bool
+	closed                 atomic.Bool
 	initializationResult   map[string]any
 	firstResultCh          chan struct{}
 	firstResultOnce        sync.Once
@@ -485,7 +486,7 @@ func (q *query) readMessages() {
 	msgCh := q.transport.ReadMessages(q.ctx)
 
 	for msg := range msgCh {
-		if q.closed {
+		if q.closed.Load() {
 			break
 		}
 
@@ -1699,7 +1700,7 @@ func (q *query) getUsageExperimentalDetail(skipBehaviors bool) (*UsageDataExperi
 func (q *query) streamInput(inputCh <-chan map[string]any) {
 	written := false
 	for msg := range inputCh {
-		if q.closed {
+		if q.closed.Load() {
 			break
 		}
 		data, _ := json.Marshal(msg)
@@ -1789,7 +1790,7 @@ func (q *query) close() error {
 // context fires, the batcher worker is left to finish in the background
 // and we proceed straight to subprocess teardown.
 func (q *query) closeContext(ctx context.Context) error {
-	q.closed = true
+	q.closed.Store(true)
 	// Drain the batcher BEFORE cancelling the context / closing stdin so
 	// in-flight mirror writes have a chance to reach the store before the
 	// CLI subprocess is torn down. CloseContext respects the caller's
