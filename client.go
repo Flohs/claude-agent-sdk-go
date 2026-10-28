@@ -712,6 +712,22 @@ func (c *Client) SetMcpServers(ctx context.Context, servers map[string]McpServer
 	return c.q.setMcpServers(servers)
 }
 
+// BackgroundTask moves a running foreground tool call (a Bash command, an
+// Agent or Task call) to the background, so the turn goes on without waiting
+// for it: the CLI answers the tool call at once and the work keeps running as
+// a background task, reported by [BackgroundTasksChangedMessage] and a
+// [TaskUpdatedMessage]. toolUseID is the id of the tool_use block. It reports
+// whether the CLI backgrounded the call. Paired with
+// [MessagePriorityNow], it lets a message sent while a long tool blocks be
+// read right away. Observed with Claude Code CLI 2.1.312; the TypeScript
+// SDK's backgroundTasks.
+func (c *Client) BackgroundTask(ctx context.Context, toolUseID string) (bool, error) {
+	if c.q == nil {
+		return false, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.backgroundTask(toolUseID)
+}
+
 // StopTask stops a running task.
 func (c *Client) StopTask(ctx context.Context, taskID string) error {
 	if c.q == nil {

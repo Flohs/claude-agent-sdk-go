@@ -1607,6 +1607,24 @@ func (q *query) setMcpServers(servers map[string]McpServerConfig) error {
 	return err
 }
 
+// backgroundTask moves a running foreground tool call to the background and
+// reports whether the CLI did. A missing backgrounded field counts as true,
+// as in the TypeScript SDK.
+func (q *query) backgroundTask(toolUseID string) (bool, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype":     "background_tasks",
+		"tool_use_id": toolUseID,
+	}, 60*time.Second)
+	if err != nil {
+		return false, err
+	}
+	backgrounded, ok := resp["backgrounded"].(bool)
+	if !ok {
+		return true, nil
+	}
+	return backgrounded, nil
+}
+
 func (q *query) stopTask(taskID string) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype": "stop_task",
