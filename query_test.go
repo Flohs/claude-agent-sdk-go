@@ -3252,3 +3252,33 @@ func TestContextUsage_UnmarshalsRecommendationsAndFix(t *testing.T) {
 		t.Errorf("unexpected fix: %+v", u.Fix)
 	}
 }
+
+// TestQueryCloseDoesNotRaceTheReader closes a query from another goroutine
+// while its reader is still handling messages. Under -race this reported a
+// data race on query.closed until the flag became atomic.
+// (https://github.com/Flohs/claude-agent-sdk-go/issues/800)
+func TestQueryCloseDoesNotRaceTheReader(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	msg := map[string]any{"type": "rate_limit_event", "rate_limit_info": map[string]any{"status": "allowed"}}
+	for i := 0; i < 20; i++ {
+		mt.messages <- msg
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	done := make(chan struct{})
+	go func() {
+		_ = q.close()
+		close(done)
+	}()
+	// The mock's channel only closes in Close, which runs after the reader
+	// exits; one more message lets the reader see closed and stop.
+	time.Sleep(20 * time.Millisecond)
+	mt.messages <- msg
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("close did not return")
+	}
+}
