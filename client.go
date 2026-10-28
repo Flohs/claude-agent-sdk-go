@@ -580,12 +580,23 @@ func (c *Client) PromptSuggestion(ctx context.Context) ([]string, error) {
 }
 
 // StopAsyncMessage cancels a queued user message by its UUID before it
-// reaches execution.
+// reaches execution. It does not report whether the message was still
+// queued; [Client.CancelAsyncMessage] does.
 func (c *Client) StopAsyncMessage(ctx context.Context, uuid string) error {
+	_, err := c.CancelAsyncMessage(ctx, uuid)
+	return err
+}
+
+// CancelAsyncMessage cancels a queued user message by its UUID before it
+// reaches execution, and reports whether the CLI cancelled it. false means
+// the message was no longer queued: it already ran, is running, or was never
+// sent. The uuid is the one the message was sent with; the CLI echoes it in
+// [CommandLifecycleMessage.CommandUUID].
+func (c *Client) CancelAsyncMessage(ctx context.Context, uuid string) (bool, error) {
 	if c.q == nil {
-		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+		return false, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
-	return c.q.stopAsyncMessage(uuid)
+	return c.q.cancelAsyncMessage(uuid)
 }
 
 // SeedReadState seeds the CLI's read-file-state tracker with the given

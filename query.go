@@ -1436,12 +1436,19 @@ func (q *query) promptSuggestion() ([]string, error) {
 	return stringSliceFromResponse(resp, "suggestions")
 }
 
-func (q *query) stopAsyncMessage(uuid string) error {
-	_, err := q.sendControlRequest(map[string]any{
-		"subtype": "cancel_async_message",
-		"uuid":    uuid,
+// cancelAsyncMessage cancels a queued user message by its uuid and reports
+// whether the CLI cancelled it. The CLI reads the uuid from message_uuid; sent
+// under uuid it answers cancelled:false and still runs the message.
+func (q *query) cancelAsyncMessage(uuid string) (bool, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype":      "cancel_async_message",
+		"message_uuid": uuid,
 	}, 60*time.Second)
-	return err
+	if err != nil {
+		return false, err
+	}
+	cancelled, _ := resp["cancelled"].(bool)
+	return cancelled, nil
 }
 
 func (q *query) seedReadState(entries []ReadStateEntry) error {
