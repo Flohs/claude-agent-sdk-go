@@ -146,6 +146,13 @@ type UserMessage struct {
 	// conversation content (e.g. a synthetic message generated internally by
 	// the SDK or CLI). Port of TypeScript SDK v0.3.198.
 	IsMeta bool `json:"isMeta,omitempty"`
+	// IsReplay marks the CLI's echo of a user message it took from stdin,
+	// sent when the session runs with the replay-user-messages extra arg
+	// (Options.ExtraArgs["replay-user-messages"] = ""). The echo carries the
+	// uuid the message was sent with and arrives when the CLI dequeues it,
+	// so it is proof the CLI took the prompt; it is not a new message.
+	// Observed with Claude Code CLI 2.1.312.
+	IsReplay bool `json:"isReplay,omitempty"`
 	// Origin identifies what triggered this message (e.g. a direct human
 	// prompt vs. a peer relay or task-notification replay). Nil when the CLI
 	// omits the field. Port of TypeScript SDK bundled sdk.d.ts
