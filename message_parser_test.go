@@ -3639,3 +3639,49 @@ func TestParseMessage_BackgroundTasksChangedSubagentType(t *testing.T) {
 		t.Errorf("Tasks = %+v", m.Tasks)
 	}
 }
+
+// TestParseMessage_CommandLifecycleTopLevelFrame parses the frame as Claude
+// Code CLI 2.1.312 sends it: a top-level type, the command's id in
+// command_uuid and the event's own id in uuid. Previously ParseMessage
+// returned nil for it, so consumers never saw a command's lifecycle.
+// (https://github.com/Flohs/claude-agent-sdk-go/issues/804)
+func TestParseMessage_CommandLifecycleTopLevelFrame(t *testing.T) {
+	data := map[string]any{
+		"type":         "command_lifecycle",
+		"command_uuid": "prompt-uuid-1",
+		"state":        "cancelled",
+		"uuid":         "event-uuid-1",
+		"session_id":   "sess-1",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cl, ok := msg.(*CommandLifecycleMessage)
+	if !ok {
+		t.Fatalf("expected *CommandLifecycleMessage, got %T", msg)
+	}
+	if cl.CommandUUID != "prompt-uuid-1" {
+		t.Errorf("CommandUUID = %q, want the command_uuid", cl.CommandUUID)
+	}
+	if cl.UUID != "event-uuid-1" {
+		t.Errorf("UUID = %q, want the event's own uuid", cl.UUID)
+	}
+	if cl.State != CommandLifecycleStateCancelled || cl.SessionID != "sess-1" {
+		t.Errorf("State = %q, SessionID = %q", cl.State, cl.SessionID)
+	}
+	if cl.Subtype != "command_lifecycle" {
+		t.Errorf("Subtype = %q, want command_lifecycle for callers that switch on it", cl.Subtype)
+	}
+}
+
+func TestParseMessage_CommandLifecycleRefused(t *testing.T) {
+	msg, err := ParseMessage(map[string]any{"type": "command_lifecycle", "command_uuid": "c", "state": "refused"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cl, ok := msg.(*CommandLifecycleMessage); !ok || cl.State != CommandLifecycleStateRefused {
+		t.Fatalf("got %#v", msg)
+	}
+}

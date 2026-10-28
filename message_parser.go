@@ -34,6 +34,12 @@ func ParseMessage(data map[string]any) (Message, error) {
 		return parseToolProgressMessage(data)
 	case "conversation_reset":
 		return parseConversationResetMessage(data)
+	case "command_lifecycle":
+		return parseCommandLifecycleMessage(SystemMessage{
+			Subtype:   "command_lifecycle",
+			Data:      data,
+			Timestamp: stringField(data, "timestamp"),
+		}, data), nil
 
 	default:
 		// Forward-compatible: skip unrecognized message types
@@ -317,12 +323,7 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 		return msg, nil
 
 	case "command_lifecycle":
-		return &CommandLifecycleMessage{
-			SystemMessage: base,
-			CommandUUID:   stringField(data, "uuid"),
-			State:         CommandLifecycleState(stringField(data, "state")),
-			SessionID:     stringField(data, "session_id"),
-		}, nil
+		return parseCommandLifecycleMessage(base, data), nil
 
 	case "background_tasks_changed":
 		msg := &BackgroundTasksChangedMessage{
@@ -1090,4 +1091,22 @@ func optionalIntField(m map[string]any, key string) *int {
 	}
 	v := intField(m, key)
 	return &v
+}
+
+// parseCommandLifecycleMessage builds a CommandLifecycleMessage from either
+// shape: the top-level frame, whose command id is command_uuid and whose uuid
+// is the event's own, or the older system subtype, whose uuid is the command's.
+func parseCommandLifecycleMessage(base SystemMessage, data map[string]any) *CommandLifecycleMessage {
+	msg := &CommandLifecycleMessage{
+		SystemMessage: base,
+		State:         CommandLifecycleState(stringField(data, "state")),
+		SessionID:     stringField(data, "session_id"),
+	}
+	if cmd := stringField(data, "command_uuid"); cmd != "" {
+		msg.CommandUUID = cmd
+		msg.UUID = stringField(data, "uuid")
+	} else {
+		msg.CommandUUID = stringField(data, "uuid")
+	}
+	return msg
 }
