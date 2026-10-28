@@ -3685,3 +3685,31 @@ func TestParseMessage_CommandLifecycleRefused(t *testing.T) {
 		t.Fatalf("got %#v", msg)
 	}
 }
+
+// TestParseMessage_UserMessageIsReplay reads the echo the CLI sends for a
+// user message it took from stdin when replay-user-messages is on.
+// (https://github.com/Flohs/claude-agent-sdk-go/issues/808)
+func TestParseMessage_UserMessageIsReplay(t *testing.T) {
+	echo := map[string]any{
+		"type":               "user",
+		"uuid":               "prompt-uuid-1",
+		"isReplay":           true,
+		"session_id":         "sess-1",
+		"parent_tool_use_id": nil,
+		"message":            map[string]any{"role": "user", "content": "also check the logs"},
+	}
+	msg, err := ParseMessage(echo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	um, ok := msg.(*UserMessage)
+	if !ok || !um.IsReplay || um.UUID != "prompt-uuid-1" {
+		t.Fatalf("want the echo marked IsReplay with its uuid, got %#v", msg)
+	}
+
+	delete(echo, "isReplay")
+	msg, _ = ParseMessage(echo)
+	if msg.(*UserMessage).IsReplay {
+		t.Fatal("a user message without isReplay must not be marked as an echo")
+	}
+}

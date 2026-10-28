@@ -53,6 +53,7 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		UUID:            stringField(data, "uuid"),
 		Timestamp:       stringField(data, "timestamp"),
 		IsMeta:          boolField(data, "isMeta"),
+		IsReplay:        boolField(data, "isReplay"),
 		Origin:          parseMessageOrigin(data),
 		ToolResultMeta:  parseToolResultMeta(data),
 	}
