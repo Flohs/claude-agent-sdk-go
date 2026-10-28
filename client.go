@@ -169,6 +169,57 @@ func (c *Client) SendQuery(ctx context.Context, prompt string) error {
 //	    claude.NewBase64Content("application/pdf", base64PDFData),
 //	}
 func (c *Client) SendQueryWithContent(ctx context.Context, content any) error {
+	return c.SendUserMessage(ctx, UserInput{Content: content})
+}
+
+// MessagePriority tells the CLI when to read a user message that arrives
+// while a turn is running. Behaviour observed with Claude Code CLI 2.1.312.
+type MessagePriority string
+
+const (
+	// MessagePriorityNow ends the running turn at its next tool boundary,
+	// without a final reply (its command reports
+	// [CommandLifecycleStateCancelled]), and runs the message as a turn of
+	// its own. A tool that is already running finishes first;
+	// [Client.BackgroundTask] moves it to the background instead.
+	MessagePriorityNow MessagePriority = "now"
+	// MessagePriorityNext has the running turn read the message at its next
+	// tool boundary and answer it inside the same turn.
+	MessagePriorityNext MessagePriority = "next"
+	// MessagePriorityLater runs the message as a turn of its own once the
+	// running turn has ended.
+	MessagePriorityLater MessagePriority = "later"
+)
+
+// UserInput is one user message written to the CLI by [Client.SendUserMessage].
+type UserInput struct {
+	// Content is a string or a []any of content blocks, as for
+	// [Client.SendQueryWithContent].
+	Content any
+	// UUID identifies the message. The CLI reports it back in
+	// [CommandLifecycleMessage.CommandUUID] and, when the session runs with
+	// the replay-user-messages extra arg, in the echoed user message;
+	// [Client.CancelAsyncMessage] takes it. Use a fresh uuid per message: one
+	// the session's transcript already holds (for example re-sent after a
+	// resume) is acknowledged as completed without running a turn. Omitted
+	// when empty.
+	UUID string
+	// Priority says when the CLI reads the message if a turn is running.
+	// Omitted when empty, which queues the message like [MessagePriorityLater].
+	Priority MessagePriority
+}
+
+// SendUserMessage sends a user message with an optional uuid and priority.
+// With neither set it writes exactly what [Client.SendQueryWithContent]
+// writes.
+func (c *Client) SendUserMessage(ctx context.Context, in UserInput) error {
+	switch in.Priority {
+	case "", MessagePriorityNow, MessagePriorityNext, MessagePriorityLater:
+	default:
+		return &SDKError{Message: fmt.Sprintf("unknown message priority %q", in.Priority)}
+	}
+
+	content := in.Content
 	if c.q == nil || c.transport == nil {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
@@ -188,12 +239,19 @@ func (c *Client) SendQueryWithContent(ctx context.Context, content any) error {
 		return &SDKError{Message: fmt.Sprintf("content must be a string or []any, got %T", content)}
 	}
 
-	message := stampUserMessage(map[string]any{
+	message := map[string]any{
 		"type":               "user",
 		"message":            map[string]any{"role": "user", "content": content},
 		"parent_tool_use_id": nil,
 		"session_id":         "default",
-	}, c.options.VerbatimPrompts)
+	}
+	if in.UUID != "" {
+		message["uuid"] = in.UUID
+	}
+	if in.Priority != "" {
+		message["priority"] = string(in.Priority)
+	}
+	message = stampUserMessage(message, c.options.VerbatimPrompts)
 
 	data, _ := json.Marshal(message)
 	return c.transport.Write(string(data) + "\n")
