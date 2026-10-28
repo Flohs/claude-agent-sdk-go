@@ -3282,3 +3282,53 @@ func TestQueryCloseDoesNotRaceTheReader(t *testing.T) {
 		t.Fatal("close did not return")
 	}
 }
+
+// writtenControlRequest returns the request body of the first control_request
+// with the given subtype that mt received, or nil.
+func writtenControlRequest(mt *stubResponseTransport, subtype string) map[string]any {
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	for _, w := range written {
+		var msg map[string]any
+		if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+			continue
+		}
+		if msg["type"] != "control_request" {
+			continue
+		}
+		if req, ok := msg["request"].(map[string]any); ok && req["subtype"] == subtype {
+			return req
+		}
+	}
+	return nil
+}
+
+// TestCancelAsyncMessage_SendsMessageUUID verifies the cancel carries the
+// message under message_uuid, the field the CLI reads, and reports the CLI's
+// cancelled answer. Sent under uuid, the CLI answered cancelled:false and
+// still ran the message. (https://github.com/Flohs/claude-agent-sdk-go/issues/802)
+func TestCancelAsyncMessage_SendsMessageUUID(t *testing.T) {
+	mt := newStubResponseTransport(map[string]any{"cancelled": true})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	cancelled, err := q.cancelAsyncMessage("msg-1")
+	if err != nil {
+		t.Fatalf("cancelAsyncMessage failed: %v", err)
+	}
+	if !cancelled {
+		t.Fatal("cancelled = false, want the CLI's true")
+	}
+	req := writtenControlRequest(mt, "cancel_async_message")
+	if req == nil {
+		t.Fatal("expected a cancel_async_message control_request")
+	}
+	if req["message_uuid"] != "msg-1" {
+		t.Fatalf("message_uuid = %v, want %q", req["message_uuid"], "msg-1")
+	}
+	if _, ok := req["uuid"]; ok {
+		t.Fatalf("request still carries uuid: %v", req)
+	}
+}
