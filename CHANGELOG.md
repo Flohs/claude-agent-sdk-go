@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-10-28
+
 ### Added
 
 - `ToolUseSummaryMessage` (`Summary`, `PrecedingToolUseIDs`, `UUID`, `SessionID`), parsed from the CLI's top-level `tool_use_summary` message: a short, model-written label for a batch of tool calls ("Listed files, counted a.txt lines") plus the ids of the calls it covers. The CLI emits it only when started with `CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES=true` in its environment (settable via `Options.Env`), after the assistant text that follows the calls and before the turn's `ResultMessage`. Claude Desktop sets the variable for Code sessions and titles its collapsed tool groups with the summary; `ParseMessage` previously skipped the type as unrecognised. Observed with Claude Code CLI 2.1.312; matches the TypeScript SDK's `SDKToolUseSummaryMessage`. ([#815](https://github.com/Flohs/claude-agent-sdk-go/issues/815))
