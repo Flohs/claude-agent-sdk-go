@@ -3332,3 +3332,37 @@ func TestCancelAsyncMessage_SendsMessageUUID(t *testing.T) {
 		t.Fatalf("request still carries uuid: %v", req)
 	}
 }
+
+// TestBackgroundTask_SendsToolUseID verifies the background_tasks request
+// carries the tool_use_id and reports the CLI's backgrounded answer, a
+// missing one counting as true. (https://github.com/Flohs/claude-agent-sdk-go/issues/810)
+func TestBackgroundTask_SendsToolUseID(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		resp map[string]any
+		want bool
+	}{
+		{"backgrounded", map[string]any{"backgrounded": true}, true},
+		{"refused", map[string]any{"backgrounded": false}, false},
+		{"no answer field", map[string]any{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mt := newStubResponseTransport(tc.resp)
+			q := newQuery(queryConfig{transport: mt})
+			q.start()
+			defer func() { _ = q.close() }()
+
+			got, err := q.backgroundTask("toolu_1")
+			if err != nil {
+				t.Fatalf("backgroundTask failed: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("backgrounded = %v, want %v", got, tc.want)
+			}
+			req := writtenControlRequest(mt, "background_tasks")
+			if req == nil || req["tool_use_id"] != "toolu_1" {
+				t.Fatalf("expected a background_tasks request with tool_use_id, got %v", req)
+			}
+		})
+	}
+}
