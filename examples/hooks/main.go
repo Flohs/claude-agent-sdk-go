@@ -67,7 +67,7 @@ func checkBashCommand(ctx context.Context, input claude.HookInput, toolUseID str
 func addCustomInstructions(ctx context.Context, input claude.HookInput, toolUseID string, hookCtx claude.HookContext) (claude.HookJSONOutput, error) {
 	return claude.HookJSONOutput{
 		"hookSpecificOutput": map[string]any{
-			"hookEventName":    "SessionStart",
+			"hookEventName":     "SessionStart",
 			"additionalContext": "My favorite color is hot pink",
 		},
 	}, nil
@@ -116,7 +116,7 @@ func reviewToolOutput(ctx context.Context, input claude.HookInput, toolUseID str
 			"systemMessage": "The command produced an error",
 			"reason":        "Tool execution failed - consider checking the command syntax",
 			"hookSpecificOutput": map[string]any{
-				"hookEventName":    "PostToolUse",
+				"hookEventName":     "PostToolUse",
 				"additionalContext": "The command encountered an error. You may want to try a different approach.",
 			},
 		}, nil

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- `AgentID` (`agent_id`) on `AssistantMessage` and `UserMessage`, the ID of the subagent that produced the message (the `task_id` of its task events, unchanged when the subagent is resumed); empty on main-thread messages and from older CLIs. Port of TypeScript SDK v0.3.290-v0.3.292 (found by diffing the npm tarballs for v0.3.289 → v0.3.292 directly); no Python SDK equivalent. ([#764](https://github.com/Flohs/claude-agent-sdk-go/issues/764))
+
+## [4.1.0] - 2026-10-28
+
+### Added
+
+- `ToolUseSummaryMessage` (`Summary`, `PrecedingToolUseIDs`, `UUID`, `SessionID`), parsed from the CLI's top-level `tool_use_summary` message: a short, model-written label for a batch of tool calls ("Listed files, counted a.txt lines") plus the ids of the calls it covers. The CLI emits it only when started with `CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES=true` in its environment (settable via `Options.Env`), after the assistant text that follows the calls and before the turn's `ResultMessage`. Claude Desktop sets the variable for Code sessions and titles its collapsed tool groups with the summary; `ParseMessage` previously skipped the type as unrecognised. Observed with Claude Code CLI 2.1.312; matches the TypeScript SDK's `SDKToolUseSummaryMessage`. ([#815](https://github.com/Flohs/claude-agent-sdk-go/issues/815))
+
 ## [4.0.0] - 2026-10-28
 
 ### Breaking

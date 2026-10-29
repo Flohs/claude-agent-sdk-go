@@ -290,7 +290,6 @@ const (
 func TestListSessions_BasicProjectDirectory(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/project")
 
-
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Hello Claude"),
 		makeAssistantLine("a1", "u1", "Hi there!"),
@@ -317,7 +316,6 @@ func TestListSessions_BasicProjectDirectory(t *testing.T) {
 
 func TestListSessions_MultipleSessions(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/multi")
-
 
 	for i, uuid := range []string{testUUID1, testUUID2, testUUID3} {
 		content := strings.Join([]string{
@@ -352,7 +350,6 @@ func TestListSessions_MultipleSessions(t *testing.T) {
 
 func TestListSessions_LimitParameter(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/limited")
-
 
 	for i, uuid := range []string{testUUID1, testUUID2, testUUID3, testUUID4, testUUID5} {
 		content := strings.Join([]string{
@@ -472,7 +469,6 @@ func TestListSessions_AllProjects(t *testing.T) {
 func TestListSessions_FiltersSidechainSessions(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/sidechain")
 
-
 	// Normal session.
 	normalContent := strings.Join([]string{
 		makeUserLine("u1", "", "Normal question"),
@@ -510,7 +506,6 @@ func TestListSessions_FiltersSidechainSessions(t *testing.T) {
 func TestListSessions_FiltersSidechainWithSpaces(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/sidechain-spaces")
 
-
 	// Sidechain with space in JSON: "isSidechain": true
 	sidechainContent := strings.Join([]string{
 		makeSessionLine(map[string]any{
@@ -541,7 +536,6 @@ func TestListSessions_FiltersSidechainWithSpaces(t *testing.T) {
 
 func TestListSessions_FiltersMetadataOnlySessions(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/metadata-only")
-
 
 	// A session with only system/meta entries and no user prompt.
 	metaOnlyContent := strings.Join([]string{
@@ -593,7 +587,6 @@ func TestListSessions_FiltersMetadataOnlySessions(t *testing.T) {
 func TestListSessions_EmptyFile(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/empty-file")
 
-
 	writeSessionFile(t, projDir, testUUID1, "")
 
 	sessions, err := ListSessions(ListSessionsOptions{
@@ -611,7 +604,6 @@ func TestListSessions_EmptyFile(t *testing.T) {
 func TestListSessions_FileWithOnlyNewlines(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/newlines-only")
 
-
 	writeSessionFile(t, projDir, testUUID1, "\n\n\n\n")
 
 	sessions, err := ListSessions(ListSessionsOptions{
@@ -628,7 +620,6 @@ func TestListSessions_FileWithOnlyNewlines(t *testing.T) {
 
 func TestListSessions_MalformedJSONLines(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/malformed")
-
 
 	// Mix of malformed and valid lines.
 	content := strings.Join([]string{
@@ -659,7 +650,6 @@ func TestListSessions_MalformedJSONLines(t *testing.T) {
 func TestListSessions_TruncatedJSONL(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/truncated")
 
-
 	// A file where the last line is truncated mid-JSON.
 	content := makeUserLine("u1", "", "Working question") + "\n" +
 		makeAssistantLine("a1", "u1", "Working answer") + "\n" +
@@ -684,7 +674,6 @@ func TestListSessions_TruncatedJSONL(t *testing.T) {
 
 func TestListSessions_IgnoresNonJSONLFiles(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/non-jsonl")
-
 
 	// Create non-JSONL files.
 	for _, f := range []struct{ name, content string }{
@@ -720,7 +709,6 @@ func TestListSessions_IgnoresNonJSONLFiles(t *testing.T) {
 
 func TestListSessions_CustomTitlePriority(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/title-priority")
-
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Initial question"),
@@ -762,7 +750,6 @@ func TestListSessions_CustomTitlePriority(t *testing.T) {
 func TestListSessions_FallsBackToSummaryField(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/summary-fallback")
 
-
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Question"),
 		makeAssistantLine("a1", "u1", "Answer"),
@@ -793,7 +780,6 @@ func TestListSessions_FallsBackToSummaryField(t *testing.T) {
 func TestListSessions_FallsBackToFirstPrompt(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/prompt-fallback")
 
-
 	// No summary or customTitle, just user messages.
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "My initial prompt"),
@@ -822,7 +808,6 @@ func TestListSessions_FallsBackToFirstPrompt(t *testing.T) {
 
 func TestListSessions_GitBranchExtraction(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/gitbranch")
-
 
 	content := strings.Join([]string{
 		makeSessionLine(map[string]any{
@@ -864,7 +849,6 @@ func TestListSessions_GitBranchExtraction(t *testing.T) {
 
 func TestListSessions_LargeFileHeadTailSplit(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/large-file")
-
 
 	// Build a file where:
 	// - head contains the first user prompt and cwd
@@ -952,7 +936,6 @@ func TestListSessions_LargeFileHeadTailSplit(t *testing.T) {
 
 func TestGetSessionMessages_Basic(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/messages")
-
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "First question"),
@@ -1215,7 +1198,6 @@ func TestGetSessionMessages_IncludeSystemMessages(t *testing.T) {
 func TestGetSessionMessages_WithOffset(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/offset")
 
-
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Q1"),
 		makeAssistantLine("a1", "u1", "A1"),
@@ -1244,7 +1226,6 @@ func TestGetSessionMessages_WithOffset(t *testing.T) {
 func TestGetSessionMessages_WithLimit(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/msg-limit")
 
-
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Q1"),
 		makeAssistantLine("a1", "u1", "A1"),
@@ -1267,7 +1248,6 @@ func TestGetSessionMessages_WithLimit(t *testing.T) {
 
 func TestGetSessionMessages_WithOffsetAndLimit(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/off-lim")
-
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Q1"),
@@ -1298,7 +1278,6 @@ func TestGetSessionMessages_WithOffsetAndLimit(t *testing.T) {
 func TestGetSessionMessages_OffsetBeyondLength(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/off-beyond")
 
-
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Q1"),
 		makeAssistantLine("a1", "u1", "A1"),
@@ -1319,7 +1298,6 @@ func TestGetSessionMessages_OffsetBeyondLength(t *testing.T) {
 
 func TestGetSessionMessages_FiltersSidechainMessages(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/msg-sidechain")
-
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Main question"),
@@ -1360,7 +1338,6 @@ func TestGetSessionMessages_FiltersSidechainMessages(t *testing.T) {
 func TestGetSessionMessages_FiltersMetaMessages(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/msg-meta")
 
-
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Hello"),
 		makeAssistantLine("a1", "u1", "Hi"),
@@ -1391,7 +1368,6 @@ func TestGetSessionMessages_FiltersMetaMessages(t *testing.T) {
 
 func TestGetSessionMessages_FiltersTeamMessages(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/msg-team")
-
 
 	content := strings.Join([]string{
 		makeUserLine("u1", "", "Hello"),
@@ -1428,7 +1404,6 @@ func TestGetSessionMessages_FiltersTeamMessages(t *testing.T) {
 func TestGetSessionMessages_MalformedLines(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/msg-malformed")
 
-
 	content := strings.Join([]string{
 		`not json at all`,
 		makeUserLine("u1", "", "Valid question"),
@@ -1452,7 +1427,6 @@ func TestGetSessionMessages_MalformedLines(t *testing.T) {
 func TestGetSessionMessages_EmptyFile(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/msg-empty")
 
-
 	writeSessionFile(t, projDir, testUUID1, "")
 
 	messages, err := GetSessionMessages(testUUID1, GetSessionMessagesOptions{
@@ -1473,7 +1447,6 @@ func TestGetSessionMessages_EmptyFile(t *testing.T) {
 
 func TestGetSessionMessages_BranchedConversation(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/branched")
-
 
 	// Create a branched conversation where u2 and u3 both descend from a1.
 	// The chain builder should pick the branch with the latest entry.
@@ -1565,7 +1538,6 @@ func TestGetSessionMessages_NewestBranchEndingInMetaRowWins(t *testing.T) {
 
 func TestGetSessionMessages_OnlyProgressEntries(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/progress-only")
-
 
 	// Progress entries are valid transcript entries but not visible.
 	content := strings.Join([]string{
@@ -2305,7 +2277,6 @@ func TestExtractLastJSONStringField_NoMatch(t *testing.T) {
 func TestListSessions_CwdExtraction(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/cwd")
 
-
 	content := strings.Join([]string{
 		makeSessionLine(map[string]any{
 			"type":    "user",
@@ -2334,7 +2305,6 @@ func TestListSessions_CwdExtraction(t *testing.T) {
 
 func TestListSessions_CwdFallsBackToProjectPath(t *testing.T) {
 	projDir := setupTestProjectDir(t, "/test/cwd-fallback")
-
 
 	// No cwd field in the session.
 	content := strings.Join([]string{
@@ -3192,13 +3162,13 @@ func seedSession(t *testing.T, store SessionStore, projectKey, sessionID, prompt
 	t.Helper()
 	entries := []SessionStoreEntry{
 		{
-			"type":       "user",
-			"uuid":       sessionID + "-u1",
-			"sessionId":  sessionID,
-			"message":    map[string]any{"content": prompt},
-			"timestamp":  "2026-04-23T10:00:00.000Z",
-			"cwd":        "/seed-cwd",
-			"gitBranch":  "main",
+			"type":      "user",
+			"uuid":      sessionID + "-u1",
+			"sessionId": sessionID,
+			"message":   map[string]any{"content": prompt},
+			"timestamp": "2026-04-23T10:00:00.000Z",
+			"cwd":       "/seed-cwd",
+			"gitBranch": "main",
 		},
 		{
 			"type":       "assistant",

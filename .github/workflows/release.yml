@@ -2,11 +2,17 @@ name: Release
 
 on:
   push:
+    branches: [main]
     tags:
       - 'v*'
 
 permissions:
   contents: write
+
+# Run one at a time so two quick merges to main can't both create the same tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -14,10 +20,35 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # On main, a merged release PR sets sdkVersion to a version that has no tag yet.
+          VERSION=$(sed -n 's/^[[:space:]]*sdkVersion[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' subprocess_transport.go)
+          if [ -z "$VERSION" ]; then
+            echo "::error::could not read sdkVersion from subprocess_transport.go"
+            exit 1
+          fi
+          if [ -n "$(git ls-remote --tags origin "refs/tags/v${VERSION}")" ]; then
+            echo "v${VERSION} is already tagged, nothing to release"
+            exit 0
+          fi
+          if ! grep -q "^## \[${VERSION}\]" CHANGELOG.md; then
+            echo "::error::sdkVersion is ${VERSION} but CHANGELOG.md has no ## [${VERSION}] section"
+            exit 1
+          fi
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Extract changelog section
         id: changelog
+        if: steps.tag.outputs.tag != ''
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
           # Extract the section between ## [VERSION] and the next ## [
           NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
@@ -26,9 +57,14 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
+        if: steps.tag.outputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
+          # --target creates the tag on this commit when it doesn't exist yet (push to main);
+          # an existing tag (tag push) keeps its commit.
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
             --notes-file /tmp/release_notes.md

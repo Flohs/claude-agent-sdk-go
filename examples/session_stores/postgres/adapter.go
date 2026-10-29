@@ -117,7 +117,7 @@ func (s *PostgresSessionStore) Load(ctx context.Context, key claude.SessionKey) 
 }
 
 // ListSessions satisfies [claude.SessionStoreLister]. Returns only main
-// transcript sessions (subpath == '') ordered by most-recently-written mtime.
+// transcript sessions (subpath == ”) ordered by most-recently-written mtime.
 func (s *PostgresSessionStore) ListSessions(ctx context.Context, projectKey string) ([]claude.SessionStoreListEntry, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

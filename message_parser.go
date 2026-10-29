@@ -32,6 +32,13 @@ func ParseMessage(data map[string]any) (Message, error) {
 		return parseRateLimitEvent(data)
 	case "tool_progress":
 		return parseToolProgressMessage(data)
+	case "tool_use_summary":
+		return &ToolUseSummaryMessage{
+			Summary:             stringField(data, "summary"),
+			PrecedingToolUseIDs: stringSliceField(data, "preceding_tool_use_ids"),
+			UUID:                stringField(data, "uuid"),
+			SessionID:           stringField(data, "session_id"),
+		}, nil
 	case "conversation_reset":
 		return parseConversationResetMessage(data)
 	case "command_lifecycle":
@@ -56,6 +63,7 @@ func parseUserMessage(data map[string]any) (*UserMessage, error) {
 		IsReplay:        boolField(data, "isReplay"),
 		Origin:          parseMessageOrigin(data),
 		ToolResultMeta:  parseToolResultMeta(data),
+		AgentID:         stringField(data, "agent_id"),
 	}
 
 	if tr, ok := data["tool_use_result"].(map[string]any); ok {
@@ -175,6 +183,7 @@ func parseAssistantMessage(data map[string]any) (*AssistantMessage, error) {
 		UserMessageUUID:  stringField(data, "user_message_uuid"),
 		UserMessageUUIDs: stringSliceField(data, "user_message_uuids"),
 		ResumeReason:     stringField(data, "resume_reason"),
+		AgentID:          stringField(data, "agent_id"),
 	}
 
 	if errStr := stringField(data, "error"); errStr != "" {
