@@ -3145,6 +3145,36 @@ func TestListPermissionRules_MinimalResponseUnmarshalsWithoutError(t *testing.T)
 	}
 }
 
+// TestListPermissionRules_McpMountSource verifies that a rule whose source
+// is "mcpMount" decodes to PermissionRuleSourceMcpMount.
+func TestListPermissionRules_McpMountSource(t *testing.T) {
+	mt := newStubResponseTransport(map[string]any{
+		"state": map[string]any{
+			"rules": []any{
+				map[string]any{
+					"behavior":    "allow",
+					"source":      "mcpMount",
+					"rule":        "mcp__docs__search",
+					"editability": "readonly",
+				},
+			},
+			"workspaceDirectories": []any{},
+			"originalCwd":          "/home/user/project",
+		},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	state, err := q.listPermissionRules()
+	if err != nil {
+		t.Fatalf("listPermissionRules failed: %v", err)
+	}
+	if len(state.Rules) != 1 || state.Rules[0].Source != PermissionRuleSourceMcpMount {
+		t.Errorf("Rules = %+v, want one rule with Source %q", state.Rules, PermissionRuleSourceMcpMount)
+	}
+}
+
 // TestGetTaskOutput_SendsRequestAndParsesResponse verifies that
 // query.getTaskOutput (the path used by Client.GetTaskOutput) sends a
 // get_task_output control_request carrying task_id and decodes the response.
