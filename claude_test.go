@@ -11,10 +11,10 @@ func TestEscapeSlashCommand(t *testing.T) {
 		want  string
 	}{
 		{"/ add tests", " / add tests"},
-		{"/  add tests", " /  add tests"},    // multiple spaces
-		{"/\tadd tests", " /\tadd tests"},    // tab after slash
-		{"/command", "/command"},              // slash command — NOT escaped
-		{"hello / world", "hello / world"},   // slash not at start
+		{"/  add tests", " /  add tests"},  // multiple spaces
+		{"/\tadd tests", " /\tadd tests"},  // tab after slash
+		{"/command", "/command"},           // slash command — NOT escaped
+		{"hello / world", "hello / world"}, // slash not at start
 		{"", ""},
 		{"normal text", "normal text"},
 	}

@@ -42,11 +42,11 @@ type PermissionRuleValue struct {
 type PermissionUpdateType string
 
 const (
-	PermissionUpdateAddRules         PermissionUpdateType = "addRules"
-	PermissionUpdateReplaceRules     PermissionUpdateType = "replaceRules"
-	PermissionUpdateRemoveRules      PermissionUpdateType = "removeRules"
-	PermissionUpdateSetMode          PermissionUpdateType = "setMode"
-	PermissionUpdateAddDirectories   PermissionUpdateType = "addDirectories"
+	PermissionUpdateAddRules          PermissionUpdateType = "addRules"
+	PermissionUpdateReplaceRules      PermissionUpdateType = "replaceRules"
+	PermissionUpdateRemoveRules       PermissionUpdateType = "removeRules"
+	PermissionUpdateSetMode           PermissionUpdateType = "setMode"
+	PermissionUpdateAddDirectories    PermissionUpdateType = "addDirectories"
 	PermissionUpdateRemoveDirectories PermissionUpdateType = "removeDirectories"
 )
 
