@@ -2097,6 +2097,7 @@ var (
 		"You're now using your usage allocation",
 		"Now using your usage allocation",
 		"Now using usage credits",
+		"Now using credits",
 		"You're now using extra usage",
 		"Now using extra usage",
 	}
