@@ -2285,6 +2285,10 @@ const (
 	PermissionRuleSourceCommand PermissionRuleSource = "command"
 	// PermissionRuleSourceSession is a rule granted for this session only (e.g. an interactive approval).
 	PermissionRuleSourceSession PermissionRuleSource = "session"
+	// PermissionRuleSourceMcpMount is a rule the CLI reports with the
+	// "mcpMount" source (a rule tied to an MCP mount). Port of TypeScript SDK
+	// v0.3.311.
+	PermissionRuleSourceMcpMount PermissionRuleSource = "mcpMount"
 	// PermissionRuleSourceToolsNarrowing is a rule derived from narrowing the available tool set.
 	PermissionRuleSourceToolsNarrowing PermissionRuleSource = "toolsNarrowing"
 	// PermissionRuleSourceMcpServerPolicy is a rule derived from an MCP server's own policy.
