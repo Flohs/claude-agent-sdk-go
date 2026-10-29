@@ -785,18 +785,20 @@ func TestParseMessage_ResultMessage_ModelUsage(t *testing.T) {
 		"session_id":      "s",
 		"modelUsage": map[string]any{
 			"claude-opus-4-8": map[string]any{
-				"inputTokens":              float64(100),
-				"outputTokens":             float64(50),
-				"thinkingTokens":           float64(30),
-				"cacheReadInputTokens":     float64(10),
-				"cacheCreationInputTokens": float64(5),
-				"webSearchRequests":        float64(2),
-				"costUSD":                  0.25,
-				"contextWindow":            float64(200000),
-				"maxOutputTokens":          float64(8192),
-				"canonicalModel":           "claude-opus-4-7",
-				"provider":                 "firstParty",
-				"costBasis":                "managed",
+				"inputTokens":                         float64(100),
+				"outputTokens":                        float64(50),
+				"thinkingTokens":                      float64(30),
+				"cacheReadInputTokens":                float64(10),
+				"cacheCreationInputTokens":            float64(5),
+				"cacheCreationEphemeral5mInputTokens": float64(3),
+				"cacheCreationEphemeral1hInputTokens": float64(1),
+				"webSearchRequests":                   float64(2),
+				"costUSD":                             0.25,
+				"contextWindow":                       float64(200000),
+				"maxOutputTokens":                     float64(8192),
+				"canonicalModel":                      "claude-opus-4-7",
+				"provider":                            "firstParty",
+				"costBasis":                           "managed",
 			},
 		},
 	}
@@ -820,6 +822,12 @@ func TestParseMessage_ResultMessage_ModelUsage(t *testing.T) {
 	}
 	if *u.ThinkingTokens != 30 {
 		t.Errorf("*ThinkingTokens = %d, want 30", *u.ThinkingTokens)
+	}
+	if u.CacheCreationEphemeral5mInputTokens == nil || *u.CacheCreationEphemeral5mInputTokens != 3 {
+		t.Errorf("CacheCreationEphemeral5mInputTokens = %v, want 3", u.CacheCreationEphemeral5mInputTokens)
+	}
+	if u.CacheCreationEphemeral1hInputTokens == nil || *u.CacheCreationEphemeral1hInputTokens != 1 {
+		t.Errorf("CacheCreationEphemeral1hInputTokens = %v, want 1", u.CacheCreationEphemeral1hInputTokens)
 	}
 }
 
@@ -850,6 +858,9 @@ func TestParseMessage_ResultMessage_ModelUsage_ThinkingTokensAbsent(t *testing.T
 	}
 	if u.ThinkingTokens != nil {
 		t.Errorf("ThinkingTokens = %v, want nil when absent", *u.ThinkingTokens)
+	}
+	if u.CacheCreationEphemeral5mInputTokens != nil || u.CacheCreationEphemeral1hInputTokens != nil {
+		t.Errorf("cache lifetime split = %v / %v, want nil when absent", u.CacheCreationEphemeral5mInputTokens, u.CacheCreationEphemeral1hInputTokens)
 	}
 }
 

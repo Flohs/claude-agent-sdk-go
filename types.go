@@ -2486,13 +2486,30 @@ type ModelUsage struct {
 	// record this field: nil when none did, and a partial count for a
 	// resumed session that began on an older version. Port of TypeScript
 	// SDK v0.3.257.
-	ThinkingTokens           *int    `json:"thinkingTokens,omitempty"`
-	CacheReadInputTokens     int     `json:"cacheReadInputTokens"`
-	CacheCreationInputTokens int     `json:"cacheCreationInputTokens"`
-	WebSearchRequests        int     `json:"webSearchRequests"`
-	CostUSD                  float64 `json:"costUSD"`
-	ContextWindow            int     `json:"contextWindow"`
-	MaxOutputTokens          int     `json:"maxOutputTokens"`
+	ThinkingTokens           *int `json:"thinkingTokens,omitempty"`
+	CacheReadInputTokens     int  `json:"cacheReadInputTokens"`
+	CacheCreationInputTokens int  `json:"cacheCreationInputTokens"`
+	// CacheCreationEphemeral5mInputTokens is the number of cache writes with
+	// a 5-minute lifetime, already counted inside CacheCreationInputTokens.
+	// This and CacheCreationEphemeral1hInputTokens can add up to less than
+	// CacheCreationInputTokens, because a response that does not report how
+	// long its cache writes live adds to neither. CostUSD prices these writes
+	// at the 5-minute rate. Counts only turns run on CLI versions that record
+	// this field: nil when none did, and an undercount when part of the
+	// session ran on an older version. Port of TypeScript SDK v0.3.311.
+	CacheCreationEphemeral5mInputTokens *int `json:"cacheCreationEphemeral5mInputTokens,omitempty"`
+	// CacheCreationEphemeral1hInputTokens is the number of cache writes with
+	// a 1-hour lifetime, already counted inside CacheCreationInputTokens.
+	// CostUSD prices them at the 1-hour rate when the model's price table has
+	// one (the built-in list prices do; a managed-settings modelPricing row
+	// applies its one cache-write rate to both lifetimes). Nil or an
+	// undercount in the same cases as CacheCreationEphemeral5mInputTokens.
+	// Port of TypeScript SDK v0.3.311.
+	CacheCreationEphemeral1hInputTokens *int    `json:"cacheCreationEphemeral1hInputTokens,omitempty"`
+	WebSearchRequests                   int     `json:"webSearchRequests"`
+	CostUSD                             float64 `json:"costUSD"`
+	ContextWindow                       int     `json:"contextWindow"`
+	MaxOutputTokens                     int     `json:"maxOutputTokens"`
 	// CanonicalModel is the canonical model id used for the pricing lookup
 	// (e.g. "claude-opus-4-8"), which may differ from the raw model string
 	// this entry is keyed by (provider-specific ids, aliases). Empty when

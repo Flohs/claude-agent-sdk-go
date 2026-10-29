@@ -4,6 +4,7 @@
 
 ### Added
 
+- `ModelUsage.CacheCreationEphemeral5mInputTokens` and `ModelUsage.CacheCreationEphemeral1hInputTokens` (`*int`), the cache writes with a 5-minute and a 1-hour lifetime, both already counted inside `CacheCreationInputTokens` (they can add up to less, since a response that does not report its cache-write lifetime adds to neither). Parsed from `ResultMessage.ModelUsage`; nil when no turn ran on a CLI that records them, an undercount when part of the session ran on an older one. Port of TypeScript SDK v0.3.311 (found by diffing the npm `sdk.d.ts` for v0.3.310 → v0.3.311); Python SDK v0.2.174 has no equivalent. ([#820](https://github.com/Flohs/claude-agent-sdk-go/issues/820))
 - `AgentID` (`agent_id`) on `AssistantMessage` and `UserMessage`, the ID of the subagent that produced the message (the `task_id` of its task events, unchanged when the subagent is resumed); empty on main-thread messages and from older CLIs. Port of TypeScript SDK v0.3.290-v0.3.292 (found by diffing the npm tarballs for v0.3.289 → v0.3.292 directly); no Python SDK equivalent. ([#764](https://github.com/Flohs/claude-agent-sdk-go/issues/764))
 
 ## [4.1.0] - 2026-10-28

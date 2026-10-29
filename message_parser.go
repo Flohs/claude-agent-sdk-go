@@ -599,18 +599,20 @@ func parseModelUsage(raw map[string]any) map[string]ModelUsage {
 			continue
 		}
 		result[model] = ModelUsage{
-			InputTokens:              intField(m, "inputTokens"),
-			OutputTokens:             intField(m, "outputTokens"),
-			ThinkingTokens:           optionalIntField(m, "thinkingTokens"),
-			CacheReadInputTokens:     intField(m, "cacheReadInputTokens"),
-			CacheCreationInputTokens: intField(m, "cacheCreationInputTokens"),
-			WebSearchRequests:        intField(m, "webSearchRequests"),
-			CostUSD:                  float64FromAny(m["costUSD"]),
-			ContextWindow:            intField(m, "contextWindow"),
-			MaxOutputTokens:          intField(m, "maxOutputTokens"),
-			CanonicalModel:           stringField(m, "canonicalModel"),
-			Provider:                 stringField(m, "provider"),
-			CostBasis:                stringField(m, "costBasis"),
+			InputTokens:                         intField(m, "inputTokens"),
+			OutputTokens:                        intField(m, "outputTokens"),
+			ThinkingTokens:                      optionalIntField(m, "thinkingTokens"),
+			CacheReadInputTokens:                intField(m, "cacheReadInputTokens"),
+			CacheCreationInputTokens:            intField(m, "cacheCreationInputTokens"),
+			CacheCreationEphemeral5mInputTokens: optionalIntField(m, "cacheCreationEphemeral5mInputTokens"),
+			CacheCreationEphemeral1hInputTokens: optionalIntField(m, "cacheCreationEphemeral1hInputTokens"),
+			WebSearchRequests:                   intField(m, "webSearchRequests"),
+			CostUSD:                             float64FromAny(m["costUSD"]),
+			ContextWindow:                       intField(m, "contextWindow"),
+			MaxOutputTokens:                     intField(m, "maxOutputTokens"),
+			CanonicalModel:                      stringField(m, "canonicalModel"),
+			Provider:                            stringField(m, "provider"),
+			CostBasis:                           stringField(m, "costBasis"),
 		}
 	}
 	return result
