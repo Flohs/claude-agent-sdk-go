@@ -27,6 +27,7 @@ func TestAgentToolCompletedOutput_DecodesFromToolUseResult(t *testing.T) {
 			"agentType":         "general-purpose",
 			"resolvedModel":     "claude-sonnet-5",
 			"modelsUsed":        []any{"claude-haiku-4-5", "claude-sonnet-5"},
+			"toolsUsed":         []any{"Read", "Bash"},
 			"totalToolUseCount": float64(4),
 			"totalDurationMs":   float64(1500),
 			"totalTokens":       float64(2048),
@@ -69,6 +70,9 @@ func TestAgentToolCompletedOutput_DecodesFromToolUseResult(t *testing.T) {
 	}
 	if out.ToolStats == nil || out.ToolStats.ReadCount != 3 || out.ToolStats.BashCount != 1 {
 		t.Errorf("ToolStats = %+v, want readCount=3 bashCount=1", out.ToolStats)
+	}
+	if len(out.ToolsUsed) != 2 || out.ToolsUsed[0] != "Read" || out.ToolsUsed[1] != "Bash" {
+		t.Errorf("ToolsUsed = %v, want [Read Bash]", out.ToolsUsed)
 	}
 	wantModelsUsed := []string{"claude-haiku-4-5", "claude-sonnet-5"}
 	if len(out.ModelsUsed) != len(wantModelsUsed) || out.ModelsUsed[0] != wantModelsUsed[0] || out.ModelsUsed[1] != wantModelsUsed[1] {
