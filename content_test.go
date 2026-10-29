@@ -3,6 +3,8 @@ package claude
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 )
 
@@ -518,5 +520,87 @@ func TestParseMessage_Base64Block_MissingSource(t *testing.T) {
 	imgBlock := asst.Content[0].(Base64Block)
 	if imgBlock.Source.Type != "" {
 		t.Fatalf("expected empty source type for missing source, got %s", imgBlock.Source.Type)
+	}
+}
+
+// --- SendUserMessage (uuid and priority) ---
+
+func connectedTestClient() (*Client, *mockTransport) {
+	mt := newMockTransport()
+	return &Client{options: &Options{}, transport: mt, q: newQuery(queryConfig{transport: mt})}, mt
+}
+
+func writtenFrames(t *testing.T, mt *mockTransport) []map[string]any {
+	t.Helper()
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+	frames := make([]map[string]any, 0, len(mt.written))
+	for _, w := range mt.written {
+		var msg map[string]any
+		if err := json.Unmarshal([]byte(w), &msg); err != nil {
+			t.Fatalf("failed to parse written message: %v", err)
+		}
+		frames = append(frames, msg)
+	}
+	return frames
+}
+
+// The CLI reads uuid and priority at the top level of the user frame.
+// (https://github.com/Flohs/claude-agent-sdk-go/issues/806)
+func TestSendUserMessage_WritesUUIDAndPriority(t *testing.T) {
+	c, mt := connectedTestClient()
+	err := c.SendUserMessage(context.TODO(), UserInput{Content: "also check the logs", UUID: "u-1", Priority: MessagePriorityNext})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	frames := writtenFrames(t, mt)
+	if len(frames) != 1 {
+		t.Fatalf("expected 1 written message, got %d", len(frames))
+	}
+	if frames[0]["uuid"] != "u-1" || frames[0]["priority"] != "next" {
+		t.Fatalf("uuid/priority = %v/%v, want u-1/next", frames[0]["uuid"], frames[0]["priority"])
+	}
+	if frames[0]["type"] != "user" || frames[0]["message"].(map[string]any)["content"] != "also check the logs" {
+		t.Fatalf("unexpected frame: %v", frames[0])
+	}
+}
+
+// With neither set, the frame is exactly what SendQueryWithContent writes.
+func TestSendUserMessage_WithoutUUIDOrPriorityMatchesSendQuery(t *testing.T) {
+	a, mta := connectedTestClient()
+	b, mtb := connectedTestClient()
+	if err := a.SendUserMessage(context.TODO(), UserInput{Content: "hello"}); err != nil {
+		t.Fatalf("SendUserMessage: %v", err)
+	}
+	if err := b.SendQueryWithContent(context.TODO(), "hello"); err != nil {
+		t.Fatalf("SendQueryWithContent: %v", err)
+	}
+	mta.mu.Lock()
+	mtb.mu.Lock()
+	defer mta.mu.Unlock()
+	defer mtb.mu.Unlock()
+	if mta.written[0] != mtb.written[0] {
+		t.Fatalf("frames differ:\n%s\n%s", mta.written[0], mtb.written[0])
+	}
+	if strings.Contains(mta.written[0], `"uuid"`) || strings.Contains(mta.written[0], `"priority"`) {
+		t.Fatalf("unset fields were written: %s", mta.written[0])
+	}
+}
+
+func TestSendUserMessage_RejectsAnUnknownPriority(t *testing.T) {
+	c, mt := connectedTestClient()
+	if err := c.SendUserMessage(context.TODO(), UserInput{Content: "x", Priority: "soon"}); err == nil {
+		t.Fatal("want an error for an unknown priority")
+	}
+	if frames := writtenFrames(t, mt); len(frames) != 0 {
+		t.Fatalf("nothing should be written, got %v", frames)
+	}
+}
+
+func TestSendUserMessage_NotConnected(t *testing.T) {
+	c := &Client{options: &Options{}}
+	var connErr *ConnectionError
+	if err := c.SendUserMessage(context.TODO(), UserInput{Content: "x"}); !errors.As(err, &connErr) {
+		t.Fatalf("want a *ConnectionError, got %v", err)
 	}
 }

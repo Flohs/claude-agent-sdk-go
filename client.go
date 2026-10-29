@@ -169,6 +169,57 @@ func (c *Client) SendQuery(ctx context.Context, prompt string) error {
 //	    claude.NewBase64Content("application/pdf", base64PDFData),
 //	}
 func (c *Client) SendQueryWithContent(ctx context.Context, content any) error {
+	return c.SendUserMessage(ctx, UserInput{Content: content})
+}
+
+// MessagePriority tells the CLI when to read a user message that arrives
+// while a turn is running. Behaviour observed with Claude Code CLI 2.1.312.
+type MessagePriority string
+
+const (
+	// MessagePriorityNow ends the running turn at its next tool boundary,
+	// without a final reply (its command reports
+	// [CommandLifecycleStateCancelled]), and runs the message as a turn of
+	// its own. A tool that is already running finishes first;
+	// [Client.BackgroundTask] moves it to the background instead.
+	MessagePriorityNow MessagePriority = "now"
+	// MessagePriorityNext has the running turn read the message at its next
+	// tool boundary and answer it inside the same turn.
+	MessagePriorityNext MessagePriority = "next"
+	// MessagePriorityLater runs the message as a turn of its own once the
+	// running turn has ended.
+	MessagePriorityLater MessagePriority = "later"
+)
+
+// UserInput is one user message written to the CLI by [Client.SendUserMessage].
+type UserInput struct {
+	// Content is a string or a []any of content blocks, as for
+	// [Client.SendQueryWithContent].
+	Content any
+	// UUID identifies the message. The CLI reports it back in
+	// [CommandLifecycleMessage.CommandUUID] and, when the session runs with
+	// the replay-user-messages extra arg, in the echoed user message;
+	// [Client.CancelAsyncMessage] takes it. Use a fresh uuid per message: one
+	// the session's transcript already holds (for example re-sent after a
+	// resume) is acknowledged as completed without running a turn. Omitted
+	// when empty.
+	UUID string
+	// Priority says when the CLI reads the message if a turn is running.
+	// Omitted when empty, which queues the message like [MessagePriorityLater].
+	Priority MessagePriority
+}
+
+// SendUserMessage sends a user message with an optional uuid and priority.
+// With neither set it writes exactly what [Client.SendQueryWithContent]
+// writes.
+func (c *Client) SendUserMessage(ctx context.Context, in UserInput) error {
+	switch in.Priority {
+	case "", MessagePriorityNow, MessagePriorityNext, MessagePriorityLater:
+	default:
+		return &SDKError{Message: fmt.Sprintf("unknown message priority %q", in.Priority)}
+	}
+
+	content := in.Content
 	if c.q == nil || c.transport == nil {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
@@ -188,12 +239,19 @@ func (c *Client) SendQueryWithContent(ctx context.Context, content any) error {
 		return &SDKError{Message: fmt.Sprintf("content must be a string or []any, got %T", content)}
 	}
 
-	message := stampUserMessage(map[string]any{
+	message := map[string]any{
 		"type":               "user",
 		"message":            map[string]any{"role": "user", "content": content},
 		"parent_tool_use_id": nil,
 		"session_id":         "default",
-	}, c.options.VerbatimPrompts)
+	}
+	if in.UUID != "" {
+		message["uuid"] = in.UUID
+	}
+	if in.Priority != "" {
+		message["priority"] = string(in.Priority)
+	}
+	message = stampUserMessage(message, c.options.VerbatimPrompts)
 
 	data, _ := json.Marshal(message)
 	return c.transport.Write(string(data) + "\n")
@@ -497,6 +555,21 @@ func (c *Client) ReloadPluginsWithOptions(ctx context.Context, holdOnCacheImpact
 	return c.q.reloadPlugins(holdOnCacheImpact)
 }
 
+// ReloadPluginsAdding is like [Client.ReloadPluginsWithOptions], but the
+// reload also loads addPlugins, as if each had been in
+// [Options.Plugins] at launch. Plugins already loaded stay; nothing is
+// removed. Each plugin Path must be absolute. The CLI refuses the request for
+// a malformed list or relative path, when managed settings set
+// disableSideloadFlags, in a cloud-hosted session, and over a connection
+// whose frames persist server-side. Port of TypeScript SDK
+// reloadPlugins({addPlugins}) (v0.3.297-v0.3.301).
+func (c *Client) ReloadPluginsAdding(ctx context.Context, holdOnCacheImpact bool, addPlugins []SdkPluginConfig) (map[string]any, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.reloadPluginsAdding(holdOnCacheImpact, addPlugins)
+}
+
 // ReloadOutputStyles re-reads the output-style directories from disk and
 // returns the refreshed style names. A style file written while the session
 // runs is otherwise invisible to it until the next session. This also drops
@@ -565,12 +638,23 @@ func (c *Client) PromptSuggestion(ctx context.Context) ([]string, error) {
 }
 
 // StopAsyncMessage cancels a queued user message by its UUID before it
-// reaches execution.
+// reaches execution. It does not report whether the message was still
+// queued; [Client.CancelAsyncMessage] does.
 func (c *Client) StopAsyncMessage(ctx context.Context, uuid string) error {
+	_, err := c.CancelAsyncMessage(ctx, uuid)
+	return err
+}
+
+// CancelAsyncMessage cancels a queued user message by its UUID before it
+// reaches execution, and reports whether the CLI cancelled it. false means
+// the message was no longer queued: it already ran, is running, or was never
+// sent. The uuid is the one the message was sent with; the CLI echoes it in
+// [CommandLifecycleMessage.CommandUUID].
+func (c *Client) CancelAsyncMessage(ctx context.Context, uuid string) (bool, error) {
 	if c.q == nil {
-		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+		return false, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
-	return c.q.stopAsyncMessage(uuid)
+	return c.q.cancelAsyncMessage(uuid)
 }
 
 // SeedReadState seeds the CLI's read-file-state tracker with the given
@@ -626,6 +710,22 @@ func (c *Client) SetMcpServers(ctx context.Context, servers map[string]McpServer
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
 	return c.q.setMcpServers(servers)
+}
+
+// BackgroundTask moves a running foreground tool call (a Bash command, an
+// Agent or Task call) to the background, so the turn goes on without waiting
+// for it: the CLI answers the tool call at once and the work keeps running as
+// a background task, reported by [BackgroundTasksChangedMessage] and a
+// [TaskUpdatedMessage]. toolUseID is the id of the tool_use block. It reports
+// whether the CLI backgrounded the call. Paired with
+// [MessagePriorityNow], it lets a message sent while a long tool blocks be
+// read right away. Observed with Claude Code CLI 2.1.312; the TypeScript
+// SDK's backgroundTasks.
+func (c *Client) BackgroundTask(ctx context.Context, toolUseID string) (bool, error) {
+	if c.q == nil {
+		return false, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.backgroundTask(toolUseID)
 }
 
 // StopTask stops a running task.
@@ -756,6 +856,9 @@ func (c *Client) GetServerCapabilities() *ServerCapabilities {
 				caps.MemoryPaths = append(caps.MemoryPaths, s)
 			}
 		}
+	}
+	if v, ok := c.q.initializationResult["claude_code_version"].(string); ok {
+		caps.ClaudeCodeVersion = v
 	}
 	if values, ok := c.q.initializationResult["capabilities"].([]any); ok {
 		for _, v := range values {

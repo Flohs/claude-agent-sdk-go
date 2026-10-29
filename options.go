@@ -331,6 +331,11 @@ type AgentDefinition struct {
 	DisallowedTools []string `json:"disallowedTools,omitempty"`
 	MaxTurns        *int     `json:"maxTurns,omitempty"`
 	InitialPrompt   string   `json:"initialPrompt,omitempty"`
+	// AutoCompactWindow is the token count at which this agent compacts its
+	// own conversation when it runs as a subagent. It only lowers the window
+	// the subagent would otherwise inherit. No effect on the main session
+	// agent.
+	AutoCompactWindow *int `json:"autoCompactWindow,omitempty"`
 	// Advisor enables the advisor tool for this agent definition.
 	// Set to true to enable with default config, or provide an *AdvisorToolConfig
 	// for fine-grained control. When nil (default), the field is omitted.
@@ -427,11 +432,18 @@ type SandboxNetworkConfig struct {
 	AllowMachLookup *bool `json:"allowMachLookup,omitempty"`
 }
 
-// SandboxIgnoreViolations specifies violations to ignore in sandbox.
-type SandboxIgnoreViolations struct {
-	File    []string `json:"file,omitempty"`
-	Network []string `json:"network,omitempty"`
-}
+// SandboxIgnoreViolations specifies sandbox violations to leave unreported.
+// It maps a command pattern ("*" matches every command) to substrings of the
+// violation text: a violation is left unreported when the command's text
+// contains the pattern and the violation's text contains one of the strings.
+// Both checks are plain substring matches, not globs. Example:
+//
+//	SandboxIgnoreViolations{"*": {"/etc/hosts"}}
+//
+// This only affects which violations are reported, not what the sandbox
+// blocks. Matches Python SDK v0.2.166 and the TypeScript SDK's
+// SandboxSettings.ignoreViolations.
+type SandboxIgnoreViolations map[string][]string
 
 // SandboxFilesystemConfig configures filesystem access restrictions for sandboxed commands.
 type SandboxFilesystemConfig struct {
@@ -604,8 +616,17 @@ type SandboxSettings struct {
 	ExcludedCommands          []string                 `json:"excludedCommands,omitempty"`
 	AllowUnsandboxedCommands  *bool                    `json:"allowUnsandboxedCommands,omitempty"`
 	Network                   *SandboxNetworkConfig    `json:"network,omitempty"`
-	IgnoreViolations          *SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
+	IgnoreViolations          SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
 	EnableWeakerNestedSandbox *bool                    `json:"enableWeakerNestedSandbox,omitempty"`
+	// AllowNestedUserNamespaces (Linux/WSL only) lets sandboxed commands create
+	// user namespaces of their own, which the sandbox refuses by default.
+	// Needed by tools that sandbox themselves that way (Chromium/Electron,
+	// a nested bubblewrap, unshare). Removes
+	// code-execution isolation: a hostile command can then bypass the
+	// filesystem deny lists and write-protected paths. Default false. Only
+	// honored from user, managed/policy or CLI settings; true from project
+	// settings is ignored. Port of TypeScript SDK v0.3.305 (doc wording per v0.3.308).
+	AllowNestedUserNamespaces *bool `json:"allowNestedUserNamespaces,omitempty"`
 	// FailIfUnavailable controls behavior when sandboxing is requested but the
 	// platform's sandbox mechanism is unavailable (no bwrap on Linux, no
 	// Seatbelt on macOS, etc). When true (the CLI default when Enabled is
@@ -710,6 +731,15 @@ type Options struct {
 	Settings string
 	// ManagedSettings is a JSON string of policy-tier settings forwarded to the
 	// spawned CLI in-memory. Honored below IT-controlled managed sources.
+	// Two hook keys are filtered by value rather than kept as written:
+	// disableAllHooks (any value but false/"false") binds as
+	// allowManagedHooksOnly: true so the administrator's own hooks keep
+	// running, and allowedHttpHookUrls / httpHookAllowedEnvVars bind only as
+	// the empty list (a non-empty one is dropped, since these lists union
+	// across settings sources and would widen an admin's). An empty list
+	// binds only where no other source sets one; pair it with
+	// allowManagedHooksOnly to stop a project's HTTP hooks outright.
+	// Port of TypeScript SDK v0.3.309.
 	ManagedSettings string
 	// AddDirs adds additional directories.
 	AddDirs []string
@@ -762,6 +792,8 @@ type Options struct {
 	IncludePartialMessages bool
 	// IncludeHookEvents enables hook lifecycle system messages
 	// (hook_started, hook_progress, hook_response) for all hook event types.
+	// The SessionStart and Setup hook events are emitted regardless of this
+	// setting.
 	IncludeHookEvents bool
 	// AgentProgressSummaries enables periodic AI-generated progress summaries
 	// on task_progress messages. When set, task progress messages carry a

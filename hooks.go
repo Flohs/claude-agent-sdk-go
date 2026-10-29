@@ -123,6 +123,18 @@ type BaseHookInput struct {
 	// the first user input of the process lifetime; absent on SessionStart.
 	// Port of TypeScript SDK v0.3.196.
 	PromptID string `json:"prompt_id,omitempty"`
+	// Effort is the reasoning effort in effect when the hook fires. Present
+	// for hooks that fire within a tool-use context (PreToolUse,
+	// PostToolUse, Stop, SubagentStop, etc.) on models that support effort;
+	// nil otherwise. Port of Python SDK v0.2.166.
+	Effort *HookEffort `json:"effort,omitempty"`
+}
+
+// HookEffort is the reasoning effort in effect when a hook fires.
+type HookEffort struct {
+	// Level is the effort level for the current turn (e.g. "low", "high",
+	// "max"), after any downgrade for the selected model.
+	Level string `json:"level"`
 }
 
 // SubagentContext carries optional sub-agent attribution fields.
@@ -160,6 +172,10 @@ type PostToolUseHookInput struct {
 	// McpServer identifies the MCP server this tool belongs to. Nil for
 	// built-in tools. Port of TypeScript SDK v0.3.274.
 	McpServer *ToolMcpServerRef `json:"mcp_server,omitempty"`
+	// DurationMs is the tool execution time in milliseconds, excluding
+	// permission-prompt and hook time. Nil when not provided. Port of
+	// Python SDK v0.2.166.
+	DurationMs *int `json:"duration_ms,omitempty"`
 }
 
 func (*PostToolUseHookInput) hookInputMarker() {}
@@ -173,6 +189,10 @@ type PostToolUseFailureHookInput struct {
 	ToolUseID   string         `json:"tool_use_id"`
 	Error       string         `json:"error"`
 	IsInterrupt bool           `json:"is_interrupt,omitempty"`
+	// DurationMs is the tool execution time in milliseconds, excluding
+	// permission-prompt and hook time. Nil when not provided. Port of
+	// Python SDK v0.2.166.
+	DurationMs *int `json:"duration_ms,omitempty"`
 }
 
 func (*PostToolUseFailureHookInput) hookInputMarker() {}

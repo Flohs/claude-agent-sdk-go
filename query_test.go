@@ -1087,6 +1087,82 @@ func TestInitialize_SdkMcpServerManifests(t *testing.T) {
 	})
 }
 
+func TestInitialize_SdkMcpServerToolPolicies(t *testing.T) {
+	initRequest := func(t *testing.T, servers map[string]*McpSdkServerConfig) map[string]any {
+		t.Helper()
+		mt := newAutoRespondTransport()
+		q := newQuery(queryConfig{transport: mt, mcpServers: servers})
+		q.start()
+		if _, err := q.initialize(); err != nil {
+			t.Fatalf("initialize failed: %v", err)
+		}
+		mt.mu.Lock()
+		written := make([]string, len(mt.written))
+		copy(written, mt.written)
+		mt.mu.Unlock()
+		_ = q.close()
+		for _, w := range written {
+			var msg map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+				continue
+			}
+			if req, _ := msg["request"].(map[string]any); req != nil && req["subtype"] == "initialize" {
+				return req
+			}
+		}
+		t.Fatal("no initialize request written")
+		return nil
+	}
+
+	t.Run("sends sdkMcpServers and sdkMcpServerConfigs tools", func(t *testing.T) {
+		server := NewSdkMcpServer("calc", "1.0.0", nil)
+		server.Tools = []McpServerToolPolicy{
+			{Name: "add", PermissionPolicy: McpToolPolicyAlwaysAsk},
+			{Name: "drop", PermissionPolicy: McpToolPolicyAlwaysDeny},
+		}
+		req := initRequest(t, map[string]*McpSdkServerConfig{"calc": server})
+
+		names, _ := req["sdkMcpServers"].([]any)
+		if len(names) != 1 || names[0] != "calc" {
+			t.Fatalf("sdkMcpServers = %v, want [calc]", names)
+		}
+		configs, _ := req["sdkMcpServerConfigs"].(map[string]any)
+		entry, _ := configs["calc"].(map[string]any)
+		tools, _ := entry["tools"].([]any)
+		if len(tools) != 2 {
+			t.Fatalf("tools = %v, want 2 entries", tools)
+		}
+		first, _ := tools[0].(map[string]any)
+		if first["name"] != "add" || first["permission_policy"] != "always_ask" {
+			t.Errorf("tools[0] = %v", first)
+		}
+	})
+
+	t.Run("sends connectorId in sdkMcpServerConfigs", func(t *testing.T) {
+		server := NewSdkMcpServer("calc", "1.0.0", nil)
+		server.ConnectorID = "conn-123"
+		req := initRequest(t, map[string]*McpSdkServerConfig{"calc": server})
+		configs, _ := req["sdkMcpServerConfigs"].(map[string]any)
+		entry, _ := configs["calc"].(map[string]any)
+		if entry["connectorId"] != "conn-123" {
+			t.Errorf("connectorId = %v, want conn-123", entry["connectorId"])
+		}
+		if _, ok := entry["tools"]; ok {
+			t.Error("tools should be omitted")
+		}
+	})
+
+	t.Run("omits both fields when no server declares a policy", func(t *testing.T) {
+		req := initRequest(t, map[string]*McpSdkServerConfig{"calc": NewSdkMcpServer("calc", "1.0.0", nil)})
+		if _, ok := req["sdkMcpServers"]; ok {
+			t.Error("sdkMcpServers should be omitted")
+		}
+		if _, ok := req["sdkMcpServerConfigs"]; ok {
+			t.Error("sdkMcpServerConfigs should be omitted")
+		}
+	})
+}
+
 func TestInitialize_ForwardSubagentText(t *testing.T) {
 	t.Run("sends forwardSubagentText when true", func(t *testing.T) {
 		mt := newAutoRespondTransport()
@@ -2529,6 +2605,41 @@ func TestReloadPlugins_HoldOnCacheImpactSendsKey(t *testing.T) {
 	}
 }
 
+// TestReloadPluginsAdding_SendsAddPlugins verifies that add_plugins carries
+// the plugin configs on the wire, and is omitted when none are given. Port of
+// TypeScript SDK v0.3.297-v0.3.301.
+func TestReloadPluginsAdding_SendsAddPlugins(t *testing.T) {
+	mt := newAutoRespondTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	if _, err := q.reloadPluginsAdding(false, []SdkPluginConfig{{Type: "local", Path: "/abs/plug"}}); err != nil {
+		t.Fatalf("reloadPluginsAdding failed: %v", err)
+	}
+	if _, err := q.reloadPlugins(false); err != nil {
+		t.Fatalf("reloadPlugins failed: %v", err)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	var with, without int
+	for _, w := range written {
+		if !strings.Contains(w, `"reload_plugins"`) {
+			continue
+		}
+		if strings.Contains(w, `"add_plugins":[{"type":"local","path":"/abs/plug"}]`) {
+			with++
+		} else if !strings.Contains(w, "add_plugins") {
+			without++
+		}
+	}
+	if with != 1 || without != 1 {
+		t.Fatalf("with=%d without=%d, written=%v", with, without, written)
+	}
+}
+
 // TestUpdateSettings_SendsSubtypeSourceAndSettings verifies that
 // query.updateSettings sends a control request with subtype
 // "update_settings" carrying the given source and settings map on the wire.
@@ -3081,5 +3192,177 @@ func TestGetTaskOutput_SendsRequestAndParsesResponse(t *testing.T) {
 	}
 	if found["task_id"] != "task-1" {
 		t.Fatalf("task_id = %v, want %q", found["task_id"], "task-1")
+	}
+}
+
+func TestNewQuery_AgentAutoCompactWindow(t *testing.T) {
+	window := 50000
+	q := newQuery(queryConfig{agents: map[string]AgentDefinition{
+		"a": {Description: "d", Prompt: "p", AutoCompactWindow: &window},
+		"b": {Description: "d", Prompt: "p"},
+	}})
+	if got := q.agents["a"]["autoCompactWindow"]; got != window {
+		t.Errorf("autoCompactWindow = %v, want %d", got, window)
+	}
+	if _, ok := q.agents["b"]["autoCompactWindow"]; ok {
+		t.Error("autoCompactWindow should be omitted when nil")
+	}
+}
+
+// TestContextUsage_UnmarshalsCamelCaseResponse verifies ContextUsage decodes
+// the CLI's camelCase get_context_usage response, including the stable row
+// ids, plugin ids, paths and MCP instruction shares added in TS SDK v0.3.304.
+func TestContextUsage_UnmarshalsCamelCaseResponse(t *testing.T) {
+	raw := `{"categories":[{"id":"mcp_instructions","name":"MCP instructions","tokens":12,"color":"x","kind":"used"}],
+"totalTokens":100,"maxTokens":200,"rawMaxTokens":250,"percentage":50.5,"model":"m",
+"mcpInstructions":[{"serverName":"srv","tokens":12}],
+"agents":[{"agentType":"a","source":"plugin","pluginId":"p@mk","path":"/x/a.md","tokens":3}],
+"skills":{"totalSkills":1,"includedSkills":1,"tokens":4,"skillFrontmatter":[{"name":"s","source":"plugin","pluginName":"p","pluginId":"p@mk","path":"/x/s/SKILL.md","tokens":4}]}}`
+	var u ContextUsage
+	if err := json.Unmarshal([]byte(raw), &u); err != nil {
+		t.Fatal(err)
+	}
+	if u.TotalTokens != 100 || u.Categories[0].ID != "mcp_instructions" || u.Categories[0].Kind != "used" {
+		t.Errorf("unexpected categories/totals: %+v", u)
+	}
+	if u.MCPInstructions[0].ServerName != "srv" || u.MCPInstructions[0].Tokens != 12 {
+		t.Errorf("unexpected mcpInstructions: %+v", u.MCPInstructions)
+	}
+	if a := u.Agents[0]; a.PluginID != "p@mk" || a.Path != "/x/a.md" {
+		t.Errorf("unexpected agent: %+v", a)
+	}
+	if s := u.Skills.SkillFrontmatter[0]; s.PluginName != "p" || s.PluginID != "p@mk" || s.Path != "/x/s/SKILL.md" {
+		t.Errorf("unexpected skill: %+v", s)
+	}
+}
+
+// TestContextUsage_UnmarshalsRecommendationsAndFix verifies the
+// recommendations and fix fields added in TS SDK v0.3.305.
+func TestContextUsage_UnmarshalsRecommendationsAndFix(t *testing.T) {
+	raw := `{"totalTokens":1,"recommendations":[{"key":"agent","pct":42.5,"title":"Trim agent","detail":"/effort low"}],
+"fix":{"keys":["agent"],"messages":["/effort low","do the rest"]}}`
+	var u ContextUsage
+	if err := json.Unmarshal([]byte(raw), &u); err != nil {
+		t.Fatal(err)
+	}
+	if r := u.Recommendations[0]; r.Key != "agent" || r.Pct != 42.5 || r.Title != "Trim agent" || r.Detail != "/effort low" {
+		t.Errorf("unexpected recommendation: %+v", r)
+	}
+	if u.Fix == nil || len(u.Fix.Messages) != 2 || u.Fix.Keys[0] != "agent" {
+		t.Errorf("unexpected fix: %+v", u.Fix)
+	}
+}
+
+// TestQueryCloseDoesNotRaceTheReader closes a query from another goroutine
+// while its reader is still handling messages. Under -race this reported a
+// data race on query.closed until the flag became atomic.
+// (https://github.com/Flohs/claude-agent-sdk-go/issues/800)
+func TestQueryCloseDoesNotRaceTheReader(t *testing.T) {
+	mt := newMockTransport()
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	msg := map[string]any{"type": "rate_limit_event", "rate_limit_info": map[string]any{"status": "allowed"}}
+	for i := 0; i < 20; i++ {
+		mt.messages <- msg
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	done := make(chan struct{})
+	go func() {
+		_ = q.close()
+		close(done)
+	}()
+	// The mock's channel only closes in Close, which runs after the reader
+	// exits; one more message lets the reader see closed and stop.
+	time.Sleep(20 * time.Millisecond)
+	mt.messages <- msg
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("close did not return")
+	}
+}
+
+// writtenControlRequest returns the request body of the first control_request
+// with the given subtype that mt received, or nil.
+func writtenControlRequest(mt *stubResponseTransport, subtype string) map[string]any {
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	for _, w := range written {
+		var msg map[string]any
+		if err := json.Unmarshal([]byte(strings.TrimSpace(w)), &msg); err != nil {
+			continue
+		}
+		if msg["type"] != "control_request" {
+			continue
+		}
+		if req, ok := msg["request"].(map[string]any); ok && req["subtype"] == subtype {
+			return req
+		}
+	}
+	return nil
+}
+
+// TestCancelAsyncMessage_SendsMessageUUID verifies the cancel carries the
+// message under message_uuid, the field the CLI reads, and reports the CLI's
+// cancelled answer. Sent under uuid, the CLI answered cancelled:false and
+// still ran the message. (https://github.com/Flohs/claude-agent-sdk-go/issues/802)
+func TestCancelAsyncMessage_SendsMessageUUID(t *testing.T) {
+	mt := newStubResponseTransport(map[string]any{"cancelled": true})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	cancelled, err := q.cancelAsyncMessage("msg-1")
+	if err != nil {
+		t.Fatalf("cancelAsyncMessage failed: %v", err)
+	}
+	if !cancelled {
+		t.Fatal("cancelled = false, want the CLI's true")
+	}
+	req := writtenControlRequest(mt, "cancel_async_message")
+	if req == nil {
+		t.Fatal("expected a cancel_async_message control_request")
+	}
+	if req["message_uuid"] != "msg-1" {
+		t.Fatalf("message_uuid = %v, want %q", req["message_uuid"], "msg-1")
+	}
+	if _, ok := req["uuid"]; ok {
+		t.Fatalf("request still carries uuid: %v", req)
+	}
+}
+
+// TestBackgroundTask_SendsToolUseID verifies the background_tasks request
+// carries the tool_use_id and reports the CLI's backgrounded answer, a
+// missing one counting as true. (https://github.com/Flohs/claude-agent-sdk-go/issues/810)
+func TestBackgroundTask_SendsToolUseID(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		resp map[string]any
+		want bool
+	}{
+		{"backgrounded", map[string]any{"backgrounded": true}, true},
+		{"refused", map[string]any{"backgrounded": false}, false},
+		{"no answer field", map[string]any{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mt := newStubResponseTransport(tc.resp)
+			q := newQuery(queryConfig{transport: mt})
+			q.start()
+			defer func() { _ = q.close() }()
+
+			got, err := q.backgroundTask("toolu_1")
+			if err != nil {
+				t.Fatalf("backgroundTask failed: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("backgrounded = %v, want %v", got, tc.want)
+			}
+			req := writtenControlRequest(mt, "background_tasks")
+			if req == nil || req["tool_use_id"] != "toolu_1" {
+				t.Fatalf("expected a background_tasks request with tool_use_id, got %v", req)
+			}
+		})
 	}
 }

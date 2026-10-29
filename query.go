@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -93,7 +94,7 @@ type query struct {
 	// State
 	initTimeout            float64
 	initialized            bool
-	closed                 bool
+	closed                 atomic.Bool
 	initializationResult   map[string]any
 	firstResultCh          chan struct{}
 	firstResultOnce        sync.Once
@@ -318,6 +319,9 @@ func newQuery(cfg queryConfig) *query {
 			if def.InitialPrompt != "" {
 				m["initialPrompt"] = def.InitialPrompt
 			}
+			if def.AutoCompactWindow != nil {
+				m["autoCompactWindow"] = *def.AutoCompactWindow
+			}
 			q.agents[name] = m
 		}
 	}
@@ -482,7 +486,7 @@ func (q *query) readMessages() {
 	msgCh := q.transport.ReadMessages(q.ctx)
 
 	for msg := range msgCh {
-		if q.closed {
+		if q.closed.Load() {
 			break
 		}
 
@@ -999,6 +1003,11 @@ func (q *query) initialize() (map[string]any, error) {
 		request["sdkMcpServerManifests"] = manifests
 	}
 
+	if names, configs := q.mcpRouter.buildToolPolicies(); len(configs) > 0 {
+		request["sdkMcpServers"] = names
+		request["sdkMcpServerConfigs"] = configs
+	}
+
 	response, err := q.sendControlRequest(request, time.Duration(q.initTimeout*float64(time.Second)))
 	if err != nil {
 		// A second initialize call returns "Already initialized" — treat as success.
@@ -1340,11 +1349,18 @@ func (q *query) updateSettings(source string, settings map[string]any) error {
 }
 
 func (q *query) reloadPlugins(holdOnCacheImpact bool) (map[string]any, error) {
+	return q.reloadPluginsAdding(holdOnCacheImpact, nil)
+}
+
+func (q *query) reloadPluginsAdding(holdOnCacheImpact bool, addPlugins []SdkPluginConfig) (map[string]any, error) {
 	req := map[string]any{
 		"subtype": "reload_plugins",
 	}
 	if holdOnCacheImpact {
 		req["hold_on_cache_impact"] = true
+	}
+	if len(addPlugins) > 0 {
+		req["add_plugins"] = addPlugins
 	}
 	resp, err := q.sendControlRequest(req, 60*time.Second)
 	return resp, err
@@ -1420,12 +1436,19 @@ func (q *query) promptSuggestion() ([]string, error) {
 	return stringSliceFromResponse(resp, "suggestions")
 }
 
-func (q *query) stopAsyncMessage(uuid string) error {
-	_, err := q.sendControlRequest(map[string]any{
-		"subtype": "cancel_async_message",
-		"uuid":    uuid,
+// cancelAsyncMessage cancels a queued user message by its uuid and reports
+// whether the CLI cancelled it. The CLI reads the uuid from message_uuid; sent
+// under uuid it answers cancelled:false and still runs the message.
+func (q *query) cancelAsyncMessage(uuid string) (bool, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype":      "cancel_async_message",
+		"message_uuid": uuid,
 	}, 60*time.Second)
-	return err
+	if err != nil {
+		return false, err
+	}
+	cancelled, _ := resp["cancelled"].(bool)
+	return cancelled, nil
 }
 
 func (q *query) seedReadState(entries []ReadStateEntry) error {
@@ -1556,6 +1579,12 @@ func (q *query) setMcpServers(servers map[string]McpServerConfig) error {
 				"name":         sdkCfg.Name,
 				"capabilities": capabilities,
 			}
+			if len(sdkCfg.Tools) > 0 {
+				serialized[name].(map[string]any)["tools"] = sdkCfg.Tools
+			}
+			if sdkCfg.ConnectorID != "" {
+				serialized[name].(map[string]any)["connectorId"] = sdkCfg.ConnectorID
+			}
 			// Register the server in the router so subsequent mcp_message
 			// control requests for it are routed correctly.
 			q.mcpRouter.addServer(sdkCfg.Name, sdkCfg)
@@ -1576,6 +1605,24 @@ func (q *query) setMcpServers(servers map[string]McpServerConfig) error {
 		"mcpServers": serialized,
 	}, 60*time.Second)
 	return err
+}
+
+// backgroundTask moves a running foreground tool call to the background and
+// reports whether the CLI did. A missing backgrounded field counts as true,
+// as in the TypeScript SDK.
+func (q *query) backgroundTask(toolUseID string) (bool, error) {
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype":     "background_tasks",
+		"tool_use_id": toolUseID,
+	}, 60*time.Second)
+	if err != nil {
+		return false, err
+	}
+	backgrounded, ok := resp["backgrounded"].(bool)
+	if !ok {
+		return true, nil
+	}
+	return backgrounded, nil
 }
 
 func (q *query) stopTask(taskID string) error {
@@ -1678,7 +1725,7 @@ func (q *query) getUsageExperimentalDetail(skipBehaviors bool) (*UsageDataExperi
 func (q *query) streamInput(inputCh <-chan map[string]any) {
 	written := false
 	for msg := range inputCh {
-		if q.closed {
+		if q.closed.Load() {
 			break
 		}
 		data, _ := json.Marshal(msg)
@@ -1768,7 +1815,7 @@ func (q *query) close() error {
 // context fires, the batcher worker is left to finish in the background
 // and we proceed straight to subprocess teardown.
 func (q *query) closeContext(ctx context.Context) error {
-	q.closed = true
+	q.closed.Store(true)
 	// Drain the batcher BEFORE cancelling the context / closing stdin so
 	// in-flight mirror writes have a chance to reach the store before the
 	// CLI subprocess is torn down. CloseContext respects the caller's

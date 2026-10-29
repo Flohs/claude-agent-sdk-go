@@ -1036,6 +1036,7 @@ func TestParseMessage_RateLimitEvent(t *testing.T) {
 			"utilization":     utilization,
 			"overage_status":  "active",
 			"limit_scope":     "group_pool",
+			"overage_enabled": true,
 		},
 	}
 
@@ -1077,6 +1078,9 @@ func TestParseMessage_RateLimitEvent(t *testing.T) {
 	}
 	if event.RateLimitInfo.LimitScope == nil || *event.RateLimitInfo.LimitScope != "group_pool" {
 		t.Errorf("expected limit_scope 'group_pool', got %v", event.RateLimitInfo.LimitScope)
+	}
+	if event.RateLimitInfo.OverageEnabled == nil || !*event.RateLimitInfo.OverageEnabled {
+		t.Errorf("expected overage_enabled true, got %v", event.RateLimitInfo.OverageEnabled)
 	}
 }
 
@@ -3594,5 +3598,189 @@ func TestParseMessage_AgentID(t *testing.T) {
 	main, _ := ParseMessage(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": "hi"}})
 	if got := main.(*UserMessage).AgentID; got != "" {
 		t.Errorf("AgentID = %q, want empty when absent", got)
+	}
+}
+
+func TestParseMessage_TaskRunIDAndParentTaskID(t *testing.T) {
+	sys := func(subtype string, extra map[string]any) map[string]any {
+		d := map[string]any{"type": "system", "subtype": subtype, "task_id": "t1", "run_id": "r1", "uuid": "u1", "session_id": "s1"}
+		for k, v := range extra {
+			d[k] = v
+		}
+		return d
+	}
+	started, err := ParseMessage(sys("task_started", map[string]any{"parent_task_id": "p1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := started.(*TaskStartedMessage); m.RunID != "r1" || m.ParentTaskID != "p1" {
+		t.Errorf("task_started RunID/ParentTaskID = %q/%q", m.RunID, m.ParentTaskID)
+	}
+	progress, _ := ParseMessage(sys("task_progress", nil))
+	if m := progress.(*TaskProgressMessage); m.RunID != "r1" {
+		t.Errorf("task_progress RunID = %q", m.RunID)
+	}
+	notif, _ := ParseMessage(sys("task_notification", map[string]any{"status": "completed"}))
+	if m := notif.(*TaskNotificationMessage); m.RunID != "r1" {
+		t.Errorf("task_notification RunID = %q", m.RunID)
+	}
+	updated, _ := ParseMessage(sys("task_updated", map[string]any{"patch": map[string]any{"status": "completed"}}))
+	if m := updated.(*TaskUpdatedMessage); m.RunID != "r1" {
+		t.Errorf("task_updated RunID = %q", m.RunID)
+	}
+	bg, _ := ParseMessage(map[string]any{
+		"type": "system", "subtype": "background_tasks_changed",
+		"tasks": []any{map[string]any{"task_id": "t1", "task_type": "local_agent", "run_id": "r1", "parent_task_id": "p1"}},
+	})
+	if m := bg.(*BackgroundTasksChangedMessage); len(m.Tasks) != 1 || m.Tasks[0].RunID != "r1" || m.Tasks[0].ParentTaskID != "p1" {
+		t.Errorf("background_tasks_changed tasks = %+v", m.Tasks)
+	}
+	absent, _ := ParseMessage(sys("task_started", nil))
+	if m := absent.(*TaskStartedMessage); m.ParentTaskID != "" {
+		t.Errorf("ParentTaskID = %q, want empty when absent", m.ParentTaskID)
+	}
+}
+
+func TestParseMessage_UserMessageOriginRunID(t *testing.T) {
+	msg, err := ParseMessage(map[string]any{
+		"type":    "user",
+		"message": map[string]any{"role": "user", "content": "done"},
+		"origin":  map[string]any{"kind": "task-notification", "runId": "r1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o := msg.(*UserMessage).Origin; o == nil || o.RunID != "r1" {
+		t.Errorf("Origin = %+v, want RunID r1", o)
+	}
+}
+
+func TestParseMessage_BackgroundTasksChangedSubagentType(t *testing.T) {
+	msg, err := ParseMessage(map[string]any{
+		"type": "system", "subtype": "background_tasks_changed", "uuid": "u1", "session_id": "s1",
+		"tasks": []any{map[string]any{"task_id": "t1", "task_type": "local_agent", "description": "d", "subagent_type": "general-purpose"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := msg.(*BackgroundTasksChangedMessage)
+	if len(m.Tasks) != 1 || m.Tasks[0].SubagentType != "general-purpose" {
+		t.Errorf("Tasks = %+v", m.Tasks)
+	}
+}
+
+// TestParseMessage_CommandLifecycleTopLevelFrame parses the frame as Claude
+// Code CLI 2.1.312 sends it: a top-level type, the command's id in
+// command_uuid and the event's own id in uuid. Previously ParseMessage
+// returned nil for it, so consumers never saw a command's lifecycle.
+// (https://github.com/Flohs/claude-agent-sdk-go/issues/804)
+func TestParseMessage_CommandLifecycleTopLevelFrame(t *testing.T) {
+	data := map[string]any{
+		"type":         "command_lifecycle",
+		"command_uuid": "prompt-uuid-1",
+		"state":        "cancelled",
+		"uuid":         "event-uuid-1",
+		"session_id":   "sess-1",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cl, ok := msg.(*CommandLifecycleMessage)
+	if !ok {
+		t.Fatalf("expected *CommandLifecycleMessage, got %T", msg)
+	}
+	if cl.CommandUUID != "prompt-uuid-1" {
+		t.Errorf("CommandUUID = %q, want the command_uuid", cl.CommandUUID)
+	}
+	if cl.UUID != "event-uuid-1" {
+		t.Errorf("UUID = %q, want the event's own uuid", cl.UUID)
+	}
+	if cl.State != CommandLifecycleStateCancelled || cl.SessionID != "sess-1" {
+		t.Errorf("State = %q, SessionID = %q", cl.State, cl.SessionID)
+	}
+	if cl.Subtype != "command_lifecycle" {
+		t.Errorf("Subtype = %q, want command_lifecycle for callers that switch on it", cl.Subtype)
+	}
+}
+
+func TestParseMessage_CommandLifecycleRefused(t *testing.T) {
+	msg, err := ParseMessage(map[string]any{"type": "command_lifecycle", "command_uuid": "c", "state": "refused"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cl, ok := msg.(*CommandLifecycleMessage); !ok || cl.State != CommandLifecycleStateRefused {
+		t.Fatalf("got %#v", msg)
+	}
+}
+
+// TestParseMessage_UserMessageIsReplay reads the echo the CLI sends for a
+// user message it took from stdin when replay-user-messages is on.
+// (https://github.com/Flohs/claude-agent-sdk-go/issues/808)
+func TestParseMessage_UserMessageIsReplay(t *testing.T) {
+	echo := map[string]any{
+		"type":               "user",
+		"uuid":               "prompt-uuid-1",
+		"isReplay":           true,
+		"session_id":         "sess-1",
+		"parent_tool_use_id": nil,
+		"message":            map[string]any{"role": "user", "content": "also check the logs"},
+	}
+	msg, err := ParseMessage(echo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	um, ok := msg.(*UserMessage)
+	if !ok || !um.IsReplay || um.UUID != "prompt-uuid-1" {
+		t.Fatalf("want the echo marked IsReplay with its uuid, got %#v", msg)
+	}
+
+	delete(echo, "isReplay")
+	msg, _ = ParseMessage(echo)
+	if msg.(*UserMessage).IsReplay {
+		t.Fatal("a user message without isReplay must not be marked as an echo")
+	}
+}
+
+// The CLI's label for a batch of tool calls, sent when it runs with
+// CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES=true. Captured from CLI 2.1.312.
+func TestParseToolUseSummaryMessage(t *testing.T) {
+	data := map[string]any{
+		"type":                   "tool_use_summary",
+		"summary":                "Listed files, counted a.txt lines",
+		"preceding_tool_use_ids": []any{"toolu_016wE3FBYnp2CJ2LLbv5v8Ks", "toolu_011uwe9g6vk82oSbktBiMEdy"},
+		"uuid":                   "8ec7ff7c-4e53-4906-ba50-af6ea47b0f93",
+		"session_id":             "95f3d083-94f4-44e6-ad85-7dd6f3f11a52",
+	}
+
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ts, ok := msg.(*ToolUseSummaryMessage)
+	if !ok {
+		t.Fatalf("expected *ToolUseSummaryMessage, got %T", msg)
+	}
+	if ts.Summary != "Listed files, counted a.txt lines" {
+		t.Errorf("Summary = %q", ts.Summary)
+	}
+	if len(ts.PrecedingToolUseIDs) != 2 || ts.PrecedingToolUseIDs[0] != "toolu_016wE3FBYnp2CJ2LLbv5v8Ks" || ts.PrecedingToolUseIDs[1] != "toolu_011uwe9g6vk82oSbktBiMEdy" {
+		t.Errorf("PrecedingToolUseIDs = %v", ts.PrecedingToolUseIDs)
+	}
+	if ts.UUID != "8ec7ff7c-4e53-4906-ba50-af6ea47b0f93" || ts.SessionID != "95f3d083-94f4-44e6-ad85-7dd6f3f11a52" {
+		t.Errorf("UUID = %q, SessionID = %q", ts.UUID, ts.SessionID)
+	}
+}
+
+// A summary without ids still parses; the ids are simply empty.
+func TestParseToolUseSummaryMessageWithoutIDs(t *testing.T) {
+	msg, err := ParseMessage(map[string]any{"type": "tool_use_summary", "summary": "Read the config"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ts, ok := msg.(*ToolUseSummaryMessage)
+	if !ok || ts.Summary != "Read the config" || len(ts.PrecedingToolUseIDs) != 0 {
+		t.Fatalf("got %#v", msg)
 	}
 }

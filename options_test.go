@@ -459,3 +459,29 @@ func TestNewSubprocessTransport_RejectsInvalidSkills(t *testing.T) {
 		t.Errorf("error message = %q, want it to contain %q", err.Error(), "bad,name")
 	}
 }
+
+func TestSandboxIgnoreViolationsMarshal(t *testing.T) {
+	s := SandboxSettings{IgnoreViolations: SandboxIgnoreViolations{"*": {"/etc/hosts"}}}
+	b, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"ignoreViolations":{"*":["/etc/hosts"]}`; !strings.Contains(string(b), want) {
+		t.Errorf("got %s, want substring %s", b, want)
+	}
+}
+
+func TestSandboxAllowNestedUserNamespacesMarshal(t *testing.T) {
+	on := true
+	b, err := json.Marshal(SandboxSettings{AllowNestedUserNamespaces: &on})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"allowNestedUserNamespaces":true`; !strings.Contains(string(b), want) {
+		t.Errorf("got %s, want substring %s", b, want)
+	}
+	b, _ = json.Marshal(SandboxSettings{})
+	if strings.Contains(string(b), "allowNestedUserNamespaces") {
+		t.Errorf("unset field should be omitted, got %s", b)
+	}
+}

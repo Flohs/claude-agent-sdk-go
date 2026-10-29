@@ -35,6 +35,21 @@ func TestGetServerCapabilities_PopulatesCapabilities(t *testing.T) {
 	}
 }
 
+// TestGetServerCapabilities_PopulatesClaudeCodeVersion verifies that
+// claude_code_version from the initialization result is surfaced, and is empty
+// on CLIs that omit it. Port of TypeScript SDK v0.3.296.
+func TestGetServerCapabilities_PopulatesClaudeCodeVersion(t *testing.T) {
+	c := &Client{q: &query{initializationResult: map[string]any{"claude_code_version": "2.1.302"}}}
+	if got := c.GetServerCapabilities().ClaudeCodeVersion; got != "2.1.302" {
+		t.Fatalf("ClaudeCodeVersion = %q, want 2.1.302", got)
+	}
+
+	c = &Client{q: &query{initializationResult: map[string]any{"supportsEffort": true}}}
+	if got := c.GetServerCapabilities().ClaudeCodeVersion; got != "" {
+		t.Fatalf("ClaudeCodeVersion = %q, want empty", got)
+	}
+}
+
 // TestGetServerCapabilities_OlderCLIOmitsCapabilities verifies that older
 // CLIs without a "capabilities" key yield a nil Capabilities slice rather
 // than an error.

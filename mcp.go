@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"sync"
 )
 
@@ -91,6 +92,27 @@ func (c McpHTTPServerConfig) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// McpToolPermissionPolicy is the permission decision a host declares for one
+// tool of an SDK MCP server.
+type McpToolPermissionPolicy string
+
+const (
+	// McpToolPolicyAlwaysAsk makes the CLI ask the host (CanUseTool) before
+	// each call, even where an allow rule covers the tool.
+	McpToolPolicyAlwaysAsk McpToolPermissionPolicy = "always_ask"
+	// McpToolPolicyAlwaysDeny denies every call to the tool.
+	McpToolPolicyAlwaysDeny McpToolPermissionPolicy = "always_deny"
+)
+
+// McpServerToolPolicy is the permission policy for one tool of an SDK MCP
+// server. Port of TypeScript SDK v0.3.301.
+type McpServerToolPolicy struct {
+	// Name is the tool name as the server lists it.
+	Name string `json:"name"`
+	// PermissionPolicy is the decision for this tool.
+	PermissionPolicy McpToolPermissionPolicy `json:"permission_policy,omitempty"`
+}
+
 // McpSdkServerConfig configures an in-process SDK MCP server.
 type McpSdkServerConfig struct {
 	Name string
@@ -101,7 +123,20 @@ type McpSdkServerConfig struct {
 	// server is first registered; changing it for an already-registered
 	// server has no effect until it is removed and re-added. Port of
 	// TypeScript SDK v0.3.248.
-	TimeoutMs       int
+	TimeoutMs int
+	// Tools declares a per-tool permission policy for this server's tools,
+	// sent on the initialize request and on mcp_set_servers. Only
+	// [McpToolPolicyAlwaysAsk] and [McpToolPolicyAlwaysDeny] take effect on an
+	// SDK server; grant allows with Options.AllowedTools or CanUseTool. Port
+	// of TypeScript SDK v0.3.301.
+	Tools []McpServerToolPolicy
+	// ConnectorID is an opaque connector identifier for this server, sent on
+	// the initialize request (sdkMcpServerConfigs), inline on mcp_set_servers
+	// and in the serialized config. Empty is omitted. Applies when the server
+	// is first registered; changing it for an already-registered server is
+	// ignored until it is removed and re-added. Port of TypeScript SDK
+	// v0.3.310.
+	ConnectorID     string
 	tools           []SdkMcpTool
 	resources       []SdkMcpResource
 	resourceHandler SdkMcpResourceHandler
@@ -114,13 +149,15 @@ func (McpSdkServerConfig) mcpServerConfigMarker() {}
 // Only serializes type, name, and timeout (not the in-process instance).
 func (c McpSdkServerConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Type    string `json:"type"`
-		Name    string `json:"name"`
-		Timeout int    `json:"timeout,omitempty"`
+		Type        string `json:"type"`
+		Name        string `json:"name"`
+		Timeout     int    `json:"timeout,omitempty"`
+		ConnectorID string `json:"connectorId,omitempty"`
 	}{
-		Type:    "sdk",
-		Name:    c.Name,
-		Timeout: c.TimeoutMs,
+		Type:        "sdk",
+		Name:        c.Name,
+		Timeout:     c.TimeoutMs,
+		ConnectorID: c.ConnectorID,
 	})
 }
 
@@ -331,6 +368,31 @@ func (r *sdkMcpRouter) buildManifests(ctx context.Context) map[string]any {
 		manifests[name] = entry
 	}
 	return manifests
+}
+
+// buildToolPolicies returns the sorted names of every registered SDK MCP
+// server (initialize's sdkMcpServers) and, keyed by name, the tool policies of
+// those that declare any (sdkMcpServerConfigs).
+func (r *sdkMcpRouter) buildToolPolicies() ([]string, map[string]any) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	names := make([]string, 0, len(r.servers))
+	configs := map[string]any{}
+	for name, server := range r.servers {
+		names = append(names, name)
+		entry := map[string]any{}
+		if len(server.Tools) > 0 {
+			entry["tools"] = server.Tools
+		}
+		if server.ConnectorID != "" {
+			entry["connectorId"] = server.ConnectorID
+		}
+		if len(entry) > 0 {
+			configs[name] = entry
+		}
+	}
+	sort.Strings(names)
+	return names, configs
 }
 
 func (r *sdkMcpRouter) handleRequest(ctx context.Context, serverName string, message map[string]any) map[string]any {

@@ -146,6 +146,13 @@ type UserMessage struct {
 	// conversation content (e.g. a synthetic message generated internally by
 	// the SDK or CLI). Port of TypeScript SDK v0.3.198.
 	IsMeta bool `json:"isMeta,omitempty"`
+	// IsReplay marks the CLI's echo of a user message it took from stdin,
+	// sent when the session runs with the replay-user-messages extra arg
+	// (Options.ExtraArgs["replay-user-messages"] = ""). The echo carries the
+	// uuid the message was sent with and arrives when the CLI dequeues it,
+	// so it is proof the CLI took the prompt; it is not a new message.
+	// Observed with Claude Code CLI 2.1.312.
+	IsReplay bool `json:"isReplay,omitempty"`
 	// Origin identifies what triggered this message (e.g. a direct human
 	// prompt vs. a peer relay or task-notification replay). Nil when the CLI
 	// omits the field. Port of TypeScript SDK bundled sdk.d.ts
@@ -563,6 +570,18 @@ type TaskStartedMessage struct {
 	// live-update watchers); hosts should exclude these from activity
 	// indicators. Port of TypeScript SDK v0.3.247.
 	Ambient *bool `json:"ambient,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
+	// ParentTaskID is the TaskID of the subagent (local_agent) task whose
+	// agent launched this subagent, shell, monitor, or workflow task. Empty
+	// when the launcher is the main thread, has no task ID of its own, or is
+	// no longer tracked. Port of TypeScript SDK v0.3.290.
+	ParentTaskID string `json:"parent_task_id,omitempty"`
 }
 
 // TaskProgressMessage is emitted while a task is in progress.
@@ -585,6 +604,13 @@ type TaskProgressMessage struct {
 	// Blocked indicates the agent was blocked by the auto-mode safety
 	// classifier. Port of TypeScript SDK v0.3.199.
 	Blocked bool `json:"blocked,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // McpResourceLink is a resource_link content block an MCP tool result
@@ -634,6 +660,13 @@ type TaskNotificationMessage struct {
 	// most 50 links, 64 KiB serialized). Nil when the result had none or the
 	// task is any other type. Port of TypeScript SDK v0.3.257.
 	ResourceLinks []McpResourceLink `json:"resource_links,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // TaskUpdatedStatus represents the lifecycle status reported in a task_updated patch.
@@ -682,6 +715,13 @@ type TaskUpdatedMessage struct {
 	SessionID string `json:"session_id,omitempty"`
 	// UUID uniquely identifies this event.
 	UUID string `json:"uuid,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // CommandLifecycleState is the lifecycle state of a queued command reported
@@ -695,11 +735,16 @@ const (
 	CommandLifecycleStateCompleted CommandLifecycleState = "completed"
 	CommandLifecycleStateCancelled CommandLifecycleState = "cancelled"
 	CommandLifecycleStateDiscarded CommandLifecycleState = "discarded"
+	// CommandLifecycleStateRefused is a command the CLI declined to run.
+	// Accepted by Claude Desktop 3.6556.2's lifecycle parser.
+	CommandLifecycleStateRefused CommandLifecycleState = "refused"
 )
 
-// CommandLifecycleMessage is emitted as a system/command_lifecycle event
-// reporting the lifecycle state of a previously-queued command. CommandUUID
-// identifies the queued message this event pertains to. A Cancelled state
+// CommandLifecycleMessage reports the lifecycle state of a previously-queued
+// command. Claude Code CLI 2.1.312 sends it as a top-level command_lifecycle
+// frame; older CLIs sent it as a system/command_lifecycle event, which is
+// still parsed. CommandUUID identifies the queued message this event pertains
+// to. A Cancelled state
 // may result from an explicit cancel or from the turn that would have
 // consumed the command dying (e.g. a ResultMessage with TerminalReason
 // "tool_deferred_unavailable", "turn_setup_failed", "api_error",
@@ -709,8 +754,12 @@ const (
 // Port of TypeScript SDK v0.3.204-v0.3.206.
 type CommandLifecycleMessage struct {
 	SystemMessage
-	// CommandUUID is the uuid of the queued command this event reports on.
-	CommandUUID string `json:"uuid"`
+	// CommandUUID is the uuid of the queued command this event reports on:
+	// the uuid the user message was sent with.
+	CommandUUID string `json:"command_uuid"`
+	// UUID is this event's own id. Empty from CLIs that sent the system
+	// subtype, where uuid carried the command's id instead.
+	UUID string `json:"uuid,omitempty"`
 	// State is the lifecycle state of the command.
 	State CommandLifecycleState `json:"state"`
 	// SessionID is the session this event belongs to.
@@ -729,6 +778,23 @@ type BackgroundTaskInfo struct {
 	// live-update watchers); hosts should exclude these from activity
 	// indicators. Port of TypeScript SDK v0.3.247.
 	Ambient *bool `json:"ambient,omitempty"`
+	// RunID identifies one run of the task: equal on every task_* event,
+	// background_tasks_changed entry, and saved notification of that run. A
+	// resumed task keeps its TaskID and gets a new RunID. Run IDs of one
+	// task sort, by plain string comparison, in the order the runs opened.
+	// Empty for a task the CLI did not register and from older CLIs. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"run_id,omitempty"`
+	// ParentTaskID is the TaskID of the subagent (local_agent) task whose
+	// agent launched this subagent, shell, monitor, or workflow task. Empty
+	// when the launcher is the main thread, has no task ID of its own, or is
+	// no longer tracked. Port of TypeScript SDK v0.3.290.
+	ParentTaskID string `json:"parent_task_id,omitempty"`
+	// SubagentType is the agent type of a local_agent task, such as
+	// "general-purpose" or a custom agent's name; "main-session" for a
+	// backgrounded main session. Empty on other tasks and from older CLIs.
+	// Port of TypeScript SDK v0.3.293.
+	SubagentType string `json:"subagent_type,omitempty"`
 }
 
 // BackgroundTasksChangedMessage is emitted as a system/background_tasks_changed
@@ -1585,6 +1651,10 @@ type MessageOrigin struct {
 	// with CLAUDE_CODE_HOST_SCHEDULED_RUN=1 (Port of TypeScript SDK
 	// v0.3.280).
 	FireReason string `json:"fireReason,omitempty"`
+	// RunID is, on a background task's own notification, the run_id its
+	// task_* events carried as of when the notification was queued. Port of
+	// TypeScript SDK v0.3.290.
+	RunID string `json:"runId,omitempty"`
 }
 
 // ResultMessage contains cost and usage information for a completed query.
@@ -1620,7 +1690,12 @@ type ResultMessage struct {
 	// producing a normal result, e.g. a known CLI startup failure. Empty
 	// when not provided by the CLI. Known values include
 	// "provider_not_allowed" (the configured API provider is rejected by
-	// the allowedProviders setting; TypeScript SDK v0.3.285). Port of
+	// the allowedProviders setting; TypeScript SDK v0.3.285),
+	// "org_config_required_unavailable" (the organization requires its
+	// policy limits and managed settings and they could not be loaded;
+	// retrying may succeed) and "org_config_refused" (Anthropic refused
+	// them for this sign-in; signing in again or an admin change is the
+	// fix, not a retry) (both TypeScript SDK v0.3.293). Port of
 	// TypeScript SDK v0.3.274.
 	StartupFailureReason string `json:"startup_failure_reason,omitempty"`
 	// Origin forwards the triggering message's origin so consumers can
@@ -1837,6 +1912,10 @@ type RateLimitInfo struct {
 	// like the member's own monthly cap). Nil on a plain member denial and
 	// from older CLIs. Port of TypeScript SDK v0.3.268.
 	LimitScope *string `json:"limit_scope,omitempty"`
+	// OverageEnabled reports, on usage-limit warnings, whether the account
+	// has extra usage turned on. Nil when absent and from older CLIs. Port
+	// of TypeScript SDK v0.3.295.
+	OverageEnabled *bool `json:"overage_enabled,omitempty"`
 }
 
 // RateLimitEvent represents a rate limit status change from the CLI.
@@ -1957,6 +2036,25 @@ type ToolProgressMessage struct {
 
 func (ToolProgressMessage) messageMarker() {}
 
+// ToolUseSummaryMessage is the CLI's short, model-written label for a batch
+// of tool calls, such as "Listed files, counted a.txt lines". The CLI emits
+// it only when started with CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES=true in its
+// environment (settable via Options.Env), and it arrives after the assistant
+// text that follows the calls, before the turn's ResultMessage. Claude
+// Desktop titles its collapsed tool groups with it. Its own top-level message
+// type; observed with Claude Code CLI 2.1.312. Matches the TypeScript SDK's
+// SDKToolUseSummaryMessage.
+type ToolUseSummaryMessage struct {
+	Summary string `json:"summary"`
+	// PrecedingToolUseIDs are the tool_use ids of the calls the summary
+	// covers, in the order they were made.
+	PrecedingToolUseIDs []string `json:"preceding_tool_use_ids"`
+	UUID                string   `json:"uuid"`
+	SessionID           string   `json:"session_id"`
+}
+
+func (ToolUseSummaryMessage) messageMarker() {}
+
 // The following prefix buckets classify a rate-limit-related message string
 // (e.g. surfaced in a ResultMessage or system message) by matching its
 // leading text with strings.HasPrefix, without hand-mirroring the literal
@@ -2008,9 +2106,134 @@ var (
 	}
 )
 
-// ContextUsage contains context window utilization broken down by category.
+// ContextUsageCategory is one row of the [ContextUsage] breakdown.
+type ContextUsageCategory struct {
+	// ID identifies which row this is. Stable where Name is not: match a
+	// particular row on this (e.g. "system_prompt", "mcp_instructions",
+	// "messages", "free_space"). Empty from a CLI that predates it; treat an
+	// unknown value as absent.
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name"`
+	Tokens     int    `json:"tokens"`
+	Color      string `json:"color,omitempty"`
+	IsDeferred bool   `json:"isDeferred,omitempty"`
+	// Kind classifies the row: "used", "free", "buffer" or "deferred".
+	Kind string `json:"kind,omitempty"`
+}
+
+// ContextUsageMemoryFile is one memory file's share of [ContextUsage].
+type ContextUsageMemoryFile struct {
+	Path   string `json:"path"`
+	Type   string `json:"type"`
+	Tokens int    `json:"tokens"`
+}
+
+// ContextUsageMCPTool is one MCP tool's share of [ContextUsage].
+type ContextUsageMCPTool struct {
+	Name       string `json:"name"`
+	ServerName string `json:"serverName"`
+	Tokens     int    `json:"tokens"`
+	IsLoaded   *bool  `json:"isLoaded,omitempty"`
+}
+
+// ContextUsageMCPInstructions is one MCP server's estimated share of the
+// "mcp_instructions" row. Only present where the CLI answers on its own
+// stdio and no server stores or forwards the reply.
+type ContextUsageMCPInstructions struct {
+	// ServerName is as mcp_status reports it and mcp_toggle takes it (not
+	// normalized, unlike [ContextUsageMCPTool.ServerName]).
+	ServerName string `json:"serverName"`
+	Tokens     int    `json:"tokens"`
+}
+
+// ContextUsageAgent is one subagent definition's share of [ContextUsage].
+type ContextUsageAgent struct {
+	AgentType string `json:"agentType"`
+	Source    string `json:"source"`
+	// PluginID is the providing plugin's id (name and marketplace), when
+	// there is one and the CLI answers on its own stdio.
+	PluginID string `json:"pluginId,omitempty"`
+	// Path is the absolute path of the agent's file on the machine the CLI
+	// runs on; absent for an agent with no file or where the reply is
+	// forwarded.
+	Path   string `json:"path,omitempty"`
+	Tokens int    `json:"tokens"`
+}
+
+// ContextUsageSkill is one skill's frontmatter share of [ContextUsage].
+type ContextUsageSkill struct {
+	Name   string `json:"name"`
+	Source string `json:"source"`
+	// PluginName is the providing plugin's name; not unique across
+	// marketplaces ([ContextUsageSkill.PluginID] is).
+	PluginName string `json:"pluginName,omitempty"`
+	// PluginID is the providing plugin's id (name and marketplace), when
+	// there is one and the CLI answers on its own stdio.
+	PluginID string `json:"pluginId,omitempty"`
+	// Path is the absolute path of the skill's file on the machine the CLI
+	// runs on; absent for a skill with no file or where the reply is
+	// forwarded.
+	Path   string `json:"path,omitempty"`
+	Tokens int    `json:"tokens"`
+}
+
+// ContextUsageSkills groups the skills row of [ContextUsage].
+type ContextUsageSkills struct {
+	TotalSkills      int                 `json:"totalSkills"`
+	IncludedSkills   int                 `json:"includedSkills"`
+	Tokens           int                 `json:"tokens"`
+	SkillFrontmatter []ContextUsageSkill `json:"skillFrontmatter"`
+}
+
+// ContextUsageRecommendation is one recommended change in [ContextUsage].
+type ContextUsageRecommendation struct {
+	// Key is the behavior key, or "agent", "skill", "plugin" or "mcp_server"
+	// for a named source.
+	Key string `json:"key"`
+	// Pct is the share of the weighted local usage this touches, 0-100.
+	Pct float64 `json:"pct"`
+	// Title says what to do, verb first.
+	Title string `json:"title"`
+	// Detail is a few words: what the scan saw, or the command to run.
+	Detail string `json:"detail,omitempty"`
+}
+
+// ContextUsageFix is what one "fix" action does for [ContextUsage].
+type ContextUsageFix struct {
+	// Keys are the recommendations it covers.
+	Keys []string `json:"keys"`
+	// Messages are the user messages to send for the person, one each and in
+	// order, at priority "later" so a running turn cannot reorder them: any
+	// /effort commands first, then one prompt for the rest.
+	Messages []string `json:"messages"`
+}
+
+// ContextUsage contains context window utilization broken down by category,
+// as returned by [Client.GetContextUsage]. Port of TypeScript SDK
+// SDKControlGetContextUsageResponse (stable row IDs, plugin IDs, file paths
+// and MCP instruction shares: v0.3.304). Only the commonly used fields of
+// the response are modeled.
 type ContextUsage struct {
-	TotalTokens     int            `json:"total_tokens"`
+	Categories      []ContextUsageCategory        `json:"categories,omitempty"`
+	TotalTokens     int                           `json:"totalTokens"`
+	MaxTokens       int                           `json:"maxTokens,omitempty"`
+	RawMaxTokens    int                           `json:"rawMaxTokens,omitempty"`
+	Percentage      float64                       `json:"percentage,omitempty"`
+	Model           string                        `json:"model,omitempty"`
+	MemoryFiles     []ContextUsageMemoryFile      `json:"memoryFiles,omitempty"`
+	MCPTools        []ContextUsageMCPTool         `json:"mcpTools,omitempty"`
+	MCPInstructions []ContextUsageMCPInstructions `json:"mcpInstructions,omitempty"`
+	Agents          []ContextUsageAgent           `json:"agents,omitempty"`
+	Skills          *ContextUsageSkills           `json:"skills,omitempty"`
+	// Recommendations lists one recommended change per notable behavior or
+	// source, largest share first, worded for display. Port of TypeScript
+	// SDK v0.3.305.
+	Recommendations []ContextUsageRecommendation `json:"recommendations,omitempty"`
+	// Fix describes what one "fix" action does; nil when nothing can be fixed
+	// in the session that answered.
+	Fix *ContextUsageFix `json:"fix,omitempty"`
+
+	// Legacy fields; the CLI does not send them under these names.
 	UsedTokens      int            `json:"used_tokens"`
 	UsageByCategory map[string]int `json:"usage_by_category,omitempty"`
 }
@@ -2413,6 +2636,10 @@ type ServerCapabilities struct {
 	// MemoryPaths is the list of memory file paths loaded at session initialization.
 	// Empty when no memory files are configured.
 	MemoryPaths []string `json:"memoryPaths,omitempty"`
+	// ClaudeCodeVersion is the version of the Claude Code CLI serving the
+	// session, known before the first turn. Empty on CLIs that predate this
+	// field. Port of TypeScript SDK v0.3.296.
+	ClaudeCodeVersion string `json:"claude_code_version,omitempty"`
 	// Capabilities lists protocol capabilities the CLI supports, letting
 	// callers feature-detect instead of version-sniffing. This is an open
 	// set: ignore unknown values and check only for the specific values you
