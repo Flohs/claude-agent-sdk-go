@@ -9,6 +9,10 @@
 - `AgentToolCompletedOutput.ToolsUsed` (`[]string`, `json:"toolsUsed,omitempty"`), the names of the tools a completed Agent/Task subagent run used, from the call's structured `tool_use_result`; nil from older CLIs. Port of TypeScript SDK v0.3.311 (`AgentOutput.toolsUsed`, found by diffing the npm `sdk-tools.d.ts` for v0.3.310 → v0.3.311); no Python SDK equivalent. ([#821](https://github.com/Flohs/claude-agent-sdk-go/issues/821))
 - `PermissionRuleSourceMcpMount` (`"mcpMount"`), a new known `PermissionRuleSource` value for rules returned by `Client.ListPermissionRules`. Port of TypeScript SDK v0.3.311 (`SDKPermissionRuleEntry.source`, found by diffing the npm `sdk.d.ts` for v0.3.310 → v0.3.311); no Python SDK equivalent. ([#822](https://github.com/Flohs/claude-agent-sdk-go/issues/822))
 
+### Changed
+
+- `UsageTransitionPrefixes` now also matches `"Now using credits"`, the CLI's new wording for switching onto credits after a limit, so such a message classifies as a usage transition instead of matching no bucket. Port of TypeScript SDK v0.3.312 (`USAGE_TRANSITION_PREFIXES`, found by diffing the npm `sdk.d.ts` for v0.3.311 → v0.3.312); no Python SDK equivalent. ([#823](https://github.com/Flohs/claude-agent-sdk-go/issues/823))
+
 ## [4.1.0] - 2026-10-28
 
 ### Added

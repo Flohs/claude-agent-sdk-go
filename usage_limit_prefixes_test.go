@@ -14,6 +14,7 @@ func TestUsageLimitPrefixes_MatchExpectedMessages(t *testing.T) {
 		{"org policy limit", OrgPolicyLimitPrefixes, "This service is disabled for your org policy settings"},
 		{"usage limit error", UsageLimitErrorPrefixes, "You've hit your usage limit for this session"},
 		{"usage transition", UsageTransitionPrefixes, "You're now using usage credits for this session"},
+		{"usage transition (credits)", UsageTransitionPrefixes, "Now using credits"},
 		{"usage warning", UsageWarningPrefixes, "You've used 90% of your allocation"},
 	}
 
