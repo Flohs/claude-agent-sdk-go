@@ -161,7 +161,7 @@ func NewSubprocessTransport(opts *Options) (*SubprocessTransport, error) {
 
 	t := &SubprocessTransport{
 		options:    opts,
-		cwd:       opts.Cwd,
+		cwd:        opts.Cwd,
 		maxBufSize: defaultMaxBufferSize,
 	}
 

@@ -611,13 +611,13 @@ type SandboxCredentialsConfig struct {
 
 // SandboxSettings controls bash command sandboxing.
 type SandboxSettings struct {
-	Enabled                   *bool                    `json:"enabled,omitempty"`
-	AutoAllowBashIfSandboxed  *bool                    `json:"autoAllowBashIfSandboxed,omitempty"`
-	ExcludedCommands          []string                 `json:"excludedCommands,omitempty"`
-	AllowUnsandboxedCommands  *bool                    `json:"allowUnsandboxedCommands,omitempty"`
-	Network                   *SandboxNetworkConfig    `json:"network,omitempty"`
+	Enabled                   *bool                   `json:"enabled,omitempty"`
+	AutoAllowBashIfSandboxed  *bool                   `json:"autoAllowBashIfSandboxed,omitempty"`
+	ExcludedCommands          []string                `json:"excludedCommands,omitempty"`
+	AllowUnsandboxedCommands  *bool                   `json:"allowUnsandboxedCommands,omitempty"`
+	Network                   *SandboxNetworkConfig   `json:"network,omitempty"`
 	IgnoreViolations          SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
-	EnableWeakerNestedSandbox *bool                    `json:"enableWeakerNestedSandbox,omitempty"`
+	EnableWeakerNestedSandbox *bool                   `json:"enableWeakerNestedSandbox,omitempty"`
 	// AllowNestedUserNamespaces (Linux/WSL only) lets sandboxed commands create
 	// user namespaces of their own, which the sandbox refuses by default.
 	// Needed by tools that sandbox themselves that way (Chromium/Electron,
