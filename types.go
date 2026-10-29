@@ -1157,15 +1157,18 @@ type AgentToolCompletedOutput struct {
 	// ModelsUsed lists, in order, the distinct models used by this subagent
 	// run. A length greater than 1 indicates a mid-run model swap. Port of
 	// TypeScript SDK v0.3.212.
-	ModelsUsed        []string        `json:"modelsUsed,omitempty"`
-	TotalToolUseCount int             `json:"totalToolUseCount"`
-	TotalDurationMs   int             `json:"totalDurationMs"`
-	TotalTokens       int             `json:"totalTokens"`
-	Usage             AgentToolUsage  `json:"usage"`
-	ToolStats         *AgentToolStats `json:"toolStats,omitempty"`
-	Prompt            string          `json:"prompt"`
-	WorktreePath      string          `json:"worktreePath,omitempty"`
-	WorktreeBranch    string          `json:"worktreeBranch,omitempty"`
+	ModelsUsed        []string       `json:"modelsUsed,omitempty"`
+	TotalToolUseCount int            `json:"totalToolUseCount"`
+	TotalDurationMs   int            `json:"totalDurationMs"`
+	TotalTokens       int            `json:"totalTokens"`
+	Usage             AgentToolUsage `json:"usage"`
+	// ToolsUsed lists the names of the tools this subagent run used. Nil
+	// from older CLIs. Port of TypeScript SDK v0.3.311.
+	ToolsUsed      []string        `json:"toolsUsed,omitempty"`
+	ToolStats      *AgentToolStats `json:"toolStats,omitempty"`
+	Prompt         string          `json:"prompt"`
+	WorktreePath   string          `json:"worktreePath,omitempty"`
+	WorktreeBranch string          `json:"worktreeBranch,omitempty"`
 }
 
 // AgentToolAsyncLaunchedOutput is the structured result payload for an
