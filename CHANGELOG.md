@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-10-29
+
 ### Added
 
 - `ModelUsage.CacheCreationEphemeral5mInputTokens` and `ModelUsage.CacheCreationEphemeral1hInputTokens` (`*int`), the cache writes with a 5-minute and a 1-hour lifetime, both already counted inside `CacheCreationInputTokens` (they can add up to less, since a response that does not report its cache-write lifetime adds to neither). Parsed from `ResultMessage.ModelUsage`; nil when no turn ran on a CLI that records them, an undercount when part of the session ran on an older one. Port of TypeScript SDK v0.3.311 (found by diffing the npm `sdk.d.ts` for v0.3.310 → v0.3.311); Python SDK v0.2.174 has no equivalent. ([#820](https://github.com/Flohs/claude-agent-sdk-go/issues/820))
@@ -11,6 +13,7 @@
 
 ### Changed
 
+- Bump `golang.org/x/text` to v0.43.0. ([#777](https://github.com/Flohs/claude-agent-sdk-go/pull/777))
 - `UsageTransitionPrefixes` now also matches `"Now using credits"`, the CLI's new wording for switching onto credits after a limit, so such a message classifies as a usage transition instead of matching no bucket. Port of TypeScript SDK v0.3.312 (`USAGE_TRANSITION_PREFIXES`, found by diffing the npm `sdk.d.ts` for v0.3.311 → v0.3.312); no Python SDK equivalent. ([#823](https://github.com/Flohs/claude-agent-sdk-go/issues/823))
 
 ## [4.1.0] - 2026-10-28
