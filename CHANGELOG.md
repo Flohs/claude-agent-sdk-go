@@ -6,6 +6,10 @@
 
 - `BashToolOutput.BackgroundWakesOwner` (`*bool`, `json:"backgroundWakesOwner,omitempty"`), true when the subagent that owns a backgrounded Bash command parks until the command ends and is woken by its completion; nil when not set and from older CLIs. Port of TypeScript SDK v0.3.314 (found by diffing the npm `sdk-tools.d.ts` for v0.3.312 → v0.3.314); Python SDK v0.2.175 has no equivalent. ([#829](https://github.com/Flohs/claude-agent-sdk-go/issues/829))
 
+### Changed
+
+- `ResultMessage.StartupFailureReason` now documents the new known value `sandbox_required_unavailable`: a working sandbox is required and cannot run in this session (for example bubblewrap is missing or the platform is not supported), so the fix is making the sandbox available or changing the requirement, not a retry. Documentation only. Port of TypeScript SDK v0.3.314 (`SDKStartupFailureReason`, found by diffing the npm `sdk.d.ts` for v0.3.312 → v0.3.314); Python SDK v0.2.175 has no equivalent. ([#831](https://github.com/Flohs/claude-agent-sdk-go/issues/831))
+
 ## [4.2.0] - 2026-10-29
 
 ### Added

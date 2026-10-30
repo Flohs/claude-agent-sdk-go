@@ -1701,10 +1701,13 @@ type ResultMessage struct {
 	// the allowedProviders setting; TypeScript SDK v0.3.285),
 	// "org_config_required_unavailable" (the organization requires its
 	// policy limits and managed settings and they could not be loaded;
-	// retrying may succeed) and "org_config_refused" (Anthropic refused
+	// retrying may succeed), "org_config_refused" (Anthropic refused
 	// them for this sign-in; signing in again or an admin change is the
-	// fix, not a retry) (both TypeScript SDK v0.3.293). Port of
-	// TypeScript SDK v0.3.274.
+	// fix, not a retry) (both TypeScript SDK v0.3.293) and
+	// "sandbox_required_unavailable" (a working sandbox is required but
+	// cannot run in this session, e.g. bubblewrap is missing or the platform
+	// is unsupported; TypeScript SDK v0.3.314). Port of TypeScript SDK
+	// v0.3.274.
 	StartupFailureReason string `json:"startup_failure_reason,omitempty"`
 	// Origin forwards the triggering message's origin so consumers can
 	// distinguish user-prompted results from task-notification followups.
