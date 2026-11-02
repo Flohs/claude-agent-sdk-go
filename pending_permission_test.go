@@ -75,8 +75,8 @@ func pendingCanUseToolFrame(requestID, toolName string) map[string]any {
 
 // runPendingInitialize initializes a query against p and returns the tool
 // names CanUseTool saw and the control responses the SDK wrote, once
-// wantCalls callbacks have run (or after a short grace period when
-// wantCalls is 0).
+// wantCalls callbacks have run and been answered (or after a short grace
+// period when wantCalls is 0).
 func runPendingInitialize(t *testing.T, p *pendingRespondTransport, wantCalls int) ([]string, []map[string]any) {
 	t.Helper()
 	var mu sync.Mutex
@@ -102,6 +102,16 @@ func runPendingInitialize(t *testing.T, p *pendingRespondTransport, wantCalls in
 		case <-time.After(2 * time.Second):
 			t.Fatalf("CanUseTool called %d times, want %d", i, wantCalls)
 		}
+	}
+	// The callback signals before it returns, so wait for the SDK's
+	// control_response writes too before close cancels the in-flight
+	// handlers.
+	deadline := time.Now().Add(2 * time.Second)
+	for len(p.controlResponses()) < wantCalls {
+		if time.Now().After(deadline) {
+			t.Fatalf("got %d control responses, want %d", len(p.controlResponses()), wantCalls)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 	if wantCalls == 0 {
 		select {
