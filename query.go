@@ -709,10 +709,8 @@ func (q *query) handleControlRequest(msg map[string]any) {
 	// a redelivered pending_permission_requests entry, or a transport-level
 	// redelivery), which would otherwise invoke the callback twice and write
 	// two control_responses for the same ID. An empty request_id is never
-	// deduped: the synthetic pending_permission_requests dispatch does not
-	// currently set one, and treating every empty ID as the same key would
-	// incorrectly drop unrelated redelivered requests. Port of TypeScript SDK
-	// v0.3.196.
+	// deduped: treating every empty ID as the same key would incorrectly drop
+	// unrelated redelivered requests. Port of TypeScript SDK v0.3.196.
 	if requestID != "" {
 		q.inFlightMu.Lock()
 		if _, dup := q.inFlightControlRequests[requestID]; dup {
@@ -1121,22 +1119,11 @@ func (q *query) sendControlRequest(request map[string]any, timeout time.Duration
 			responseData = map[string]any{}
 		}
 
-		// Dispatch any permission requests that were queued before the session
-		// loop was fully running. Port of TypeScript SDK v0.3.161.
-		if pending, ok := responseData["pending_permission_requests"].([]any); ok {
-			for _, pr := range pending {
-				if prMap, ok := pr.(map[string]any); ok {
-					syntheticMsg := map[string]any{
-						"type":    "control_request",
-						"request": prMap,
-					}
-					q.wg.Add(1)
-					go func(msg map[string]any) {
-						defer q.wg.Done()
-						q.handleControlRequest(msg)
-					}(syntheticMsg)
-				}
-			}
+		// Redeliver the permission prompts the CLI is still waiting on, so a
+		// client (re)joining a session can answer them. Only the initialize
+		// response carries them, as the TypeScript SDK does.
+		if subtype, _ := request["subtype"].(string); subtype == "initialize" {
+			q.dispatchPendingPermissionRequests(resp, responseData)
 		}
 
 		return responseData, nil
@@ -1155,6 +1142,53 @@ func (q *query) sendControlRequest(request map[string]any, timeout time.Duration
 		delete(q.pendingResults, requestID)
 		q.pendingMu.Unlock()
 		return nil, q.ctx.Err()
+	}
+}
+
+// dispatchPendingPermissionRequests hands each can_use_tool request listed in
+// an initialize response's pending_permission_requests to
+// handleControlRequest, so a prompt the CLI issued before this client was
+// listening still reaches CanUseTool and is answered under its original
+// request_id.
+//
+// The CLI sends the list on the control response itself, as a sibling of
+// "response", and each entry is a whole control_request frame. A list inside
+// the "response" payload and entries that are bare requests (no "request"
+// field) are accepted too. A request that is already being handled is
+// dropped by handleControlRequest's in-flight guard. Other entries (such as
+// pending_user_dialog_requests and pending_elicitation_requests) are ignored,
+// as in the TypeScript SDK. Port of TypeScript SDK v0.3.161 (fixed against
+// v0.3.316).
+func (q *query) dispatchPendingPermissionRequests(resp, responseData map[string]any) {
+	pending, ok := resp["pending_permission_requests"].([]any)
+	if !ok {
+		pending, _ = responseData["pending_permission_requests"].([]any)
+	}
+	for _, entry := range pending {
+		entryMap, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		requestID, _ := entryMap["request_id"].(string)
+		inner, ok := entryMap["request"].(map[string]any)
+		if !ok {
+			inner = entryMap
+		}
+		if subtype, _ := inner["subtype"].(string); subtype != "can_use_tool" {
+			continue
+		}
+		msg := map[string]any{
+			"type":    "control_request",
+			"request": inner,
+		}
+		if requestID != "" {
+			msg["request_id"] = requestID
+		}
+		q.wg.Add(1)
+		go func(msg map[string]any) {
+			defer q.wg.Done()
+			q.handleControlRequest(msg)
+		}(msg)
 	}
 }
 
