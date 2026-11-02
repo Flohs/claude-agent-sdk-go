@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.3.1] - 2026-11-02
+
 ### Fixed
 
 - Permission prompts that the CLI lists in `pending_permission_requests` on the `initialize` response (sent by `Client.Connect` and `Client.Reinitialize`) now reach `Options.CanUseTool` and are answered under their original `request_id`. The SDK looked for the list inside the response payload instead of on the control response itself, where the CLI sends it, and wrapped each entry as a bare request although it is a whole `control_request` frame. So a prompt the CLI issued before the client was listening was never redelivered, and a redelivered prompt could not have been matched to its answer. Only `can_use_tool` entries on the `initialize` response are dispatched now, as in the TypeScript SDK. The old shape (list inside the payload, bare requests) is still accepted. `pending_user_dialog_requests` and the new `pending_elicitation_requests` stay ignored, as in the TypeScript SDK. Port of TypeScript SDK v0.3.161, checked against v0.3.316 (found by diffing the npm `sdk.d.ts` and `sdk.mjs` for v0.3.314 → v0.3.316); Python SDK v0.2.176 has no equivalent. ([#834](https://github.com/Flohs/claude-agent-sdk-go/issues/834))
