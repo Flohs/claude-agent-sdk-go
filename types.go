@@ -1018,6 +1018,11 @@ type TaskCreateOutput struct {
 	Task struct {
 		ID      string `json:"id"`
 		Subject string `json:"subject"`
+		// Description is the task's description as saved. It can differ
+		// from the tool_use input when Claude Code corrects a malformed
+		// call or a PreToolUse hook changes the input. Empty from older
+		// Claude Code versions. Port of TypeScript SDK v0.3.317.
+		Description string `json:"description,omitempty"`
 	} `json:"task"`
 }
 
