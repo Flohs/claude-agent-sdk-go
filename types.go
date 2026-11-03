@@ -1,6 +1,9 @@
 package claude
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // Message is the interface implemented by all message types returned from the SDK.
 type Message interface {
@@ -1018,12 +1021,46 @@ type TaskCreateOutput struct {
 	Task struct {
 		ID      string `json:"id"`
 		Subject string `json:"subject"`
-		// Description is the task's description as saved. It can differ
-		// from the tool_use input when Claude Code corrects a malformed
-		// call or a PreToolUse hook changes the input. Empty from older
-		// Claude Code versions. Port of TypeScript SDK v0.3.317.
+	} `json:"task"`
+	// TaskDescription is the task's description as saved (task.description
+	// on the wire). It can differ from the tool_use input when Claude Code
+	// corrects a malformed call or a PreToolUse hook changes the input.
+	// Empty from older Claude Code versions. It is a sibling of Task rather
+	// than a field of it so that the anonymous Task struct type stays
+	// unchanged. Port of TypeScript SDK v0.3.317.
+	TaskDescription string `json:"-"`
+}
+
+// taskCreateOutputWire is the wire shape of [TaskCreateOutput].
+type taskCreateOutputWire struct {
+	Task struct {
+		ID          string `json:"id"`
+		Subject     string `json:"subject"`
 		Description string `json:"description,omitempty"`
 	} `json:"task"`
+}
+
+// UnmarshalJSON decodes the wire shape, filling TaskDescription from
+// task.description.
+func (o *TaskCreateOutput) UnmarshalJSON(data []byte) error {
+	var w taskCreateOutputWire
+	if err := json.Unmarshal(data, &w); err != nil {
+		return err
+	}
+	o.Task.ID = w.Task.ID
+	o.Task.Subject = w.Task.Subject
+	o.TaskDescription = w.Task.Description
+	return nil
+}
+
+// MarshalJSON encodes the wire shape, writing TaskDescription as
+// task.description when set.
+func (o TaskCreateOutput) MarshalJSON() ([]byte, error) {
+	var w taskCreateOutputWire
+	w.Task.ID = o.Task.ID
+	w.Task.Subject = o.Task.Subject
+	w.Task.Description = o.TaskDescription
+	return json.Marshal(w)
 }
 
 // TaskGetInput is the input schema for the TaskGet tool.
