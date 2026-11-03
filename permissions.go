@@ -144,8 +144,10 @@ type ToolPermissionContext struct {
 	Description string
 	// SuppressAlwaysAllowRule is true when the dialog must not offer a
 	// persistent "don't ask again" affordance for this ask: accepting it
-	// would write a whole-tool allow rule broader than the ask's own verb.
-	// Port of TypeScript SDK v0.3.214.
+	// would write a whole-tool allow rule broader than the ask's own verb,
+	// or the ask comes from a run a plugin started, where Claude Code saves
+	// no rule from the answer, not even for the session (TypeScript SDK
+	// v0.3.317). Port of TypeScript SDK v0.3.214.
 	SuppressAlwaysAllowRule bool
 	// MatchedAskRule is set when a user-configured ask rule (permissions.ask)
 	// forced this prompt while the ask still carries the tool's own

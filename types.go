@@ -1767,8 +1767,12 @@ type ResultMessage struct {
 	// fix, not a retry) (both TypeScript SDK v0.3.293) and
 	// "sandbox_required_unavailable" (a working sandbox is required but
 	// cannot run in this session, e.g. bubblewrap is missing or the platform
-	// is unsupported; TypeScript SDK v0.3.314). Port of TypeScript SDK
-	// v0.3.274.
+	// is unsupported; TypeScript SDK v0.3.314) and "initialize_not_first"
+	// (the CLI was started with --await-initialize, as for
+	// PluginDelivery "initialize", and its first stdin line was not the
+	// initialize control request; the fix is in the host or a wrapper
+	// script between it and the CLI, not a retry; TypeScript SDK
+	// v0.3.317). Port of TypeScript SDK v0.3.274.
 	StartupFailureReason string `json:"startup_failure_reason,omitempty"`
 	// Origin forwards the triggering message's origin so consumers can
 	// distinguish user-prompted results from task-notification followups.

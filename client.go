@@ -705,6 +705,15 @@ func (c *Client) ToggleMcpServer(ctx context.Context, name string, enabled bool)
 // even if the CLI was launched without them. SDK MCP servers with resources
 // correctly advertise the resources capability so that resource tools are
 // injected. Port of TypeScript SDK v0.3.163 and v0.3.166.
+//
+// Servers from settings files are not affected. A .mcp.json or local-scope
+// server of the session's current folder stays up when omitted, unless
+// enterprise policy denies it; once a call has named such a server it is the
+// caller's, and a later call that omits it removes it. Servers introduced by
+// plugins also keep running when omitted (naming one explicitly still
+// replaces it). So an empty map does not guarantee a session with no dynamic
+// MCP servers when plugins are loaded or the current folder has such
+// servers. Documented in TypeScript SDK v0.3.317.
 func (c *Client) SetMcpServers(ctx context.Context, servers map[string]McpServerConfig) error {
 	if c.q == nil {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
