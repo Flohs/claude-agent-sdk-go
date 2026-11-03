@@ -92,10 +92,13 @@ type query struct {
 	messageCh chan map[string]any
 
 	// State
-	initTimeout            float64
-	initialized            bool
-	closed                 atomic.Bool
-	initializationResult   map[string]any
+	initTimeout          float64
+	initialized          bool
+	closed               atomic.Bool
+	initializationResult map[string]any
+	// hookOnFailureRefused is set when initialize refused the response
+	// because a hook set to OnFailure "block" would not be honored.
+	hookOnFailureRefused   bool
 	firstResultCh          chan struct{}
 	firstResultOnce        sync.Once
 	mainResultCh           chan struct{}
@@ -162,9 +165,10 @@ type query struct {
 }
 
 type hookMatcherInternal struct {
-	matcher string
-	hooks   []HookCallback
-	timeout *float64
+	matcher   string
+	hooks     []HookCallback
+	timeout   *float64
+	onFailure HookOnFailure
 }
 
 type queryConfig struct {
@@ -263,9 +267,10 @@ func newQuery(cfg queryConfig) *query {
 			internal := make([]hookMatcherInternal, len(matchers))
 			for i, m := range matchers {
 				internal[i] = hookMatcherInternal{
-					matcher: m.Matcher,
-					hooks:   m.Hooks,
-					timeout: m.Timeout,
+					matcher:   m.Matcher,
+					hooks:     m.Hooks,
+					timeout:   m.Timeout,
+					onFailure: m.OnFailure,
 				}
 			}
 			q.hooks[string(event)] = internal
@@ -966,6 +971,9 @@ func (q *query) initialize() (map[string]any, error) {
 				if m.timeout != nil {
 					mc["timeout"] = *m.timeout
 				}
+				if m.onFailure != "" {
+					mc["onFailure"] = string(m.onFailure)
+				}
 				matcherConfigs = append(matcherConfigs, mc)
 			}
 			hooksConfig[event] = matcherConfigs
@@ -1018,9 +1026,47 @@ func (q *query) initialize() (map[string]any, error) {
 		return nil, err
 	}
 
+	if err := q.checkHookOnFailure(response, !q.initialized); err != nil {
+		q.hookOnFailureRefused = true
+		return nil, err
+	}
+
 	q.initialized = true
 	q.initializationResult = response
 	return response, nil
+}
+
+// hasHookSetToBlock reports whether a hook matcher sets OnFailure to a
+// value other than "continue". The CLI reads an unknown value as "block".
+func (q *query) hasHookSetToBlock() bool {
+	for _, matchers := range q.hooks {
+		for _, m := range matchers {
+			if m.onFailure != "" && m.onFailure != HookOnFailureContinue {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkHookOnFailure refuses an initialize response under which a hook set
+// to fail closed would fail open or never run. A responder that does not
+// honor onFailure (a CLI that predates it) drops the field and answers
+// without hook_on_failure_supported. hooks_applied: false on the first
+// initialize means nothing registered the callbacks, as on a session that
+// was already running. Port of TypeScript SDK v0.3.317 and Python SDK
+// v0.2.177.
+func (q *query) checkHookOnFailure(response map[string]any, first bool) error {
+	if !q.hasHookSetToBlock() {
+		return nil
+	}
+	if supported, _ := response["hook_on_failure_supported"].(bool); !supported {
+		return &ConnectionError{SDKError: SDKError{Message: `The process answering initialize does not honor OnFailure on hook matchers, so a hook that fails would not block. Update Claude Code if it is old, or remove OnFailure: "block" from your hooks.`}}
+	}
+	if applied, ok := response["hooks_applied"].(bool); first && ok && !applied {
+		return &ConnectionError{SDKError: SDKError{Message: `This session was already running and did not register your hooks, so a hook set to OnFailure: "block" would never run. Start a new session, or remove OnFailure: "block" from your hooks.`}}
+	}
+	return nil
 }
 
 // resultErrorText picks the most informative text from an is_error result

@@ -1062,4 +1062,36 @@ type HookMatcher struct {
 	Hooks []HookCallback
 	// Timeout in seconds for all hooks in this matcher (default: 60).
 	Timeout *float64
+	// OnFailure sets what a failure of a callback in this matcher does: the
+	// callback returns an error, panics, or returns output the CLI rejects
+	// (such as an unknown permissionDecision). Empty (unset) or
+	// [HookOnFailureContinue] reports the failure and lets the action go
+	// ahead. [HookOnFailureBlock] blocks the action the event guards (a tool
+	// call, a permission request, a prompt), so a callback with no opinion
+	// must return an empty [HookJSONOutput] and a nil error. Unrecognized
+	// output keys are not a failure. Stop, SubagentStop, TaskCompleted and
+	// TeammateIdle ignore it, and a PermissionRequest block counts only if it
+	// lands before CanUseTool answers.
+	//
+	// With any value other than empty or [HookOnFailureContinue] (the CLI
+	// reads an unknown value as "block"), connecting fails with a
+	// [*ConnectionError] when the process answering initialize does not
+	// report honoring the option (a CLI that predates it would let the
+	// action run), and when the first initialize reports that the session
+	// was already running and did not register the hooks. Port of
+	// TypeScript SDK v0.3.317 (HookCallbackMatcher.onFailure) and Python SDK
+	// v0.2.177 (HookMatcher.on_failure).
+	OnFailure HookOnFailure
 }
+
+// HookOnFailure is the value of [HookMatcher.OnFailure].
+type HookOnFailure string
+
+const (
+	// HookOnFailureContinue reports a failed hook callback and lets the
+	// action go ahead. It is the CLI's default.
+	HookOnFailureContinue HookOnFailure = "continue"
+	// HookOnFailureBlock counts a failed hook callback as a block, as for
+	// a command hook, so the action the event guards is blocked.
+	HookOnFailureBlock HookOnFailure = "block"
+)
