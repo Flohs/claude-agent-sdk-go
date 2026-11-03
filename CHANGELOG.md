@@ -8,6 +8,10 @@
 - `SessionWritesLostMessage` (`ErrorCode`, `Lost`, `TranscriptSessionIDs`, `UUID`, `SessionID`), parsed from the CLI's `system` message with subtype `session_writes_lost`: sent at most once as the CLI exits when it could not save transcript lines (`SessionWritesLostTranscript`) and/or `~/.claude.json` changes (`SessionWritesLostGlobalConfig`) because the disk was full (`SessionWritesLostErrorENOSPC`) or over quota (`SessionWritesLostErrorEDQUOT`); `ParseMessage` previously returned it as a generic `*SystemMessage`. Port of TypeScript SDK v0.3.317 (`SDKSessionWritesLostMessage`, found by diffing the npm `sdk.d.ts` for v0.3.316 → v0.3.317); Python SDK v0.2.177 has no equivalent. ([#839](https://github.com/Flohs/claude-agent-sdk-go/issues/839))
 - `TaskCreateOutput.Task.Description` (`json:"description,omitempty"`), the task's description as saved, which can differ from the tool_use input when Claude Code corrects a malformed call or a PreToolUse hook changes the input; empty from older CLIs. Port of TypeScript SDK v0.3.317 (found by diffing the npm `sdk-tools.d.ts` for v0.3.316 → v0.3.317); Python SDK v0.2.177 has no equivalent. ([#841](https://github.com/Flohs/claude-agent-sdk-go/issues/841))
 
+### Changed
+
+- `ResultMessage.StartupFailureReason` now documents the new known value `initialize_not_first`: the CLI was started with `--await-initialize` (as for `PluginDelivery: "initialize"`) and its first stdin line was not the initialize control request, so the fix is in the host or a wrapper script, not a retry. `ToolPermissionContext.SuppressAlwaysAllowRule` now documents that it is also set for an ask from a run a plugin started, where Claude Code saves no rule from the answer. `Client.SetMcpServers` now documents which servers survive being omitted: settings-file servers, a `.mcp.json` or local-scope server of the current folder until a call has named it, and plugin servers. Documentation only. Port of TypeScript SDK v0.3.317 (found by diffing the npm `sdk.d.ts` for v0.3.316 → v0.3.317); Python SDK v0.2.177 has no equivalent. ([#843](https://github.com/Flohs/claude-agent-sdk-go/issues/843))
+
 ## [4.3.1] - 2026-11-02
 
 ### Fixed
