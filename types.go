@@ -1478,6 +1478,62 @@ type WorkerShuttingDownMessage struct {
 	Reason string `json:"reason,omitempty"`
 }
 
+// SessionWritesLostMessage is emitted when the CLI could not save lines of a
+// session transcript, changes to ~/.claude.json, or both, because the disk
+// was full or its quota was used up. Sent at most once, as the CLI exits,
+// after the last [ResultMessage] if there was one. Results already received
+// stand, and the message does not change the exit status. Sent only with
+// stream-json output on stdout. Safe to ignore. Parsed from the system
+// subtype "session_writes_lost". Port of TypeScript SDK v0.3.317
+// (SDKSessionWritesLostMessage).
+type SessionWritesLostMessage struct {
+	SystemMessage
+	// ErrorCode is why the writes failed: [SessionWritesLostErrorENOSPC]
+	// (the disk was full) or [SessionWritesLostErrorEDQUOT] (the disk quota
+	// was used up). When both kinds of write were lost for different
+	// reasons, the transcript's. More codes may be added.
+	ErrorCode SessionWritesLostErrorCode `json:"error_code"`
+	// Lost says what was not saved: [SessionWritesLostTranscript] (lines of
+	// a session transcript, so resuming a session in TranscriptSessionIDs
+	// may miss part of its conversation) and/or
+	// [SessionWritesLostGlobalConfig] (changes this run made to
+	// ~/.claude.json). Never empty. More values may be added.
+	Lost []SessionWritesLostKind `json:"lost"`
+	// TranscriptSessionIDs lists the sessions whose transcripts lost lines,
+	// in the order each first lost one. Set only when Lost contains
+	// [SessionWritesLostTranscript]; usually SessionID alone. A CLI that
+	// started a new session after the loss (as /clear does) lists the
+	// earlier session, and lists SessionID only if it lost lines too.
+	TranscriptSessionIDs []string `json:"transcript_session_ids,omitempty"`
+	// UUID is the message's unique identifier.
+	UUID string `json:"uuid,omitempty"`
+	// SessionID is the session the CLI is in.
+	SessionID string `json:"session_id,omitempty"`
+}
+
+// SessionWritesLostErrorCode is the value of
+// [SessionWritesLostMessage.ErrorCode].
+type SessionWritesLostErrorCode string
+
+const (
+	// SessionWritesLostErrorENOSPC means the disk was full.
+	SessionWritesLostErrorENOSPC SessionWritesLostErrorCode = "ENOSPC"
+	// SessionWritesLostErrorEDQUOT means the disk quota was used up.
+	SessionWritesLostErrorEDQUOT SessionWritesLostErrorCode = "EDQUOT"
+)
+
+// SessionWritesLostKind is an entry of [SessionWritesLostMessage.Lost].
+type SessionWritesLostKind string
+
+const (
+	// SessionWritesLostTranscript means lines of a session transcript were
+	// not saved.
+	SessionWritesLostTranscript SessionWritesLostKind = "transcript"
+	// SessionWritesLostGlobalConfig means changes this run made to
+	// ~/.claude.json were not saved.
+	SessionWritesLostGlobalConfig SessionWritesLostKind = "global_config"
+)
+
 // PermissionDeniedAdvisoryReason is the machine-readable reason a tool call
 // was denied in a permission_denied_advisory system message.
 // Port of TypeScript SDK v0.3.178.

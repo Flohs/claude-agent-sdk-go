@@ -463,6 +463,25 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Reason:        stringField(data, "reason"),
 		}, nil
 
+	case "session_writes_lost":
+		lostRaw, _ := stringSliceFromResponse(data, "lost")
+		var lost []SessionWritesLostKind
+		if lostRaw != nil {
+			lost = make([]SessionWritesLostKind, len(lostRaw))
+			for i, k := range lostRaw {
+				lost[i] = SessionWritesLostKind(k)
+			}
+		}
+		transcriptIDs, _ := stringSliceFromResponse(data, "transcript_session_ids")
+		return &SessionWritesLostMessage{
+			SystemMessage:        base,
+			ErrorCode:            SessionWritesLostErrorCode(stringField(data, "error_code")),
+			Lost:                 lost,
+			TranscriptSessionIDs: transcriptIDs,
+			UUID:                 stringField(data, "uuid"),
+			SessionID:            stringField(data, "session_id"),
+		}, nil
+
 	case "permission_denied_advisory":
 		return &PermissionDeniedAdvisoryMessage{
 			SystemMessage: base,
