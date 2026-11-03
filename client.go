@@ -764,11 +764,19 @@ func (c *Client) RewindFiles(ctx context.Context, userMessageID string) (*Rewind
 // pending permission or dialog prompts queued since the last initialization.
 // Call this after a transport gap to restore session state without creating a
 // new Client. Port of TypeScript SDK v0.3.195.
+//
+// When a [HookMatcher] sets OnFailure to "block" and the process answering
+// does not report honoring it, Reinitialize closes the client and returns a
+// [*ConnectionError], as the TypeScript SDK does, so a hook meant to fail
+// closed never fails open.
 func (c *Client) Reinitialize(ctx context.Context) error {
 	if c.q == nil {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
 	_, err := c.q.initialize()
+	if err != nil && c.q.hookOnFailureRefused {
+		_ = c.Close()
+	}
 	return err
 }
 

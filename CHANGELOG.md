@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `HookMatcher.OnFailure` (`HookOnFailure`, with `HookOnFailureContinue` and `HookOnFailureBlock`), sent as `onFailure` on the matcher in the `initialize` request: with `"block"` a failed callback (an error, a panic, or output the CLI rejects) blocks the action the event guards instead of letting it go ahead; ignored on Stop, SubagentStop, TaskCompleted and TeammateIdle. When a matcher sets a value other than `"continue"`, `Client.Connect`, `Query` and `Client.Reinitialize` fail with a `*ConnectionError` if the CLI does not answer `hook_on_failure_supported: true` (an older CLI would let the action run), and the first initialize also fails if it reports `hooks_applied: false`; `Reinitialize` then closes the client, as the TypeScript SDK does. Port of TypeScript SDK v0.3.317 and Python SDK v0.2.177 (found by diffing the npm `sdk.d.ts` and `sdk.mjs` for v0.3.316 → v0.3.317 and the PyPI sdist for v0.2.176 → v0.2.177). ([#837](https://github.com/Flohs/claude-agent-sdk-go/issues/837))
+
 ## [4.3.1] - 2026-11-02
 
 ### Fixed
