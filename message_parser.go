@@ -525,6 +525,7 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		UserMessageUUIDs:     stringSliceField(data, "user_message_uuids"),
 		ResumeReason:         stringField(data, "resume_reason"),
 		StartupFailureReason: stringField(data, "startup_failure_reason"),
+		CredentialExpiresAt:  stringField(data, "credential_expires_at"),
 	}
 
 	if errors, ok := data["errors"].([]any); ok {

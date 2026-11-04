@@ -1,7 +1,9 @@
 package claude
 
 import (
+	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -2037,6 +2039,54 @@ func TestParseMessage_ResultMessage_StartupFailureReason_Absent(t *testing.T) {
 	r := msg.(*ResultMessage)
 	if r.StartupFailureReason != "" {
 		t.Errorf("StartupFailureReason = %q, want empty when absent", r.StartupFailureReason)
+	}
+}
+
+func TestParseMessage_ResultMessage_CredentialExpiresAt(t *testing.T) {
+	for _, subtype := range []string{"success", "error_during_execution"} {
+		data := map[string]any{
+			"type":                  "result",
+			"subtype":               subtype,
+			"is_error":              subtype != "success",
+			"session_id":            "s",
+			"credential_expires_at": "2026-12-01T10:00:00.000Z",
+		}
+		msg, err := ParseMessage(data)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", subtype, err)
+		}
+		r := msg.(*ResultMessage)
+		if r.CredentialExpiresAt != "2026-12-01T10:00:00.000Z" {
+			t.Errorf("%s: CredentialExpiresAt = %q, want 2026-12-01T10:00:00.000Z", subtype, r.CredentialExpiresAt)
+		}
+	}
+}
+
+func TestParseMessage_ResultMessage_CredentialExpiresAt_Absent(t *testing.T) {
+	msg, err := ParseMessage(map[string]any{
+		"type":       "result",
+		"subtype":    "success",
+		"session_id": "s",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := msg.(*ResultMessage).CredentialExpiresAt; got != "" {
+		t.Errorf("CredentialExpiresAt = %q, want empty when absent", got)
+	}
+}
+
+func TestResultMessage_CredentialExpiresAt_JSON(t *testing.T) {
+	b, err := json.Marshal(ResultMessage{CredentialExpiresAt: "2026-12-01T10:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"credential_expires_at":"2026-12-01T10:00:00Z"`) {
+		t.Errorf("marshal = %s, want credential_expires_at", b)
+	}
+	b, _ = json.Marshal(ResultMessage{})
+	if strings.Contains(string(b), "credential_expires_at") {
+		t.Errorf("marshal = %s, want credential_expires_at omitted when empty", b)
 	}
 }
 

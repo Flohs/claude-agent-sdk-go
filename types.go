@@ -1811,6 +1811,19 @@ type ResultMessage struct {
 	// script between it and the CLI, not a retry; TypeScript SDK
 	// v0.3.317). Port of TypeScript SDK v0.3.274.
 	StartupFailureReason string `json:"startup_failure_reason,omitempty"`
+	// CredentialExpiresAt is when the claude.ai credential the CLI's
+	// requests send ends for good, as an ISO 8601 instant read when the
+	// result was written. For a stored claude.ai login it is the end of the
+	// login's refresh chain as stored at sign-in, which renewing the access
+	// token does not move: the server's date when it sent one, otherwise a
+	// 30-day estimate, and the real end can be up to 3 days earlier. The
+	// server is not asked, so a login revoked early still shows its date,
+	// and a date in the past means the login has probably ended, not that
+	// it has. Set on both success and error results. Empty when no date is
+	// known, for every other credential (an API key, a token from the
+	// environment, another provider), on results the CLI did not number,
+	// and from older CLIs. Port of TypeScript SDK v0.3.318.
+	CredentialExpiresAt string `json:"credential_expires_at,omitempty"`
 	// Origin forwards the triggering message's origin so consumers can
 	// distinguish user-prompted results from task-notification followups.
 	// Nil when the CLI omits the field (the common case for main-session
