@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-11-04
+
 ### Added
 
 - `ResultMessage.CredentialExpiresAt` (`credential_expires_at`), parsed on success and error results: when the claude.ai credential the CLI's requests send ends for good, as an ISO 8601 instant (for a stored claude.ai login, the end of its refresh chain as stored at sign-in; the server's date or a 30-day estimate, possibly up to 3 days late, and not re-checked with the server). Empty when no date is known, for API keys, environment tokens and other providers, and from older CLIs. Port of TypeScript SDK v0.3.318 (found by diffing the npm `sdk.d.ts` for v0.3.317 → v0.3.318); Python SDK v0.2.178 has no equivalent. ([#847](https://github.com/Flohs/claude-agent-sdk-go/issues/847))
