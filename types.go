@@ -598,7 +598,8 @@ type TaskProgressMessage struct {
 	ToolUseID    string    `json:"tool_use_id,omitempty"`
 	LastToolName string    `json:"last_tool_name,omitempty"`
 	// Summary is an AI-generated progress summary when AgentProgressSummaries
-	// is enabled in Options.
+	// is enabled in Options. Summaries are not a heartbeat: see
+	// [Options.AgentProgressSummaries].
 	Summary string `json:"summary,omitempty"`
 	// SubagentType identifies the type of subagent that owns this task.
 	SubagentType string `json:"subagent_type,omitempty"`
@@ -1809,7 +1810,17 @@ type ResultMessage struct {
 	// PluginDelivery "initialize", and its first stdin line was not the
 	// initialize control request; the fix is in the host or a wrapper
 	// script between it and the CLI, not a retry; TypeScript SDK
-	// v0.3.317). Port of TypeScript SDK v0.3.274.
+	// v0.3.317) and "config_file_invalid" (a configuration file read at
+	// start-up is not valid JSON; Errors names the file and, for the global
+	// configuration file, how to restore or repair it. The file is left
+	// unchanged and every start without a terminal is refused until it is
+	// repaired, so a retry alone does not help; TypeScript SDK v0.3.318).
+	// Failures that otherwise end with stderr alone produce this result
+	// only when CLAUDE_CODE_STARTUP_FAILURE_RESULTS is set in the CLI's
+	// environment, except "org_config_required_unavailable",
+	// "org_config_refused" and "config_file_invalid", which every
+	// stream-json run reports (TypeScript SDK v0.3.318). Port of TypeScript
+	// SDK v0.3.274.
 	StartupFailureReason string `json:"startup_failure_reason,omitempty"`
 	// CredentialExpiresAt is when the claude.ai credential the CLI's
 	// requests send ends for good, as an ISO 8601 instant read when the
@@ -2710,7 +2721,10 @@ type ReadStateEntry struct {
 type InterruptReceipt struct {
 	// StillQueued lists uuids of async user messages that survive this
 	// interrupt: commands still in the queue, plus any batch already
-	// dequeued for the imminent turn but not yet reachable by the abort.
+	// dequeued for the imminent turn but not yet reachable by the abort,
+	// plus any user message the CLI has read from its input stream but not
+	// yet queued (held, for instance, while a model change is still being
+	// checked or behind start-up work; TypeScript SDK v0.3.318).
 	// These WILL run unless cancelled first via a mechanism outside this
 	// SDK's current surface. Coverage caveats: only uuid-stamped messages
 	// appear (a message enqueued without a uuid still runs but is never
@@ -2721,7 +2735,9 @@ type InterruptReceipt struct {
 	// rather than an error.
 	StillQueued []string
 	// Cancelled lists uuids of main-thread commands cancelled by this
-	// interrupt. Populated only by [Client.InterruptCancelQueued] on CLIs
+	// interrupt, whether removed from the queue or dropped before it was
+	// queued (a message the CLI had read and was still holding; TypeScript
+	// SDK v0.3.318). Populated only by [Client.InterruptCancelQueued] on CLIs
 	// advertising the "interrupt_cancel_queued_v1" protocol capability (see
 	// [ServerCapabilities.Capabilities]); nil for [Client.Interrupt] and on
 	// older CLIs, in which case StillQueued reports the same commands

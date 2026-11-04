@@ -798,6 +798,13 @@ type Options struct {
 	// AgentProgressSummaries enables periodic AI-generated progress summaries
 	// on task_progress messages. When set, task progress messages carry a
 	// Summary field describing the subagent's current activity.
+	//
+	// Summaries are not a heartbeat. None is made while the conversation is
+	// unchanged, and one can be delayed by up to 5 minutes while the
+	// subagent is waiting for a model response and its prompt cache is
+	// likely cold (no response yet, or none begun in the last 4.5 minutes).
+	// If the subagent finishes first, that summary is not sent. Documented
+	// in TypeScript SDK v0.3.318.
 	AgentProgressSummaries bool
 	// StrictMcpConfig, when true, tells the CLI to only use MCP servers passed
 	// via McpServers, ignoring project, user, and global MCP configurations.

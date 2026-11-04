@@ -6,6 +6,10 @@
 
 - `ResultMessage.CredentialExpiresAt` (`credential_expires_at`), parsed on success and error results: when the claude.ai credential the CLI's requests send ends for good, as an ISO 8601 instant (for a stored claude.ai login, the end of its refresh chain as stored at sign-in; the server's date or a 30-day estimate, possibly up to 3 days late, and not re-checked with the server). Empty when no date is known, for API keys, environment tokens and other providers, and from older CLIs. Port of TypeScript SDK v0.3.318 (found by diffing the npm `sdk.d.ts` for v0.3.317 → v0.3.318); Python SDK v0.2.178 has no equivalent. ([#847](https://github.com/Flohs/claude-agent-sdk-go/issues/847))
 
+### Changed
+
+- `ResultMessage.StartupFailureReason` now documents the new known value `config_file_invalid` (a configuration file read at start-up is not valid JSON; the file is left unchanged and starts without a terminal are refused until it is repaired, so a retry alone does not help) and that `org_config_required_unavailable`, `org_config_refused` and `config_file_invalid` are reported by every stream-json run, not only when `CLAUDE_CODE_STARTUP_FAILURE_RESULTS` is set. `DeleteSession` and `DeleteSessionViaStore` now document that they delete data only on this computer or only in the store, not anything stored by Anthropic. `Options.AgentProgressSummaries` now documents that summaries are not a heartbeat (none while the conversation is unchanged, up to 5 minutes late while the prompt cache is likely cold, dropped if the subagent finishes first). `InterruptReceipt.StillQueued` and `InterruptReceipt.Cancelled` now document that they also cover user messages the CLI has read but not yet queued. Documentation only. Port of TypeScript SDK v0.3.318 (found by diffing the npm `sdk.d.ts` for v0.3.317 → v0.3.318); Python SDK v0.2.178 has no equivalent. ([#849](https://github.com/Flohs/claude-agent-sdk-go/issues/849))
+
 ## [4.4.0] - 2026-11-03
 
 ### Added
