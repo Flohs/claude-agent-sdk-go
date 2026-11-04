@@ -259,6 +259,8 @@ func RenameSession(sessionID string, title string, directory *string) error {
 
 // DeleteSession deletes a session's JSONL transcript file and any subagent
 // transcripts stored in the sibling {session_id}/ directory.
+// It deletes data only on this computer, not anything stored by Anthropic
+// (TypeScript SDK v0.3.318).
 //
 // The JSONL file is a hard delete — an error is returned if it cannot be
 // removed. The sibling directory (if any) is removed on a best-effort basis;
@@ -2726,6 +2728,9 @@ func TagSessionViaStore(ctx context.Context, store SessionStore, sessionID strin
 // returned error aggregates the subkey failures; the session is left in
 // whatever partial state the adapter produced. Callers that require
 // transactional semantics should implement them in the adapter.
+//
+// It deletes data only in store, not anything stored by Anthropic
+// (TypeScript SDK v0.3.318).
 //
 // sessionID must be a valid UUID. opts selects the project scope; pass
 // StoreMutationOptions{} to default to the current working directory.
