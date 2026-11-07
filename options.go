@@ -721,7 +721,11 @@ type Options struct {
 	// anything that would otherwise prompt is denied immediately with a
 	// message telling Claude the session has no approval surface, without
 	// ever invoking CanUseTool. Empty leaves the CLI's default in effect.
-	// Port of TypeScript SDK v0.3.259.
+	// The settings key permissions.denyInsteadOfPrompting does the same as
+	// "none" in every kind of session; the CLI reads it only from user
+	// settings, --settings (Options.Settings) and managed settings, and true
+	// in any of those wins (TypeScript SDK v0.3.319). Port of TypeScript SDK
+	// v0.3.259.
 	PermissionPrompts string
 	// Cwd sets the working directory for the CLI process.
 	Cwd string

@@ -1523,10 +1523,13 @@ type WorkerShuttingDownMessage struct {
 
 // SessionWritesLostMessage is emitted when the CLI could not save lines of a
 // session transcript, changes to ~/.claude.json, or both, because the disk
-// was full or its quota was used up. Sent at most once, as the CLI exits,
-// after the last [ResultMessage] if there was one. Results already received
-// stand, and the message does not change the exit status. Sent only with
-// stream-json output on stdout. Safe to ignore. Parsed from the system
+// was full or its quota was used up. Sent at most once, as the CLI exits
+// with status 0, after the last [ResultMessage] if there was one. A run that
+// exits with status 1, as after an error result, reports it only on stderr;
+// CLI 2.1.317 and some later releases sent this message there too
+// (TypeScript SDK v0.3.319). Results already received stand, and the message
+// does not change the exit status. Sent only with stream-json output on
+// stdout. Safe to ignore. Parsed from the system
 // subtype "session_writes_lost". Port of TypeScript SDK v0.3.317
 // (SDKSessionWritesLostMessage).
 type SessionWritesLostMessage struct {

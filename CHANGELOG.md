@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `ToolPermissionContext.MatchedAskRule` now documents that it may also be set, whatever the `DecisionReason`, when an ask rule reaches an MCP tool only under another name of its server (such as a connector's id or its claude.ai name), so a host looking the rule up by `ToolName` does not find it. `SessionWritesLostMessage` now documents that it is sent only when the CLI exits with status 0; a run that exits with status 1 reports the lost writes only on stderr. `Options.PermissionPrompts` now documents the equivalent settings key `permissions.denyInsteadOfPrompting`, read only from user settings, `--settings` and managed settings. Documentation only. Port of TypeScript SDK v0.3.319 (found by diffing the npm `sdk.d.ts` for v0.3.318 → v0.3.319); Python SDK v0.2.179 has no equivalent. ([#852](https://github.com/Flohs/claude-agent-sdk-go/issues/852))
+
 ## [4.5.0] - 2026-11-04
 
 ### Added
