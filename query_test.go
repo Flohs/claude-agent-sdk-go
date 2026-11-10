@@ -2147,6 +2147,40 @@ func TestInterrupt_CancelQueuedSendsFlagAndPopulatesCancelled(t *testing.T) {
 	}
 }
 
+// TestInterrupt_PlainInterruptPopulatesCancelled verifies that a plain
+// interrupt (no cancel_queued) still surfaces "cancelled" uuids when the CLI
+// sends them, as it may in a remote session behind a flag, and does not send
+// cancel_queued. Port of TypeScript SDK v0.3.321.
+func TestInterrupt_PlainInterruptPopulatesCancelled(t *testing.T) {
+	mt := newInterruptRespondTransport(map[string]any{
+		"still_queued": []any{"uuid-1"},
+		"cancelled":    []any{"uuid-held"},
+	})
+	q := newQuery(queryConfig{transport: mt})
+	q.start()
+	defer func() { _ = q.close() }()
+
+	receipt, err := q.interrupt(context.Background(), false)
+	if err != nil {
+		t.Fatalf("interrupt failed: %v", err)
+	}
+	if len(receipt.Cancelled) != 1 || receipt.Cancelled[0] != "uuid-held" {
+		t.Fatalf("Cancelled = %v, want [uuid-held]", receipt.Cancelled)
+	}
+	if len(receipt.StillQueued) != 1 || receipt.StillQueued[0] != "uuid-1" {
+		t.Fatalf("StillQueued = %v, want [uuid-1]", receipt.StillQueued)
+	}
+
+	mt.mu.Lock()
+	written := append([]string(nil), mt.written...)
+	mt.mu.Unlock()
+	for _, w := range written {
+		if strings.Contains(w, `"cancel_queued"`) {
+			t.Fatalf("plain interrupt must not send cancel_queued, got %v", w)
+		}
+	}
+}
+
 // TestGetContextUsage_OmitsDetailByDefault verifies that query.getContextUsage("")
 // (the path used by Client.GetContextUsage) sends a get_context_usage
 // control request with no "detail" key, letting the CLI fall back to its
