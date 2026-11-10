@@ -2745,6 +2745,12 @@ type InterruptReceipt struct {
 	// [ServerCapabilities.Capabilities]); nil for [Client.Interrupt] and on
 	// older CLIs, in which case StillQueued reports the same commands
 	// instead. Port of TypeScript SDK v0.3.219.
+	//
+	// One exception: in a remote session, behind a flag, a plain
+	// [Client.Interrupt] may also return Cancelled, listing only the
+	// messages it cancelled that the server had sent again and the CLI was
+	// holding aside to run later. No capability advertises this (TypeScript
+	// SDK v0.3.321).
 	Cancelled []string
 }
 

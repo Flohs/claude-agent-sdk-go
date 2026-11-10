@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `InterruptReceipt.Cancelled` now documents that, in a remote session and behind a flag, a plain `Client.Interrupt` may also fill it in, listing only the messages it cancelled that the server had sent again and the CLI was holding aside to run later; no capability advertises this. The SDK already parses `cancelled` on every interrupt response. Documentation only. Port of TypeScript SDK v0.3.321 (found by diffing the npm `sdk.d.ts` for v0.3.319 → v0.3.321); Python SDK v0.2.180 has no equivalent. ([#855](https://github.com/Flohs/claude-agent-sdk-go/issues/855))
+
 ## [4.5.1] - 2026-11-07
 
 ### Changed
