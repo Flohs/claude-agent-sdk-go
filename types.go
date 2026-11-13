@@ -1817,7 +1817,16 @@ type ResultMessage struct {
 	// start-up is not valid JSON; Errors names the file and, for the global
 	// configuration file, how to restore or repair it. The file is left
 	// unchanged and every start without a terminal is refused until it is
-	// repaired, so a retry alone does not help; TypeScript SDK v0.3.318).
+	// repaired, so a retry alone does not help; TypeScript SDK v0.3.318)
+	// and "managed_settings_not_delivered" (the CLI was started with
+	// --managed-settings-in-initialize and could not use the managed
+	// settings in the initialize control request: stdin ended or failed
+	// first, or its first line was too long; the request has no
+	// managedSettings object, that object could not be used, or its plugins
+	// field is malformed; or the launch does not read that request at
+	// start-up or also passes --managed-settings. Errors says which. No
+	// session starts without them; the fix is in the host or a wrapper
+	// script between it and the CLI, not a retry; TypeScript SDK v0.3.323).
 	// Failures that otherwise end with stderr alone produce this result
 	// only when CLAUDE_CODE_STARTUP_FAILURE_RESULTS is set in the CLI's
 	// environment, except "org_config_required_unavailable",
@@ -2736,6 +2745,12 @@ type InterruptReceipt struct {
 	// internally-enqueued uuids the caller never sent (cron triggers,
 	// auto-resume continuations) — treat unknown uuids as informational
 	// rather than an error.
+	//
+	// A worker of a cloud session may treat a plain interrupt from a person
+	// differently: if it reads the interrupt before its first turn, while
+	// it holds a prompt from the worker before it, the interrupt stops the
+	// turn of that prompt, and listed messages that no turn has started
+	// then run (TypeScript SDK v0.3.323).
 	StillQueued []string
 	// Cancelled lists uuids of main-thread commands cancelled by this
 	// interrupt, whether removed from the queue or dropped before it was

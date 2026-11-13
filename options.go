@@ -814,6 +814,10 @@ type Options struct {
 	// likely cold (no response yet, or none begun in the last 4.5 minutes).
 	// If the subagent finishes first, that summary is not sent. Documented
 	// in TypeScript SDK v0.3.318.
+	//
+	// CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1 in the CLI's
+	// environment turns summaries off even when this option is true
+	// (TypeScript SDK v0.3.323).
 	AgentProgressSummaries bool
 	// StrictMcpConfig, when true, tells the CLI to only use MCP servers passed
 	// via McpServers, ignoring project, user, and global MCP configurations.
@@ -865,6 +869,12 @@ type Options struct {
 	// SettingSources specifies which setting sources to load.
 	SettingSources []SettingSource
 	// Sandbox configures bash command isolation.
+	//
+	// The SDK sends it inside the --settings value, so one value there that
+	// fails the CLI's validation rejects all of the settings, Sandbox
+	// included. With Enabled true the run then ends with the same error
+	// result as a sandbox that cannot start, unless FailIfUnavailable is
+	// false (TypeScript SDK v0.3.323).
 	Sandbox *SandboxSettings
 	// WorkflowSizeGuideline sets an advisory size guideline for the dynamic
 	// workflows Claude writes: WorkflowSizeGuidelineSmall aims for fewer than

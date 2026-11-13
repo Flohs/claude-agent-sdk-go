@@ -680,6 +680,8 @@ func (c *Client) ReconnectMcpServer(ctx context.Context, name string) error {
 // binary, per the MCP ReadResourceResult shape). The named server must be
 // connected and must itself expose MCP Apps UI resources; servers without
 // that capability, or one that is disconnected/unknown, return an error.
+// In a cloud session, a server on the user's own computer or browser is
+// rejected too (TypeScript SDK v0.3.323).
 //
 // WARNING: This method is alpha/experimental and may change or be removed
 // without notice. Port of TypeScript SDK v0.3.280 (readMcpResource, alpha;
@@ -714,6 +716,15 @@ func (c *Client) ToggleMcpServer(ctx context.Context, name string, enabled bool)
 // replaces it). So an empty map does not guarantee a session with no dynamic
 // MCP servers when plugins are loaded or the current folder has such
 // servers. Documented in TypeScript SDK v0.3.317.
+//
+// A call replaces the servers added by earlier calls and all in-process SDK
+// servers, including any passed in Options.McpServers. Outside a cloud
+// session, a call that leaves out a stdio, sse or http server passed in
+// Options.McpServers does not disconnect it or list it as removed, unless an
+// earlier call named that server; to be able to remove a server later, add
+// it with SetMcpServers instead of in Options.McpServers. Because of these
+// exceptions, an empty map does not guarantee that a session has no MCP
+// servers left. Documented in TypeScript SDK v0.3.323.
 func (c *Client) SetMcpServers(ctx context.Context, servers map[string]McpServerConfig) error {
 	if c.q == nil {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
