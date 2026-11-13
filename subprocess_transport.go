@@ -1064,43 +1064,104 @@ func (t *SubprocessTransport) settingsValue() (string, error) {
 
 // findCLI locates the Claude Code CLI binary.
 func findCLI() (string, error) {
-	// Check PATH first
-	if path, err := exec.LookPath("claude"); err == nil {
-		return path, nil
-	}
-
 	home, _ := os.UserHomeDir()
-	locations := []string{
-		filepath.Join(home, ".npm-global", "bin", "claude"),
-		"/usr/local/bin/claude",
-		filepath.Join(home, ".local", "bin", "claude"),
-		filepath.Join(home, "node_modules", ".bin", "claude"),
-		filepath.Join(home, ".yarn", "bin", "claude"),
-		filepath.Join(home, ".claude", "local", "claude"),
+	return findCLIFor(runtime.GOOS, os.Getenv("PATH"), home, exec.LookPath, isRegularFile)
+}
+
+// isRegularFile reports whether path names an existing regular file.
+func isRegularFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
+}
+
+// findCLIFor is findCLI with its platform inputs passed in, so the Windows
+// and POSIX discovery rules can be tested on any host.
+//
+// On Windows only a native claude.exe is discovered, and only in absolute
+// PATH entries, in order, then in ~/.local/bin: CreateProcess cannot run an
+// extensionless wrapper script, Connect refuses npm's claude.cmd shim
+// (rejectWindowsBatchCLIForGOOS), and the POSIX locations are not probed
+// because a driveless path such as /usr/local/bin/claude resolves against
+// the current drive. Port of Python SDK v0.2.181.
+func findCLIFor(goos, pathEnv, home string, lookPath func(string) (string, error), isFile func(string) bool) (string, error) {
+	var locations []string
+	if goos == "windows" {
+		for _, dir := range strings.Split(pathEnv, ";") {
+			if !isWindowsAbsPath(dir) {
+				continue
+			}
+			if exe := joinWindowsPath(dir, "claude.exe"); isFile(exe) {
+				return exe, nil
+			}
+		}
+		if home != "" {
+			locations = []string{joinWindowsPath(home, `.local\bin\claude.exe`)}
+		}
+	} else {
+		if path, err := lookPath("claude"); err == nil {
+			return path, nil
+		}
+		locations = []string{
+			filepath.Join(home, ".npm-global", "bin", "claude"),
+			"/usr/local/bin/claude",
+			filepath.Join(home, ".local", "bin", "claude"),
+			filepath.Join(home, "node_modules", ".bin", "claude"),
+			filepath.Join(home, ".yarn", "bin", "claude"),
+			filepath.Join(home, ".claude", "local", "claude"),
+		}
 	}
 
 	for _, path := range locations {
-		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+		if isFile(path) {
 			return path, nil
 		}
 	}
 
-	cliName := "claude"
-	if runtime.GOOS == "windows" {
-		cliName = "claude.exe"
+	if goos == "windows" {
+		// npm's Windows install is a claude.cmd shim, which Connect refuses,
+		// so it is not recommended here.
+		return "", &NotFoundError{
+			ConnectionError: ConnectionError{SDKError: SDKError{
+				Message: "Claude Code not found. Install the native claude.exe with (PowerShell):\n" +
+					"  irm https://claude.ai/install.ps1 | iex\n\n" +
+					"Or provide the path to a claude.exe via Options:\n" +
+					"  Options{CLIPath: `C:\\path\\to\\claude.exe`}\n\n" +
+					"(npm install -g @anthropic-ai/claude-code produces a claude.cmd shim, " +
+					"which this SDK refuses to run on Windows.)",
+			}},
+		}
 	}
 
 	return "", &NotFoundError{
 		ConnectionError: ConnectionError{SDKError: SDKError{
-			Message: fmt.Sprintf(
-				"Claude Code not found. Install with:\n"+
-					"  npm install -g @anthropic-ai/claude-code\n\n"+
-					"If already installed, try:\n"+
-					"  export PATH=\"$HOME/node_modules/.bin:$PATH\"\n\n"+
-					"Or provide the path via Options:\n"+
-					"  Options{CLIPath: \"/path/to/%s\"}", cliName),
+			Message: "Claude Code not found. Install with:\n" +
+				"  npm install -g @anthropic-ai/claude-code\n\n" +
+				"If already installed, try:\n" +
+				"  export PATH=\"$HOME/node_modules/.bin:$PATH\"\n\n" +
+				"Or provide the path via Options:\n" +
+				"  Options{CLIPath: \"/path/to/claude\"}",
 		}},
 	}
+}
+
+// isWindowsAbsPath reports whether p is an absolute Windows path: a drive
+// letter followed by a colon and a separator, or a UNC path. A relative or
+// drive-relative PATH entry would be searched against the current
+// directory or drive.
+func isWindowsAbsPath(p string) bool {
+	if len(p) >= 3 && p[1] == ':' && (p[2] == '\\' || p[2] == '/') {
+		c := p[0] | 0x20
+		return c >= 'a' && c <= 'z'
+	}
+	return len(p) >= 2 && (p[0] == '\\' || p[0] == '/') && (p[1] == '\\' || p[1] == '/')
+}
+
+// joinWindowsPath joins dir and name with a backslash.
+func joinWindowsPath(dir, name string) string {
+	if strings.HasSuffix(dir, `\`) || strings.HasSuffix(dir, "/") {
+		return dir + name
+	}
+	return dir + `\` + name
 }
 
 // windowsCmdMetacharacters is the set of characters that carry special
