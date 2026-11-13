@@ -905,6 +905,17 @@ type Options struct {
 	ToolConfig *BuiltinToolConfig
 	// EnableFileCheckpointing enables file change tracking for rewind support.
 	EnableFileCheckpointing bool
+	// ClientApp is your app or library identifier (e.g. "my-app/1.0.0"),
+	// sent on requests to the API. When non-empty it sets the
+	// CLAUDE_AGENT_SDK_CLIENT_APP environment variable for the CLI
+	// subprocess and wins over a value in Env. The value must be valid in an
+	// HTTP header: a character above U+00FF stops every request. Empty
+	// leaves CLAUDE_AGENT_SDK_CLIENT_APP to Env and the inherited
+	// environment. The SDK always removes CLAUDE_AGENT_SDK_DERIVED_CLIENT_APP
+	// (an app label the Python SDK derives) from the subprocess environment,
+	// since one inherited from an outer SDK session names that session's
+	// app. Port of Python SDK v0.2.181.
+	ClientApp string
 	// TraceParent is the W3C `traceparent` header value to propagate to the
 	// CLI subprocess (forwarded as the `TRACEPARENT` env var). Callers using
 	// OpenTelemetry can obtain it via `propagation.TraceContext{}` or format

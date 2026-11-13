@@ -225,39 +225,7 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	args := t.buildCommand()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 
-	// Merge environment using layered ordering:
-	// 1. SDK defaults (overridable by system env or user env)
-	env := []string{"CLAUDE_CODE_ENTRYPOINT=sdk-go"}
-
-	inheritEnv := t.options.InheritEnv == nil || *t.options.InheritEnv
-	if inheritEnv {
-		// 2. System environment (filter CLAUDECODE to prevent interference with nested instances)
-		for _, e := range os.Environ() {
-			if !strings.HasPrefix(e, "CLAUDECODE=") {
-				env = append(env, e)
-			}
-		}
-	}
-	// 3. User-provided env vars (override defaults and system env)
-	for k, v := range t.options.Env {
-		env = append(env, k+"="+v)
-	}
-	// 4. SDK-controlled vars (never overridable)
-	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+sdkVersion)
-	if t.options.EnableFileCheckpointing {
-		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
-	}
-	if t.options.TraceParent != "" {
-		env = append(env, "TRACEPARENT="+t.options.TraceParent)
-	}
-	if t.options.TraceState != "" {
-		env = append(env, "TRACESTATE="+t.options.TraceState)
-	}
-	if t.cwd != "" {
-		env = append(env, "PWD="+t.cwd)
-	}
-
-	cmd.Env = env
+	cmd.Env = t.buildEnv()
 	if t.cwd != "" {
 		cmd.Dir = t.cwd
 	}
@@ -980,6 +948,63 @@ func normaliseDisallowedTools(tools []string) []string {
 		}
 	}
 	return out
+}
+
+// clientAppEnv names the app or library that is using the SDK on API
+// requests; Options.ClientApp sets it.
+const clientAppEnv = "CLAUDE_AGENT_SDK_CLIENT_APP"
+
+// derivedClientAppEnv is the app label the Python SDK derives from its
+// installed distribution. It is never passed on to the CLI. Port of Python
+// SDK v0.2.181.
+const derivedClientAppEnv = "CLAUDE_AGENT_SDK_DERIVED_CLIENT_APP"
+
+// buildEnv returns the CLI subprocess environment.
+func (t *SubprocessTransport) buildEnv() []string {
+	// Merge environment using layered ordering:
+	// 1. SDK defaults (overridable by system env or user env)
+	env := []string{"CLAUDE_CODE_ENTRYPOINT=sdk-go"}
+
+	inheritEnv := t.options.InheritEnv == nil || *t.options.InheritEnv
+	if inheritEnv {
+		// 2. System environment (filter CLAUDECODE to prevent interference with nested instances)
+		for _, e := range os.Environ() {
+			if !strings.HasPrefix(e, "CLAUDECODE=") {
+				env = append(env, e)
+			}
+		}
+	}
+	// 3. User-provided env vars (override defaults and system env)
+	for k, v := range t.options.Env {
+		env = append(env, k+"="+v)
+	}
+	// 4. SDK-controlled vars (never overridable)
+	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+sdkVersion)
+	if t.options.EnableFileCheckpointing {
+		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
+	}
+	if t.options.TraceParent != "" {
+		env = append(env, "TRACEPARENT="+t.options.TraceParent)
+	}
+	if t.options.TraceState != "" {
+		env = append(env, "TRACESTATE="+t.options.TraceState)
+	}
+	if t.cwd != "" {
+		env = append(env, "PWD="+t.cwd)
+	}
+	if t.options.ClientApp != "" {
+		env = append(env, clientAppEnv+"="+t.options.ClientApp)
+	}
+
+	// A derived app label from an outer SDK session names that session's
+	// app, not this one; the Go SDK derives none itself.
+	filtered := env[:0]
+	for _, e := range env {
+		if !strings.HasPrefix(e, derivedClientAppEnv+"=") {
+			filtered = append(filtered, e)
+		}
+	}
+	return filtered
 }
 
 // buildSettingsValue returns the --settings value, or "" when there is none
