@@ -132,17 +132,21 @@ type SubprocessTransport struct {
 	cliPath string
 	cwd     string
 
-	cmd          *exec.Cmd
-	stdin        io.WriteCloser
-	stdout       io.ReadCloser
-	stderr       io.ReadCloser
-	stderrBuf    stderrBuffer
-	ready        bool
-	maxBufSize   int
-	mu           sync.Mutex
-	stdinClosed  bool
-	cleanupMu    sync.Mutex
-	cleanupFuncs []func()
+	cmd         *exec.Cmd
+	stdin       io.WriteCloser
+	stdout      io.ReadCloser
+	stderr      io.ReadCloser
+	stderrBuf   stderrBuffer
+	ready       bool
+	maxBufSize  int
+	mu          sync.Mutex
+	stdinClosed bool
+	// versionChecked is set once the CLI's version has been checked (or the
+	// check is turned off by CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK). Only the
+	// ReadMessages goroutine reads or writes it after Connect.
+	versionChecked bool
+	cleanupMu      sync.Mutex
+	cleanupFuncs   []func()
 }
 
 // NewSubprocessTransport creates a new subprocess transport.
@@ -190,9 +194,8 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 
 	// Security: refuse to spawn a .bat/.cmd CLI on Windows, and reject
 	// cmd.exe metacharacters in Resume/SessionID. Both checks must run
-	// before any process is spawned with the resolved CLI path — this
-	// covers the version probe below as well as the main spawn further
-	// down. See rejectWindowsBatchCLIForGOOS / rejectWindowsCmdMetacharactersForGOOS
+	// before any process is spawned with the resolved CLI path. See
+	// rejectWindowsBatchCLIForGOOS / rejectWindowsCmdMetacharactersForGOOS
 	// for the CVE-2024-27980 ("BatBadBut") background; neither check does
 	// anything off Windows.
 	if err := rejectWindowsBatchCLIForGOOS(runtime.GOOS, t.cliPath); err != nil {
@@ -205,9 +208,9 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 		return err
 	}
 
-	if os.Getenv("CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK") == "" {
-		checkClaudeVersion(t.cliPath, t.options)
-	}
+	// The CLI's version is checked from its first system/init message (see
+	// ReadMessages), so cliPath is only ever executed by the spawn below.
+	t.versionChecked = os.Getenv("CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK") != ""
 
 	args := t.buildCommand()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
@@ -394,6 +397,8 @@ func (t *SubprocessTransport) ReadMessages(ctx context.Context) <-chan map[strin
 			}
 
 			jsonBuffer = ""
+
+			t.checkClaudeVersion(data)
 
 			select {
 			case ch <- data:
@@ -1113,8 +1118,7 @@ func containsWindowsCmdMetacharacters(value string) bool {
 // Linux/macOS is unchanged.
 //
 // This must run before any process is spawned with cliPath, which is why
-// Connect calls it before both the version probe (checkClaudeVersion) and
-// the main CLI spawn, regardless of whether cliPath came from
+// Connect calls it before the CLI spawn, regardless of whether cliPath came from
 // Options.CLIPath or the findCLI() fallback.
 func rejectWindowsBatchCLIForGOOS(goos, cliPath string) error {
 	if goos != "windows" || !isWindowsBatchScript(cliPath) {
@@ -1165,35 +1169,58 @@ var versionRegexp = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+)`)
 // are still expanded there.
 const verbatimPromptsMinimumClaudeCodeVersion = "2.1.248"
 
-func checkClaudeVersion(cliPath string, opts *Options) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	out, err := exec.CommandContext(ctx, cliPath, "-v").Output()
-	if err != nil {
+// checkClaudeVersion warns on stderr, once, when the CLI's first system/init
+// message shows an old version. The version comes from the running CLI
+// rather than from a separate "<cliPath> -v", so cliPath is only ever
+// executed by Connect. Port of Python SDK v0.2.181.
+func (t *SubprocessTransport) checkClaudeVersion(data map[string]any) {
+	if t.versionChecked || data["type"] != "system" || data["subtype"] != "init" {
 		return
 	}
+	t.versionChecked = true
+	for _, w := range claudeVersionWarnings(t.cliPath, t.options, data["claude_code_version"]) {
+		fmt.Fprintln(os.Stderr, w)
+	}
+}
 
-	match := versionRegexp.FindStringSubmatch(strings.TrimSpace(string(out)))
-	if len(match) < 2 {
-		return
+// claudeVersionWarnings returns the warnings for the claude_code_version
+// value of an init message: none for a supported version. CLIs below the
+// minimum, and the first 2.0 releases, send no version.
+func claudeVersionWarnings(cliPath string, opts *Options, reported any) []string {
+	versionStr, _ := reported.(string)
+	var version string
+	if match := versionRegexp.FindStringSubmatch(strings.TrimSpace(versionStr)); len(match) >= 2 {
+		version = match[1]
 	}
 
-	version := match[1]
-	if compareVersions(version, minimumClaudeCodeVersion) < 0 {
-		fmt.Fprintf(os.Stderr,
-			"Warning: Claude Code version %s is unsupported in the Agent SDK. "+
-				"Minimum required version is %s. Some features may not work correctly.\n",
-			version, minimumClaudeCodeVersion)
+	var warnings []string
+	switch {
+	case version == "":
+		warnings = append(warnings, fmt.Sprintf(
+			"Warning: Claude Code at %s is too old to report its version, and may be "+
+				"unsupported in the Agent SDK. Minimum required version is %s. "+
+				"Some features may not work correctly.",
+			cliPath, minimumClaudeCodeVersion))
+	case compareVersions(version, minimumClaudeCodeVersion) < 0:
+		warnings = append(warnings, fmt.Sprintf(
+			"Warning: Claude Code version %s at %s is unsupported in the Agent SDK. "+
+				"Minimum required version is %s. Some features may not work correctly.",
+			version, cliPath, minimumClaudeCodeVersion))
 	}
 
-	if opts != nil && opts.VerbatimPrompts && compareVersions(version, verbatimPromptsMinimumClaudeCodeVersion) < 0 {
-		fmt.Fprintf(os.Stderr,
-			"Warning: VerbatimPrompts is enabled, but Claude Code version %s ignores it: "+
+	if opts != nil && opts.VerbatimPrompts &&
+		(version == "" || compareVersions(version, verbatimPromptsMinimumClaudeCodeVersion) < 0) {
+		shown := version
+		if shown == "" {
+			shown = "unknown"
+		}
+		warnings = append(warnings, fmt.Sprintf(
+			"Warning: VerbatimPrompts is enabled, but Claude Code version %s at %s ignores it: "+
 				"prompts will still have @path mentions expanded and slash commands dispatched. "+
-				"Claude Code %s or later is required.\n",
-			version, verbatimPromptsMinimumClaudeCodeVersion)
+				"Claude Code %s or later is required.",
+			shown, cliPath, verbatimPromptsMinimumClaudeCodeVersion))
 	}
+	return warnings
 }
 
 func compareVersions(a, b string) int {
