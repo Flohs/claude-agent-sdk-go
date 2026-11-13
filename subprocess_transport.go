@@ -2,6 +2,7 @@ package claude
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -145,6 +146,9 @@ type SubprocessTransport struct {
 	// check is turned off by CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK). Only the
 	// ReadMessages goroutine reads or writes it after Connect.
 	versionChecked bool
+	// loadedSettings is the --settings value Connect loaded, so the command
+	// it spawns uses exactly what it validated.
+	loadedSettings *string
 	cleanupMu      sync.Mutex
 	cleanupFuncs   []func()
 }
@@ -211,6 +215,12 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	// The CLI's version is checked from its first system/init message (see
 	// ReadMessages), so cliPath is only ever executed by the spawn below.
 	t.versionChecked = os.Getenv("CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK") != ""
+
+	settings, settingsErr := t.settingsValue()
+	if settingsErr != nil {
+		return settingsErr
+	}
+	t.loadedSettings = &settings
 
 	args := t.buildCommand()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
@@ -972,30 +982,66 @@ func normaliseDisallowedTools(tools []string) []string {
 	return out
 }
 
+// buildSettingsValue returns the --settings value, or "" when there is none
+// or Options.Settings cannot be loaded (Connect reports that error before
+// spawning; see settingsValue).
 func (t *SubprocessTransport) buildSettingsValue() string {
+	if t.loadedSettings != nil {
+		return *t.loadedSettings
+	}
+	value, err := t.settingsValue()
+	if err != nil {
+		return ""
+	}
+	return value
+}
+
+// settingsValue builds the --settings value, merging Options.Sandbox and
+// Options.WorkflowSizeGuideline into Options.Settings when either is set.
+// Options.Settings is then parsed as inline JSON or read from the file it
+// names, relative to Options.Cwd when that is set and with or without a
+// UTF-8 BOM, as the CLI reads it. Settings that cannot be loaded are an
+// error: launching without them would drop the caller's permission rules
+// and hooks. Port of Python SDK v0.2.181.
+func (t *SubprocessTransport) settingsValue() (string, error) {
 	hasSettings := t.options.Settings != ""
 	hasSandbox := t.options.Sandbox != nil
 	hasWorkflowSizeGuideline := t.options.WorkflowSizeGuideline != ""
 
 	if !hasSettings && !hasSandbox && !hasWorkflowSizeGuideline {
-		return ""
+		return "", nil
 	}
 
 	if hasSettings && !hasSandbox && !hasWorkflowSizeGuideline {
-		return t.options.Settings
+		return t.options.Settings, nil
 	}
 
 	settingsObj := make(map[string]any)
 
 	if hasSettings {
-		str := strings.TrimSpace(t.options.Settings)
-		if strings.HasPrefix(str, "{") && strings.HasSuffix(str, "}") {
-			_ = json.Unmarshal([]byte(str), &settingsObj)
-		} else {
-			data, err := os.ReadFile(str)
-			if err == nil {
-				_ = json.Unmarshal(data, &settingsObj)
+		data := []byte(strings.TrimSpace(t.options.Settings))
+		if !bytes.HasPrefix(data, []byte("{")) || !bytes.HasSuffix(data, []byte("}")) {
+			// A file path.
+			path := string(data)
+			if t.cwd != "" && !filepath.IsAbs(path) {
+				path = filepath.Join(t.cwd, path)
 			}
+			fileData, err := os.ReadFile(path)
+			if err != nil {
+				return "", &ConnectionError{SDKError: SDKError{
+					Message: fmt.Sprintf("Failed to load settings: %v", err),
+				}}
+			}
+			data = bytes.TrimPrefix(fileData, []byte("\xef\xbb\xbf"))
+		}
+		if err := json.Unmarshal(data, &settingsObj); err != nil {
+			return "", &ConnectionError{SDKError: SDKError{
+				Message: fmt.Sprintf("Failed to load settings: %v", err),
+			}}
+		}
+		if settingsObj == nil {
+			// JSON null: nothing to merge into.
+			settingsObj = make(map[string]any)
 		}
 	}
 
@@ -1007,8 +1053,13 @@ func (t *SubprocessTransport) buildSettingsValue() string {
 		settingsObj["workflowSizeGuideline"] = t.options.WorkflowSizeGuideline
 	}
 
-	data, _ := json.Marshal(settingsObj)
-	return string(data)
+	data, err := json.Marshal(settingsObj)
+	if err != nil {
+		return "", &ConnectionError{SDKError: SDKError{
+			Message: fmt.Sprintf("Failed to build settings: %v", err),
+		}}
+	}
+	return string(data), nil
 }
 
 // findCLI locates the Claude Code CLI binary.

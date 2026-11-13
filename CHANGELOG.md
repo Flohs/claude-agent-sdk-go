@@ -6,6 +6,10 @@
 
 - `SubprocessTransport.Connect` no longer runs `<cli> -v` before spawning the CLI to check its version; the version is now read from `claude_code_version` in the CLI's first `system`/`init` message, so `Options.CLIPath` is only ever executed once. An init message with no parseable version now warns that the CLI is too old to report its version, and the `VerbatimPrompts` warning also fires in that case (as version "unknown"). `CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK` still turns the check off. Port of Python SDK v0.2.181 (found by diffing the PyPI sdist for v0.2.180 → v0.2.181); TypeScript SDK v0.3.323 has no equivalent. ([#858](https://github.com/Flohs/claude-agent-sdk-go/issues/858))
 
+### Fixed
+
+- When `Options.Sandbox` or `Options.WorkflowSizeGuideline` is set and the SDK merges it into `Options.Settings`, a settings file path is now read relative to `Options.Cwd` when that is set (as the CLI reads it) and may start with a UTF-8 BOM, and settings that cannot be read or parsed (a missing file, invalid JSON, JSON that is not an object) now make `Connect` fail with a `*ConnectionError` ("Failed to load settings: …") instead of being silently dropped, which launched the CLI without the caller's permission rules and hooks. Port of Python SDK v0.2.181 (found by diffing the PyPI sdist for v0.2.180 → v0.2.181); TypeScript SDK v0.3.323 has no equivalent. ([#860](https://github.com/Flohs/claude-agent-sdk-go/issues/860))
+
 ## [4.5.2] - 2026-11-10
 
 ### Changed

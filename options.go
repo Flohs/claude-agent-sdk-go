@@ -731,7 +731,12 @@ type Options struct {
 	Cwd string
 	// CLIPath overrides the path to the Claude CLI binary.
 	CLIPath string
-	// Settings is a JSON string or file path for settings.
+	// Settings is a JSON string or file path for settings. When Sandbox or
+	// WorkflowSizeGuideline is also set, the SDK merges them into these
+	// settings itself: a file path is then read relative to Cwd when Cwd is
+	// set (as the CLI reads it), with or without a UTF-8 BOM, and settings
+	// that cannot be read or parsed make Connect fail with a
+	// *ConnectionError instead of being dropped (Python SDK v0.2.181).
 	Settings string
 	// ManagedSettings is a JSON string of policy-tier settings forwarded to the
 	// spawned CLI in-memory. Honored below IT-controlled managed sources.
