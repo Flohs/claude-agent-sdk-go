@@ -725,7 +725,8 @@ func readSessionsFromDir(projectDir string, projectPath string) []SDKSessionInfo
 			continue
 		}
 
-		lite := readSessionLite(filepath.Join(projectDir, name))
+		transcriptPath := filepath.Join(projectDir, name)
+		lite := readSessionLite(transcriptPath)
 		if lite == nil {
 			continue
 		}
@@ -779,6 +780,7 @@ func readSessionsFromDir(projectDir string, projectPath string) []SDKSessionInfo
 			Cwd:          sessionCwd,
 			Tag:          tag,
 			CreatedAt:    createdAt,
+			Archived:     sessionArchivedState(transcriptPath, sessionID, lite),
 		})
 	}
 
@@ -1999,6 +2001,7 @@ func GetSessionInfo(sessionID string, directory ...string) (*SDKSessionInfo, err
 		Cwd:          sessionCwd,
 		Tag:          tag,
 		CreatedAt:    createdAt,
+		Archived:     sessionArchivedState(filePath, sessionID, lite),
 	}, nil
 }
 

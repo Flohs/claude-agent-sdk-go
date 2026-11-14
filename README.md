@@ -354,6 +354,9 @@ claude.RenameSession("session-uuid", "My Custom Title", &dir)
 // Tag a session
 tag := "reviewed"
 claude.TagSession("session-uuid", &tag, &dir)
+
+// Archive a session (ListSessions still returns it, with Archived set)
+claude.ArchiveSession("session-uuid", "/path/to/project")
 ```
 
 ## Examples
