@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `Client.ReloadPluginsWithConfig` with `ReloadPluginsOptions` (`HoldOnCacheImpact`, `AddPlugins`, `RefuseIfBusy`): with `RefuseIfBusy` the `reload_plugins` request carries `refuse_if_busy: true`, and a session that is busy (a turn running or queued, an unanswered permission prompt taken over from an earlier process, live background work such as an agent or workflow, or an in-process teammate at work; a background shell command alone is not busy) reloads nothing and the call fails with `ReloadPluginsBusyErrorCode`. Only a CLI whose init capabilities list `reload_plugins_refuse_if_busy_v1` is sure to honor it. A control request the CLI answers with an error now returns a `*ControlRequestError` whose `ErrorCode` holds the CLI's `error_code` (when it is a lowercase identifier of at most 64 characters); its `Error()` text is unchanged. Port of TypeScript SDK v0.3.324 (found by diffing the npm `sdk.d.ts` and `sdk.mjs` for v0.3.323 → v0.3.324); Python SDK v0.2.182 has no equivalent. ([#869](https://github.com/Flohs/claude-agent-sdk-go/issues/869))
+
 ## [4.6.0] - 2026-11-13
 
 ### Added

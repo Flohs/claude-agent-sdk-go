@@ -2839,7 +2839,9 @@ type ServerCapabilities struct {
 	// "sdk_mcp_tools_list_changed" (SDK MCP server tool manifests; TypeScript
 	// SDK v0.3.286, which also adds an initialize response field
 	// "sdk_mcp_manifests_parked" readable from the raw initialization
-	// result). Empty on CLIs that predate this field. Port of
+	// result) and "reload_plugins_refuse_if_busy_v1"
+	// ([ReloadPluginsOptions.RefuseIfBusy] is honored; TypeScript SDK
+	// v0.3.324). Empty on CLIs that predate this field. Port of
 	// TypeScript SDK v0.3.205 / v0.3.219.
 	Capabilities []string `json:"capabilities,omitempty"`
 }
