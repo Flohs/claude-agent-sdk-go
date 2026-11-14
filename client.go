@@ -431,7 +431,15 @@ func (c *Client) SetModel(ctx context.Context, model string) error {
 // ApplyFlagSettings applies one or more flag settings to the running session.
 // Settings take effect on the next query turn. Pass nil as the value for a
 // key to clear that setting (e.g. map[string]any{"agent": nil} resets to the
-// default agent). Port of TypeScript SDK v0.2.132 / v0.3.161.
+// default agent).
+//
+// The call fails if a value would make Claude Code discard the flag settings
+// layer: nothing in that call applies, including its valid keys, and
+// settings from earlier calls stay in force, so check the error. A value
+// Claude Code ignores on its own does not fail the call, and its key still
+// replaces the earlier value: a "permissions" object whose only deny rule is
+// malformed leaves no deny rules (TypeScript SDK v0.3.324). Port of
+// TypeScript SDK v0.2.132 / v0.3.161.
 func (c *Client) ApplyFlagSettings(ctx context.Context, settings map[string]any) error {
 	if c.q == nil {
 		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}

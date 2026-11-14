@@ -611,7 +611,14 @@ type SandboxCredentialsConfig struct {
 
 // SandboxSettings controls bash command sandboxing.
 type SandboxSettings struct {
-	Enabled                   *bool                   `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
+	// AutoAllowBashIfSandboxed (macOS and Linux/WSL only) approves a Bash
+	// command that will run inside the sandbox without a permission prompt,
+	// unless a deny rule, a command-specific ask rule or a safety check stops
+	// it. The CLI default is false, so sandboxed commands go through the same
+	// permission flow as any other command; set it to true to skip the
+	// prompt. Has no effect on native Windows. Documented per TypeScript SDK
+	// v0.3.324.
 	AutoAllowBashIfSandboxed  *bool                   `json:"autoAllowBashIfSandboxed,omitempty"`
 	ExcludedCommands          []string                `json:"excludedCommands,omitempty"`
 	AllowUnsandboxedCommands  *bool                   `json:"allowUnsandboxedCommands,omitempty"`
@@ -631,7 +638,11 @@ type SandboxSettings struct {
 	// platform's sandbox mechanism is unavailable (no bwrap on Linux, no
 	// Seatbelt on macOS, etc). When true (the CLI default when Enabled is
 	// true), the CLI emits an error result message instead of silently running
-	// commands unsandboxed.
+	// commands unsandboxed. A Claude Code on the web, scheduled-task or Cowork
+	// cloud session (Anthropic's cloud container, which has no command
+	// sandbox) starts anyway with a warning: the container isolates it, and
+	// the Filesystem and Network rules are not enforced there (TypeScript SDK
+	// v0.3.324).
 	FailIfUnavailable *bool `json:"failIfUnavailable,omitempty"`
 	// Filesystem configures filesystem access restrictions for sandboxed commands.
 	Filesystem *SandboxFilesystemConfig `json:"filesystem,omitempty"`
