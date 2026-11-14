@@ -2787,6 +2787,11 @@ type SDKSessionInfo struct {
 	Cwd          string  `json:"cwd,omitempty"`
 	Tag          *string `json:"tag,omitempty"`
 	CreatedAt    *int64  `json:"created_at,omitempty"`
+	// Archived reports whether the session is archived (see
+	// [ArchiveSession]): false if it was and has been unarchived, or a
+	// prompt was sent in it since. Nil if it never was, and for sessions
+	// listed from a [SessionStore]. Port of TypeScript SDK v0.3.324.
+	Archived *bool `json:"archived,omitempty"`
 }
 
 // ReadStateEntry is a single file-state record used by
