@@ -114,3 +114,41 @@ func TestSkillToolOutput_DecodesFromToolResponse_Inline(t *testing.T) {
 		t.Error("Background = true, want false when the key is absent (inline skill run)")
 	}
 }
+
+// TestProposeSkillsInput_DecodesEdits verifies an improvement proposal that
+// carries edits in place of skillMd decodes. Port of TypeScript SDK
+// v0.3.324.
+func TestProposeSkillsInput_DecodesEdits(t *testing.T) {
+	toolInput := map[string]any{
+		"proposals": []any{
+			map[string]any{
+				"name":        "code-review",
+				"kind":        "improvement",
+				"target":      "code-review",
+				"description": "Add a security-focused pass",
+				"edits": []any{
+					map[string]any{"old_string": "## Steps\n", "new_string": "## Steps\n- Check for secrets\n"},
+					map[string]any{"old_string": "v1", "new_string": "v2"},
+				},
+			},
+		},
+	}
+
+	var in ProposeSkillsInput
+	decodeToolUseResult(t, toolInput, &in)
+
+	if len(in.Proposals) != 1 {
+		t.Fatalf("len(Proposals) = %d, want 1", len(in.Proposals))
+	}
+	p := in.Proposals[0]
+	if p.SkillMd != "" {
+		t.Errorf("SkillMd = %q, want empty", p.SkillMd)
+	}
+	want := []SkillMdEdit{
+		{OldString: "## Steps\n", NewString: "## Steps\n- Check for secrets\n"},
+		{OldString: "v1", NewString: "v2"},
+	}
+	if len(p.Edits) != len(want) || p.Edits[0] != want[0] || p.Edits[1] != want[1] {
+		t.Errorf("Edits = %+v, want %+v", p.Edits, want)
+	}
+}
