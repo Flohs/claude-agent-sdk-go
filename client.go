@@ -489,7 +489,9 @@ func (c *Client) GetSettings(ctx context.Context) (map[string]any, error) {
 // workspace directories — the same data the terminal's /permissions command
 // lists: rules from settings files plus session-only approvals,
 // slash-command grants, and --allowedTools flag rules, each with its
-// source. Port of TypeScript SDK v0.3.269.
+// source. A connection that stores its answers (a cloud or self-hosted
+// session) gets a cut answer: see [PermissionRulesState.Withheld]. Port of
+// TypeScript SDK v0.3.269; the cut documented per TypeScript SDK v0.3.324.
 func (c *Client) ListPermissionRules(ctx context.Context) (*PermissionRulesState, error) {
 	if c.q == nil {
 		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}

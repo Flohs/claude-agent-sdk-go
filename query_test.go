@@ -3430,3 +3430,37 @@ func TestBackgroundTask_SendsToolUseID(t *testing.T) {
 		})
 	}
 }
+
+// TestListPermissionRules_WithheldUnmarshals verifies the withheld flag of a
+// cut answer is decoded, and is false when absent. Port of TypeScript SDK
+// v0.3.324.
+func TestListPermissionRules_WithheldUnmarshals(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		state map[string]any
+		want  bool
+	}{
+		{"cut", map[string]any{
+			"rules":                []any{map[string]any{"behavior": "deny", "source": "session", "rule": "*(withheld)", "editability": "session"}},
+			"workspaceDirectories": []any{},
+			"originalCwd":          "",
+			"managedOnly":          false,
+			"withheld":             true,
+		}, true},
+		{"absent", map[string]any{"rules": []any{}, "workspaceDirectories": []any{}, "originalCwd": "/p", "managedOnly": false}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mt := newStubResponseTransport(map[string]any{"state": tc.state})
+			q := newQuery(queryConfig{transport: mt})
+			q.start()
+			defer func() { _ = q.close() }()
+			state, err := q.listPermissionRules()
+			if err != nil {
+				t.Fatalf("listPermissionRules failed: %v", err)
+			}
+			if state.Withheld != tc.want {
+				t.Errorf("Withheld = %v, want %v", state.Withheld, tc.want)
+			}
+		})
+	}
+}
