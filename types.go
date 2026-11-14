@@ -2477,7 +2477,9 @@ type PermissionRuleEntry struct {
 	Behavior PermissionBehavior `json:"behavior"`
 	// Source identifies where this rule came from.
 	Source PermissionRuleSource `json:"source"`
-	// Rule is the rule text, stored verbatim (may carry invisible/control characters).
+	// Rule is the rule text, stored verbatim (may carry invisible/control
+	// characters). When [PermissionRulesState.Withheld] is true the text may
+	// be cut (TypeScript SDK v0.3.324).
 	Rule string `json:"rule"`
 	// Description is an optional structured, human-readable description of the rule.
 	Description *PermissionRuleDescription `json:"description,omitempty"`
@@ -2511,6 +2513,20 @@ type PermissionRulesState struct {
 	// not exposed in the bundled sdk.d.ts, so entries are passed through
 	// untyped rather than modeled with an invented struct.
 	Errors []map[string]any `json:"errors,omitempty"`
+	// Withheld is true when this answer was cut because the connection
+	// stores its answers (a cloud or self-hosted session): Rules holds only
+	// rows from settings sources and mcpServerPolicy, WorkspaceDirectories
+	// only folders from settings sources, each Errors entry only a fixed
+	// "message" and an empty "path", and the response's
+	// parentSettingsIncluded is absent. Where session folders are withheld,
+	// WorkspaceDirectories is empty, OriginalCwd is "", and each rule other
+	// than a bare tool name the session can send loses its Description and
+	// goes as "Tool(withheld)", or as "(withheld)" where its tool name
+	// cannot be sent. An ask or deny rule of that last kind goes as
+	// "*(withheld)", so a client that matches rules by tool name treats it
+	// as covering every tool. False for an answer that was not cut, and from
+	// older CLIs. Port of TypeScript SDK v0.3.324.
+	Withheld bool `json:"withheld,omitempty"`
 }
 
 // HookListingEvent summarizes one hook event in the CLI's /hooks menu
