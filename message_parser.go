@@ -536,6 +536,15 @@ func parseResultMessage(data map[string]any) (*ResultMessage, error) {
 		msg.StopDetails = sd
 	}
 
+	if icf, ok := data["invalid_config_file"].(map[string]any); ok {
+		msg.InvalidConfigFile = &InvalidConfigFile{
+			Path:           stringField(icf, "path"),
+			IsGlobal:       boolField(icf, "is_global"),
+			BackupSearched: boolField(icf, "backup_searched"),
+			BackupPath:     stringField(icf, "backup_path"),
+		}
+	}
+
 	if v, ok := data["api_error_status"]; ok {
 		if status := intFromAny(v); status != 0 {
 			msg.APIErrorStatus = &status

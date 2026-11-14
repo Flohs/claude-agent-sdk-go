@@ -3845,3 +3845,45 @@ func TestParseToolUseSummaryMessageWithoutIDs(t *testing.T) {
 		t.Fatalf("got %#v", msg)
 	}
 }
+
+// TestParseMessage_ResultMessage_InvalidConfigFile verifies the
+// invalid_config_file object of a config_file_invalid result is parsed, and
+// is nil when absent. Port of TypeScript SDK v0.3.324.
+func TestParseMessage_ResultMessage_InvalidConfigFile(t *testing.T) {
+	data := map[string]any{
+		"type":                   "result",
+		"subtype":                "error_during_execution",
+		"is_error":               true,
+		"session_id":             "s",
+		"startup_failure_reason": "config_file_invalid",
+		"invalid_config_file": map[string]any{
+			"path":            "/home/u/.claude.json",
+			"is_global":       true,
+			"backup_searched": true,
+			"backup_path":     "/home/u/.claude/backups/.claude.json.backup.1",
+		},
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := msg.(*ResultMessage).InvalidConfigFile
+	want := &InvalidConfigFile{
+		Path:           "/home/u/.claude.json",
+		IsGlobal:       true,
+		BackupSearched: true,
+		BackupPath:     "/home/u/.claude/backups/.claude.json.backup.1",
+	}
+	if got == nil || *got != *want {
+		t.Fatalf("InvalidConfigFile = %+v, want %+v", got, want)
+	}
+
+	delete(data, "invalid_config_file")
+	msg, err = ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := msg.(*ResultMessage).InvalidConfigFile; got != nil {
+		t.Errorf("InvalidConfigFile = %+v, want nil when absent", got)
+	}
+}
