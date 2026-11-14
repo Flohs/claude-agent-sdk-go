@@ -922,8 +922,31 @@ type SkillProposal struct {
 	Description string `json:"description"`
 	// Evidence lists memory file paths where this procedure was observed.
 	Evidence []string `json:"evidence,omitempty"`
-	// SkillMd is the complete SKILL.md draft (frontmatter + body).
-	SkillMd string `json:"skillMd"`
+	// SkillMd is the complete SKILL.md draft (frontmatter + body), for a
+	// new skill or a full rewrite. When the user saves, the body below the
+	// frontmatter becomes the skill's entire instructions and the name and
+	// description come from the fields above; other frontmatter keys are not
+	// kept. For an improvement it replaces the existing SKILL.md entirely.
+	// Empty when the proposal carries Edits instead (TypeScript SDK
+	// v0.3.324, which made it optional).
+	SkillMd string `json:"skillMd,omitempty"`
+	// Edits, for an improvement and in place of SkillMd, are changes to the
+	// skill's current SKILL.md, applied in order (1-100 of them). They apply
+	// to that file as it is now, not to an earlier proposal; the review card
+	// shows the whole updated file. The name and description come from the
+	// fields above, not from the frontmatter. Port of TypeScript SDK
+	// v0.3.324.
+	Edits []SkillMdEdit `json:"edits,omitempty"`
+}
+
+// SkillMdEdit is one change in [SkillProposal.Edits]. Port of TypeScript SDK
+// v0.3.324.
+type SkillMdEdit struct {
+	// OldString is the text to replace. It must occur exactly once in that
+	// SKILL.md.
+	OldString string `json:"old_string"`
+	// NewString is the text to put in its place.
+	NewString string `json:"new_string"`
 }
 
 // ProposeSkillsInput is the typed input for the ProposeSkills tool.
