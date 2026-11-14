@@ -1767,6 +1767,32 @@ type MessageOrigin struct {
 	RunID string `json:"runId,omitempty"`
 }
 
+// InvalidConfigFile names the configuration file that stopped the CLI from
+// starting, on a [ResultMessage] whose StartupFailureReason is
+// "config_file_invalid". Each path is in the form that the machine running
+// Claude Code uses, which can differ from the host's. Port of TypeScript SDK
+// v0.3.324.
+type InvalidConfigFile struct {
+	// Path is the file that is not valid JSON.
+	Path string `json:"path"`
+	// IsGlobal reports whether this is Claude Code's global config file.
+	// Only that file has backups, and only its message says how to repair
+	// it.
+	IsGlobal bool `json:"is_global"`
+	// BackupSearched reports whether Claude Code knows the result of its
+	// search for a backup of the file. True with an empty BackupPath: it
+	// found none. False: the result is not known, or this is not the global
+	// config file.
+	BackupSearched bool `json:"backup_searched"`
+	// BackupPath is the backup that the message in Errors names. Usually it
+	// parses and shows use. Where the search finds none that does, it is the
+	// newest found with an account, then the newest that holds anything, or
+	// at last the newest that does not parse or could not be read, which a
+	// person may be able to mend. So show it to a person, or check that it
+	// parses before copying it over Path. Empty when there is none.
+	BackupPath string `json:"backup_path,omitempty"`
+}
+
 // ResultMessage contains cost and usage information for a completed query.
 type ResultMessage struct {
 	Subtype       string `json:"subtype"`
@@ -1831,9 +1857,16 @@ type ResultMessage struct {
 	// only when CLAUDE_CODE_STARTUP_FAILURE_RESULTS is set in the CLI's
 	// environment, except "org_config_required_unavailable",
 	// "org_config_refused" and "config_file_invalid", which every
-	// stream-json run reports (TypeScript SDK v0.3.318). Port of TypeScript
-	// SDK v0.3.274.
+	// stream-json run reports (TypeScript SDK v0.3.318). For
+	// "config_file_invalid", InvalidConfigFile carries the paths as fields
+	// (TypeScript SDK v0.3.324). Port of TypeScript SDK v0.3.274.
 	StartupFailureReason string `json:"startup_failure_reason,omitempty"`
+	// InvalidConfigFile is set when StartupFailureReason is
+	// "config_file_invalid": the configuration file that did not parse and
+	// its backup, as separate fields. Read paths from here, never from the
+	// text of Errors. Nil on every other result and from older CLIs. Port of
+	// TypeScript SDK v0.3.324.
+	InvalidConfigFile *InvalidConfigFile `json:"invalid_config_file,omitempty"`
 	// CredentialExpiresAt is when the claude.ai credential the CLI's
 	// requests send ends for good, as an ISO 8601 instant read when the
 	// result was written. For a stored claude.ai login it is the end of the
