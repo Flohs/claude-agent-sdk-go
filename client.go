@@ -570,6 +570,44 @@ func (c *Client) ReloadPluginsAdding(ctx context.Context, holdOnCacheImpact bool
 	return c.q.reloadPluginsAdding(holdOnCacheImpact, addPlugins)
 }
 
+// ReloadPluginsOptions configures [Client.ReloadPluginsWithConfig]. The zero
+// value reloads unconditionally, as [Client.ReloadPlugins] does.
+type ReloadPluginsOptions struct {
+	// HoldOnCacheImpact holds the reload back when it would change the
+	// session's tool list while the conversation's prompt cache depends on
+	// it (see [Client.ReloadPluginsWithOptions]).
+	HoldOnCacheImpact bool
+	// AddPlugins are also loaded by the reload, as if each had been in
+	// [Options.Plugins] at launch (see [Client.ReloadPluginsAdding]).
+	AddPlugins []SdkPluginConfig
+	// RefuseIfBusy makes a request that finds the session busy reload
+	// nothing: the call fails with a [*ControlRequestError] whose ErrorCode
+	// is [ReloadPluginsBusyErrorCode], and the caller asks again once the
+	// session is idle. Busy means a turn is running or still ending, a
+	// message is queued for one, a permission prompt taken over from an
+	// earlier process is unanswered, background work that keeps the session
+	// running (an agent, a workflow and the like) is live, or an in-process
+	// teammate is at work; a session that only waits for a background shell
+	// command is not busy. Meant for a host whose request can arrive late,
+	// such as one that reaches the session over SSH: a reload changes the
+	// commands, agents, hooks and servers under a running turn, agent or
+	// teammate. Only a CLI whose init capabilities list
+	// "reload_plugins_refuse_if_busy_v1" is sure to honor it; any other may
+	// ignore the field and serve the request, in a turn too. Port of
+	// TypeScript SDK v0.3.324.
+	RefuseIfBusy bool
+}
+
+// ReloadPluginsWithConfig is like [Client.ReloadPlugins], with every
+// reload_plugins option available: see [ReloadPluginsOptions]. Port of
+// TypeScript SDK reloadPlugins(options) (v0.3.324).
+func (c *Client) ReloadPluginsWithConfig(ctx context.Context, opts ReloadPluginsOptions) (map[string]any, error) {
+	if c.q == nil {
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+	}
+	return c.q.reloadPluginsWithConfig(opts)
+}
+
 // ReloadOutputStyles re-reads the output-style directories from disk and
 // returns the refreshed style names. A style file written while the session
 // runs is otherwise invisible to it until the next session. This also drops

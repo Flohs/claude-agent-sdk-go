@@ -2,6 +2,7 @@ package claude
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -17,6 +18,41 @@ func (e *SDKError) Error() string {
 // ConnectionError is returned when unable to connect to Claude Code.
 type ConnectionError struct {
 	SDKError
+}
+
+// ControlRequestError is returned by a [Client] method when the CLI answers
+// its control request with an error. Error returns the CLI's error text,
+// exactly as the plain error the SDK returned before this type existed, so
+// existing string checks keep working; use errors.As to read ErrorCode.
+type ControlRequestError struct {
+	SDKError
+	// ErrorCode is the CLI's machine-readable error_code for the failure,
+	// such as [ReloadPluginsBusyErrorCode], so a caller can branch on why
+	// the request failed instead of matching the text. Empty when the CLI
+	// sent none, or sent a value that is not a lowercase identifier of at
+	// most 64 characters (letters, digits and underscores, starting with a
+	// letter), which the SDK drops as the TypeScript SDK does. Port of
+	// TypeScript SDK v0.3.324 (errorCode on control request failures).
+	ErrorCode string
+}
+
+// ReloadPluginsBusyErrorCode is the [ControlRequestError.ErrorCode] of a
+// reload_plugins request sent with [ReloadPluginsOptions.RefuseIfBusy] that
+// found the session busy: nothing was reloaded; ask again once the session
+// is idle. Port of TypeScript SDK v0.3.324.
+const ReloadPluginsBusyErrorCode = "reload_plugins_busy"
+
+var controlErrorCodeRE = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+
+// newControlRequestError builds the error for a control response with
+// subtype "error", keeping error_code only when it is a well-formed code.
+func newControlRequestError(response map[string]any) *ControlRequestError {
+	msg, _ := response["error"].(string)
+	code, _ := response["error_code"].(string)
+	if !controlErrorCodeRE.MatchString(code) {
+		code = ""
+	}
+	return &ControlRequestError{SDKError: SDKError{Message: msg}, ErrorCode: code}
 }
 
 // NotFoundError is returned when Claude Code is not found or not installed.

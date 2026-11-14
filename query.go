@@ -506,8 +506,7 @@ func (q *query) readMessages() {
 			if ch, ok := q.pendingEvents[requestID]; ok {
 				subtype, _ := response["subtype"].(string)
 				if subtype == "error" {
-					errMsg, _ := response["error"].(string)
-					q.pendingResults[requestID] = fmt.Errorf("%s", errMsg)
+					q.pendingResults[requestID] = newControlRequestError(response)
 				} else {
 					q.pendingResults[requestID] = response
 				}
@@ -1429,18 +1428,25 @@ func (q *query) updateSettings(source string, settings map[string]any) error {
 }
 
 func (q *query) reloadPlugins(holdOnCacheImpact bool) (map[string]any, error) {
-	return q.reloadPluginsAdding(holdOnCacheImpact, nil)
+	return q.reloadPluginsWithConfig(ReloadPluginsOptions{HoldOnCacheImpact: holdOnCacheImpact})
 }
 
 func (q *query) reloadPluginsAdding(holdOnCacheImpact bool, addPlugins []SdkPluginConfig) (map[string]any, error) {
+	return q.reloadPluginsWithConfig(ReloadPluginsOptions{HoldOnCacheImpact: holdOnCacheImpact, AddPlugins: addPlugins})
+}
+
+func (q *query) reloadPluginsWithConfig(opts ReloadPluginsOptions) (map[string]any, error) {
 	req := map[string]any{
 		"subtype": "reload_plugins",
 	}
-	if holdOnCacheImpact {
+	if opts.HoldOnCacheImpact {
 		req["hold_on_cache_impact"] = true
 	}
-	if len(addPlugins) > 0 {
-		req["add_plugins"] = addPlugins
+	if len(opts.AddPlugins) > 0 {
+		req["add_plugins"] = opts.AddPlugins
+	}
+	if opts.RefuseIfBusy {
+		req["refuse_if_busy"] = true
 	}
 	resp, err := q.sendControlRequest(req, 60*time.Second)
 	return resp, err
