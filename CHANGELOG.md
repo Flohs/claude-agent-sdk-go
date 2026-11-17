@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `Options.McpServersDelivery` with `McpServersDeliveryArgv` (`"argv"`, the default) and `McpServersDeliveryInitialize` (`"initialize"`): with `"initialize"`, the `Options.McpServers` that Claude Code runs or connects to (stdio, SSE, HTTP) are sent over stdin in the initialize control request (`mcpServers`) and the CLI is started with `--await-initialize`, so server `Env` and `Headers` stay off the command line; in-process SDK servers, `McpServers` given as a string, and a launch whose `ExtraArgs` pass `sdk-url` still use `--mcp-config`. When servers were sent and the initialize answer has no boolean `mcp_servers_applied` (a Claude Code older than 2.1.261), `Connect` fails with a `*ConnectionError` naming the option; `false` on the first initialize prints a warning to stderr. `ResultMessage.StartupFailureReason` now documents that `managed_settings_not_delivered` also covers a malformed `mcpServers` field. Upstream deprecates sending these servers on the command line and plans to make `"initialize"` the default; the Go SDK keeps `"argv"` as the default and does not print the TypeScript SDK's deprecation warning. Port of TypeScript SDK v0.3.326 (found by diffing the npm `sdk.d.ts` and `sdk.mjs` for v0.3.325 → v0.3.326); Python SDK v0.2.183 has no equivalent. ([#882](https://github.com/Flohs/claude-agent-sdk-go/issues/882))
+
 ## [4.7.0] - 2026-11-14
 
 ### Added

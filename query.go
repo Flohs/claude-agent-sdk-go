@@ -114,6 +114,10 @@ type query struct {
 	// load them from stdin.
 	pluginDelivery string
 	plugins        []SdkPluginConfig
+	// mcpServersViaInit holds the McpServers sent in the initialize request
+	// under McpServersDelivery "initialize" (see splitMcpServersForDelivery);
+	// nil sends none.
+	mcpServersViaInit map[string]any
 	// lastIsErrorResultDelivered is set (and never cleared) once a result
 	// message with is_error:true has been delivered to messageCh in this
 	// query's lifetime. Together with lastErrorResultMsg (which does clear,
@@ -183,6 +187,7 @@ type queryConfig struct {
 	forwardSubagentText    bool
 	pluginDelivery         string
 	plugins                []SdkPluginConfig
+	mcpServersViaInit      map[string]any
 	// sessionStore, when non-nil, enables transcript mirroring. projectsDir
 	// is the base directory the CLI emits transcript filePath values under
 	// (resolved by [getProjectsDir]). loadTimeoutMs caps the batcher's
@@ -241,6 +246,7 @@ func newQuery(cfg queryConfig) *query {
 		forwardSubagentText:     cfg.forwardSubagentText,
 		pluginDelivery:          cfg.pluginDelivery,
 		plugins:                 cfg.plugins,
+		mcpServersViaInit:       cfg.mcpServersViaInit,
 		flushTimeout:            flushTimeout,
 		stderrCallback:          cfg.stderr,
 		ctx:                     ctx,
@@ -1004,6 +1010,10 @@ func (q *query) initialize() (map[string]any, error) {
 		request["plugins"] = q.plugins
 	}
 
+	if len(q.mcpServersViaInit) > 0 {
+		request["mcpServers"] = q.mcpServersViaInit
+	}
+
 	if manifests := q.mcpRouter.buildManifests(q.ctx); len(manifests) > 0 {
 		request["sdkMcpServerManifests"] = manifests
 	}
@@ -1027,6 +1037,10 @@ func (q *query) initialize() (map[string]any, error) {
 
 	if err := q.checkHookOnFailure(response, !q.initialized); err != nil {
 		q.hookOnFailureRefused = true
+		return nil, err
+	}
+
+	if err := q.checkMcpServersApplied(response, !q.initialized); err != nil {
 		return nil, err
 	}
 
@@ -1064,6 +1078,37 @@ func (q *query) checkHookOnFailure(response map[string]any, first bool) error {
 	}
 	if applied, ok := response["hooks_applied"].(bool); first && ok && !applied {
 		return &ConnectionError{SDKError: SDKError{Message: `This session was already running and did not register your hooks, so a hook set to OnFailure: "block" would never run. Start a new session, or remove OnFailure: "block" from your hooks.`}}
+	}
+	return nil
+}
+
+// checkMcpServersApplied checks the initialize response when McpServers were
+// sent in the request (McpServersDelivery "initialize"). A CLI that predates
+// the field never reads them and answers without a boolean
+// mcp_servers_applied, so the session would run without the servers: that
+// fails initialize. false on the first initialize means the process did not
+// load them at launch (a cloud session never does, and a wrapper may have
+// removed --await-initialize), which only warns. Port of TypeScript SDK
+// v0.3.326.
+func (q *query) checkMcpServersApplied(response map[string]any, first bool) error {
+	if len(q.mcpServersViaInit) == 0 {
+		return nil
+	}
+	applied, ok := response["mcp_servers_applied"].(bool)
+	if !ok {
+		version := ""
+		if v, _ := response["claude_code_version"].(string); v != "" {
+			version = " (version " + v + ")"
+		}
+		return &ConnectionError{SDKError: SDKError{Message: "This Claude Code" + version + " is too old to read MCP servers from the initialize request, so it started without them. " +
+			"Update the Claude Code you start (Options.CLIPath) to 2.1.261 or newer, or set McpServersDelivery to \"argv\", " +
+			"which puts the servers' Env and Headers on Claude Code's command line, where other users of the machine can read them."}}
+	}
+	if first && !applied {
+		fmt.Fprintln(os.Stderr,
+			"Warning: Claude Code reported that it did not load the MCP servers sent in the initialize request, "+
+				"so this session may be running without them. A cloud session never starts them; "+
+				"otherwise check that no wrapper removes --await-initialize from the launch.")
 	}
 	return nil
 }

@@ -674,7 +674,39 @@ type Options struct {
 	// Mutually exclusive with SystemPrompt.
 	SystemPromptFile string
 	// McpServers maps server names to their config. Use map[string]McpServerConfig or a string/path.
+	//
+	// Servers that Claude Code runs or connects to (stdio, SSE, HTTP) reach it
+	// on its command line unless McpServersDelivery is
+	// McpServersDeliveryInitialize; see that option's deprecation notice.
 	McpServers any // map[string]McpServerConfig | string | nil
+	// McpServersDelivery controls how the McpServers that Claude Code runs or
+	// connects to (stdio, SSE, HTTP) reach it. In-process SDK servers
+	// (*McpSdkServerConfig) are not affected.
+	//
+	//   - McpServersDeliveryArgv ("argv", the default; empty behaves the
+	//     same): sent in one --mcp-config flag. Works with any Claude Code
+	//     version, but puts server Env and Headers on the command line, which
+	//     other users of the machine can read.
+	//   - McpServersDeliveryInitialize ("initialize"): sent over stdin in the
+	//     initialize control request, with the CLI started with
+	//     --await-initialize, so Env and Headers stay off the command line.
+	//     Connect waits for Claude Code's answer, and an error answer fails
+	//     it. Requires Claude Code 2.1.261 or newer; an older binary exits at
+	//     startup with an unknown-option error, or answers initialize without
+	//     "mcp_servers_applied", in which case Connect fails with a
+	//     *ConnectionError naming this option. Client.GetServerInfo's
+	//     "mcp_servers_applied" key is true when Claude Code took the servers
+	//     at launch, which does not mean each one connected.
+	//
+	// McpServers given as a string (a JSON document or file path), and a
+	// launch whose ExtraArgs include "sdk-url", always use --mcp-config.
+	//
+	// Deprecation notice: sending these servers on the command line is
+	// deprecated upstream, and a future release changes the default to
+	// "initialize". Set "initialize" once the Claude Code you start is new
+	// enough, or set "argv" to stay on the command line. Port of TypeScript
+	// SDK v0.3.326.
+	McpServersDelivery McpServersDelivery
 	// PermissionMode controls tool execution permissions. Used as the fallback
 	// for tools not matched by AllowedTools or DisallowedTools.
 	PermissionMode PermissionMode
@@ -970,6 +1002,60 @@ type Options struct {
 	FastMode bool
 }
 
+// McpServersDelivery selects how Options.McpServers that Claude Code runs or
+// connects to reach it. Port of TypeScript SDK v0.3.326.
+type McpServersDelivery string
+
+const (
+	// McpServersDeliveryArgv sends the servers in one --mcp-config flag (the
+	// default).
+	McpServersDeliveryArgv McpServersDelivery = "argv"
+	// McpServersDeliveryInitialize sends the servers over stdin in the
+	// initialize control request.
+	McpServersDeliveryInitialize McpServersDelivery = "initialize"
+)
+
+// splitMcpServersForDelivery splits opts.McpServers (when it is a map) into
+// the entries that go on the --mcp-config flag and the entries sent in the
+// initialize request. viaInit is non-nil only when McpServersDelivery is
+// "initialize", at least one server Claude Code runs or connects to is
+// configured, and ExtraArgs do not pass --sdk-url (that session cannot read
+// the request at launch). SDK servers always stay on the flag.
+func splitMcpServersForDelivery(opts *Options) (argv, viaInit map[string]any) {
+	servers, ok := opts.McpServers.(map[string]McpServerConfig)
+	if !ok || len(servers) == 0 {
+		return nil, nil
+	}
+	initialize := opts.McpServersDelivery == McpServersDeliveryInitialize && !hasSdkURLExtraArg(opts.ExtraArgs)
+	argv = make(map[string]any, len(servers))
+	for name, config := range servers {
+		switch config.(type) {
+		case *McpSdkServerConfig, McpSdkServerConfig:
+			argv[name] = config
+		default:
+			if initialize {
+				if viaInit == nil {
+					viaInit = make(map[string]any)
+				}
+				viaInit[name] = config
+			} else {
+				argv[name] = config
+			}
+		}
+	}
+	return argv, viaInit
+}
+
+// hasSdkURLExtraArg reports whether ExtraArgs pass --sdk-url.
+func hasSdkURLExtraArg(extra map[string]string) bool {
+	for flag := range extra {
+		if flag == "sdk-url" || strings.HasPrefix(flag, "sdk-url=") {
+			return true
+		}
+	}
+	return false
+}
+
 // warnCanUseToolPermissionConflicts emits a non-fatal stderr warning when
 // CanUseTool is configured alongside AllowedTools or
 // PermissionModeBypassPermissions, since either can silently short-circuit
@@ -988,4 +1074,11 @@ func warnCanUseToolPermissionConflicts(opts *Options) {
 			"Warning: CanUseTool is configured alongside PermissionMode "+
 				"PermissionModeBypassPermissions. Tool calls will bypass CanUseTool entirely.")
 	}
+}
+
+// mcpServersViaInit returns the McpServers sent in the initialize request
+// under McpServersDelivery "initialize", or nil.
+func mcpServersViaInit(opts *Options) map[string]any {
+	_, viaInit := splitMcpServersForDelivery(opts)
+	return viaInit
 }
