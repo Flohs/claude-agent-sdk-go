@@ -1872,7 +1872,8 @@ type ResultMessage struct {
 	// settings in the initialize control request: stdin ended or failed
 	// first, or its first line was too long; the request has no
 	// managedSettings object, that object could not be used, or its plugins
-	// field is malformed; or the launch does not read that request at
+	// or mcpServers field is malformed (mcpServers per TypeScript SDK
+	// v0.3.326); or the launch does not read that request at
 	// start-up or also passes --managed-settings. Errors says which. No
 	// session starts without them; the fix is in the host or a wrapper
 	// script between it and the CLI, not a retry; TypeScript SDK v0.3.323).

@@ -122,6 +122,7 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		forwardSubagentText:    configuredOpts.ForwardSubagentText,
 		pluginDelivery:         configuredOpts.PluginDelivery,
 		plugins:                configuredOpts.Plugins,
+		mcpServersViaInit:      mcpServersViaInit(&configuredOpts),
 		sessionStore:           configuredOpts.SessionStore,
 		projectsDir:            projectsDir,
 		loadTimeoutMs:          configuredOpts.LoadTimeoutMs,

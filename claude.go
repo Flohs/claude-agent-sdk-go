@@ -140,6 +140,7 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			forwardSubagentText:    configuredOpts.ForwardSubagentText,
 			pluginDelivery:         configuredOpts.PluginDelivery,
 			plugins:                configuredOpts.Plugins,
+			mcpServersViaInit:      mcpServersViaInit(&configuredOpts),
 		})
 
 		q.start()
@@ -339,6 +340,7 @@ func Startup(ctx context.Context, opts *Options) (*WarmQuery, error) {
 		forwardSubagentText:    configuredOpts.ForwardSubagentText,
 		pluginDelivery:         configuredOpts.PluginDelivery,
 		plugins:                configuredOpts.Plugins,
+		mcpServersViaInit:      mcpServersViaInit(&configuredOpts),
 	})
 	q.start()
 

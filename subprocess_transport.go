@@ -767,11 +767,10 @@ func (t *SubprocessTransport) buildCommand() []string {
 	if opts.McpServers != nil {
 		switch servers := opts.McpServers.(type) {
 		case map[string]McpServerConfig:
-			if len(servers) > 0 {
-				serversForCLI := make(map[string]any, len(servers))
-				for name, config := range servers {
-					serversForCLI[name] = config
-				}
+			// With McpServersDelivery "initialize", the servers Claude Code
+			// runs or connects to go in the initialize control request
+			// instead (see query.go's initialize()); SDK servers stay here.
+			if serversForCLI, _ := splitMcpServersForDelivery(opts); len(serversForCLI) > 0 {
 				mcpConfig := map[string]any{"mcpServers": serversForCLI}
 				data, _ := json.Marshal(mcpConfig)
 				cmd = append(cmd, "--mcp-config", string(data))
@@ -824,9 +823,13 @@ func (t *SubprocessTransport) buildCommand() []string {
 	// stdin in the initialize control request instead (see query.go's
 	// initialize()), and the CLI is started with --await-initialize so the
 	// command line does not depend on the plugin count.
-	if opts.PluginDelivery == "initialize" && len(opts.Plugins) > 0 {
+	// McpServersDelivery "initialize" likewise needs --await-initialize.
+	_, mcpViaInit := splitMcpServersForDelivery(opts)
+	pluginsViaInit := opts.PluginDelivery == "initialize" && len(opts.Plugins) > 0
+	if pluginsViaInit || len(mcpViaInit) > 0 {
 		cmd = append(cmd, "--await-initialize")
-	} else {
+	}
+	if !pluginsViaInit {
 		for _, plugin := range opts.Plugins {
 			if plugin.Type == "local" {
 				cmd = append(cmd, "--plugin-dir", plugin.Path)
