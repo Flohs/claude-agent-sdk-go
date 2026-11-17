@@ -966,11 +966,12 @@ type ProposeSkillsOutput struct {
 	ProposalCount int `json:"proposalCount"`
 }
 
-// ProposeGoalInput is the typed input for the ProposeGoal tool. Accessible
-// from [PreToolUseHookInput].ToolInput when ToolName is "ProposeGoal". Port of
+// ProposeGoalInput is the typed input for the goal tool. Accessible from
+// [PreToolUseHookInput].ToolInput when ToolName is "SetGoal" (the tool's
+// name as of TypeScript SDK v0.3.326) or "ProposeGoal" (older CLIs). Port of
 // TypeScript SDK v0.3.227.
 type ProposeGoalInput struct {
-	// Condition is the completion condition to propose, written so a
+	// Condition is the completion condition to set, written so a
 	// separate evaluator can verify it from the conversation (e.g. "all
 	// tests in test/auth pass (bun test exits 0)"). At most 500 characters.
 	Condition string `json:"condition"`
@@ -978,17 +979,19 @@ type ProposeGoalInput struct {
 	// goal is set. Upstream defaults this to true (an approval dialog is
 	// shown) when omitted; false sets the goal directly, with a visible
 	// notice in the transcript, and is only used when the user's own words
-	// in the conversation stated the outcome directly.
+	// in the conversation stated the outcome directly. While a goal is
+	// active the dialog is shown whatever this says (TypeScript SDK
+	// v0.3.326).
 	AskUser bool `json:"ask_user,omitempty"`
 }
 
-// ProposeGoalOutput is the result returned by the ProposeGoal tool.
-// Accessible from [PostToolUseHookInput].ToolResponse when ToolName is
-// "ProposeGoal" (decode the map[string]any with json.Marshal/Unmarshal, as
+// ProposeGoalOutput is the result returned by the goal tool. Accessible from
+// [PostToolUseHookInput].ToolResponse when ToolName is "SetGoal" or, on older
+// CLIs, "ProposeGoal" (decode the map[string]any with json.Marshal/Unmarshal, as
 // with [NotebookEditResult]). Port of TypeScript SDK v0.3.227.
 type ProposeGoalOutput struct {
 	// Condition is the condition shown to the user for approval, or set
-	// directly when AskUser was false.
+	// directly.
 	Condition string `json:"condition"`
 	// AskUser is true when the user was asked for approval, false when the
 	// goal was set directly.
@@ -1904,13 +1907,25 @@ type ResultMessage struct {
 	// environment, another provider), on results the CLI did not number,
 	// and from older CLIs. Port of TypeScript SDK v0.3.318.
 	CredentialExpiresAt string `json:"credential_expires_at,omitempty"`
-	// Origin forwards the triggering message's origin so consumers can
-	// distinguish user-prompted results from task-notification followups.
-	// Nil when the CLI omits the field (the common case for main-session
-	// results).
+	// Origin is the origin of the user message that started this turn, such
+	// as a background-task notification. It describes only what started the
+	// turn: a prompt sent while an injected turn is running can be answered
+	// inside that turn, and the result then carries the injected turn's
+	// origin, so to find the result for a prompt you sent, send it with a
+	// uuid and look for that uuid in UserMessageUUIDs (or UserMessageUUID),
+	// reading with Client.ReceiveMessages, since Client.ReceiveResponse stops
+	// at the first result, which can be an injected turn's. For prompts sent
+	// without a uuid, Origin being nil or of kind "human" is only a best
+	// effort (Python SDK v0.2.183). Nil when the CLI omits the field (the
+	// common case for main-session results).
 	Origin *MessageOrigin `json:"origin,omitempty"`
 	// RequestID is the API request identifier for the final API call.
-	RequestID    string   `json:"request_id,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
+	// TotalCostUSD is the cumulative estimated cost in USD, covering the
+	// same calls as ModelUsage: billed permission classifier calls and
+	// calls stopped or cut mid-response are included, and
+	// Options.MaxBudgetUSD therefore counts them (TypeScript SDK v0.3.326). An
+	// estimate, not a billing statement.
 	TotalCostUSD *float64 `json:"total_cost_usd,omitempty"`
 	// Usage is the raw main-loop usage blob for this turn only — it does not
 	// include tokens consumed by subagents, background tasks, or other
@@ -1925,7 +1940,12 @@ type ResultMessage struct {
 	// by the raw model string reported by the CLI. Nil when not provided.
 	// Unlike Usage, this is cumulative across every call in the query
 	// pipeline (main loop, subagents, background tasks), not just the main
-	// loop, and is the field to use for cost accounting. Port of TypeScript
+	// loop, and is the field to use for cost accounting. Auto mode's
+	// permission classifier calls are included where they are billed (not
+	// on Pro, Max or Team plans, nor on a claude.ai sign-in whose plan
+	// cannot be read), and so is a call stopped or cut mid-response, with
+	// its output tokens estimated from what had streamed (TypeScript SDK
+	// v0.3.326). Port of TypeScript
 	// SDK v0.3.218 / Python SDK v0.2.126; cumulative-vs-per-turn distinction
 	// documented in TypeScript SDK v0.3.223. ([#563])
 	ModelUsage       map[string]ModelUsage `json:"model_usage,omitempty"`
@@ -1939,7 +1959,12 @@ type ResultMessage struct {
 	// CLI transcript. Empty when not provided by the CLI.
 	Timestamp string `json:"timestamp,omitempty"`
 	// UserMessageUUID is the uuid of the user message that triggered this
-	// result, for cross-host request-latency correlation. Populated on both
+	// result, for cross-host request-latency correlation. On an injected
+	// turn (see Origin), it is the last user message taken in while the turn
+	// was running (Python SDK v0.2.183). Use a new uuid for every message, as
+	// the CLI can skip one whose uuid it has already seen; since it is set
+	// on error results too, check TerminalReason and IsError before treating
+	// the message as answered. Populated on both
 	// success and error result subtypes as of TypeScript SDK v0.3.246;
 	// empty when the CLI omits it (e.g. synthetic/scheduled turns, turns
 	// without a client uuid, or older CLIs).
@@ -2864,8 +2889,9 @@ type RewindFilesResult struct {
 	// SkippedLinks counts tracked files that were NOT restored or deleted
 	// because a symlink, hard link, or other non-regular file was detected at
 	// the tracked path, its parent directory no longer resolves to where it
-	// pointed when the checkpoint was taken, or its backup could not be
-	// safely read. Only populated by a real (non-dry-run) rewind — on a dry
+	// pointed when the checkpoint was taken, it is behind a link in a folder
+	// that sandboxed commands can write (TypeScript SDK v0.3.326), or its
+	// backup could not be safely read. Only populated by a real (non-dry-run) rewind — on a dry
 	// run response the field is never set and the preview counts do not
 	// reflect link-safety refusals. Absent or 0 on a real rewind means no
 	// link-safety refusals occurred; other per-file failures (for example a
