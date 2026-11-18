@@ -1894,7 +1894,13 @@ type ResultMessage struct {
 	// v0.3.326); or the launch does not read that request at
 	// start-up or also passes --managed-settings. Errors says which. No
 	// session starts without them; the fix is in the host or a wrapper
-	// script between it and the CLI, not a retry; TypeScript SDK v0.3.323).
+	// script between it and the CLI, not a retry; TypeScript SDK v0.3.323)
+	// and "initialize_fields_not_delivered" (as
+	// "managed_settings_not_delivered", for a CLI started with
+	// --initialize-fields and the settings or disallowedTools fields it
+	// names; also when a named field's own flag, --settings or
+	// --disallowedTools, is passed too. The Go SDK never passes
+	// --initialize-fields itself; TypeScript SDK v0.3.327).
 	// Failures that otherwise end with stderr alone produce this result
 	// only when CLAUDE_CODE_STARTUP_FAILURE_RESULTS is set in the CLI's
 	// environment, except "org_config_required_unavailable",
