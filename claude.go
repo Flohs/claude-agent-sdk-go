@@ -101,6 +101,7 @@ func Query(ctx context.Context, prompt string, opts *Options) (<-chan Message, <
 			configuredOpts.PermissionPromptToolName = "stdio"
 		}
 		warnCanUseToolPermissionConflicts(opts)
+		warnAgentSdkMcpServers(opts)
 
 		// Create transport
 		transport, err := NewSubprocessTransport(&configuredOpts)
@@ -308,6 +309,7 @@ func Startup(ctx context.Context, opts *Options) (*WarmQuery, error) {
 		configuredOpts.PermissionPromptToolName = "stdio"
 	}
 	warnCanUseToolPermissionConflicts(opts)
+	warnAgentSdkMcpServers(opts)
 
 	transport, err := NewSubprocessTransport(&configuredOpts)
 	if err != nil {

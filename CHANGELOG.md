@@ -6,6 +6,10 @@
 
 - `PermissionUpdate.Validate`: reports an update that Claude Code would reject: `Rules` nil or `Behavior` empty for addRules/replaceRules/removeRules, `Mode` empty for setMode, `Directories` nil for addDirectories/removeDirectories, or an unknown `Type`. Claude Code ignores every update in a response when one of them is incomplete, so the `UpdatedPermissions` of a `PermissionResultAllow` returned from `CanUseTool` are now sent all together or not at all: if any fails `Validate`, none are sent and a warning naming its index is written to stderr, while the tool call is still allowed. `PermissionUpdate.ToDict` now sends `destination` as `"session"` when `Destination` is empty (it was left out), and leaves a rule's `ruleContent` out when `RuleContent` is empty (it was sent as `""`), which is how Claude Code expects a rule for the whole tool. Port of Python SDK v0.2.184 (found by diffing the PyPI sdist for v0.2.183 → v0.2.184); TypeScript SDK v0.3.327 has no equivalent. ([#888](https://github.com/Flohs/claude-agent-sdk-go/issues/888))
 
+### Changed
+
+- `Query`, `Startup` and `Client.Connect` now write a warning to stderr for each in-process SDK MCP server (`*McpSdkServerConfig` from `NewSdkMcpServer`) listed in an `AgentDefinition.MCPServers` entry: Claude Code ignores such a server there, as it works only in `Options.McpServers`. The warning names the agent and server and says to move the server to `Options.McpServers` and, if the agent has a `Tools` list, add `mcp__<name>` to it. `AgentDefinition.MCPServers` now documents that entries are server names or inline config and that SDK servers there are deprecated (upstream will make them an error in a later release). The wire form is unchanged: such a server is still sent as `{"type": "sdk", "name": ...}`. Port of TypeScript SDK v0.3.327 (found by diffing the npm `sdk.d.ts` and `sdk.mjs` for v0.3.326 → v0.3.327); Python SDK v0.2.184 has no equivalent. ([#890](https://github.com/Flohs/claude-agent-sdk-go/issues/890))
+
 ## [4.8.0] - 2026-11-17
 
 ### Added
