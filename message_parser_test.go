@@ -3887,3 +3887,52 @@ func TestParseMessage_ResultMessage_InvalidConfigFile(t *testing.T) {
 		t.Errorf("InvalidConfigFile = %+v, want nil when absent", got)
 	}
 }
+
+func TestParseMessage_TaskStarted_PromptWorkflowNameSkipTranscript(t *testing.T) {
+	data := map[string]any{
+		"type":            "system",
+		"subtype":         "task_started",
+		"task_id":         "t1",
+		"description":     "Run the spec workflow",
+		"uuid":            "u1",
+		"session_id":      "s1",
+		"task_type":       "local_workflow",
+		"workflow_name":   "spec",
+		"prompt":          "Write the spec for the parser",
+		"skip_transcript": true,
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	task := msg.(*TaskStartedMessage)
+	if task.WorkflowName != "spec" {
+		t.Errorf("WorkflowName = %q, want spec", task.WorkflowName)
+	}
+	if task.Prompt != "Write the spec for the parser" {
+		t.Errorf("Prompt = %q", task.Prompt)
+	}
+	if task.SkipTranscript == nil || !*task.SkipTranscript {
+		t.Errorf("SkipTranscript = %v, want true", task.SkipTranscript)
+	}
+}
+
+func TestParseMessage_TaskStarted_PromptWorkflowNameSkipTranscriptAbsent(t *testing.T) {
+	data := map[string]any{
+		"type":        "system",
+		"subtype":     "task_started",
+		"task_id":     "t1",
+		"description": "Running task",
+		"uuid":        "u1",
+		"session_id":  "s1",
+	}
+	msg, err := ParseMessage(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	task := msg.(*TaskStartedMessage)
+	if task.Prompt != "" || task.WorkflowName != "" || task.SkipTranscript != nil {
+		t.Errorf("expected zero values when absent, got Prompt=%q WorkflowName=%q SkipTranscript=%v",
+			task.Prompt, task.WorkflowName, task.SkipTranscript)
+	}
+}

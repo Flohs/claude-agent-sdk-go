@@ -260,6 +260,9 @@ func parseSystemMessage(data map[string]any) (Message, error) {
 			Ambient:         optionalBoolField(data, "ambient"),
 			RunID:           stringField(data, "run_id"),
 			ParentTaskID:    stringField(data, "parent_task_id"),
+			WorkflowName:    stringField(data, "workflow_name"),
+			Prompt:          stringField(data, "prompt"),
+			SkipTranscript:  optionalBoolField(data, "skip_transcript"),
 		}, nil
 
 	case "task_progress":
