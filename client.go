@@ -49,6 +49,7 @@ func (c *Client) Connect(ctx context.Context, prompt ...string) error {
 		configuredOpts.PermissionPromptToolName = "stdio"
 	}
 	warnCanUseToolPermissionConflicts(c.options)
+	warnAgentSdkMcpServers(c.options)
 
 	// Pre-flight SessionStore validation — fail fast on mutually-exclusive
 	// combinations (e.g. SessionStore + EnableFileCheckpointing) instead of

@@ -3,6 +3,7 @@ package claude
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -319,8 +320,15 @@ type AgentDefinition struct {
 	Model       string   `json:"model,omitempty"` // "sonnet", "opus", "haiku", "inherit"
 	Skills      []string `json:"skills,omitempty"`
 	Memory      string   `json:"memory,omitempty"` // "user" | "project" | "local"
-	MCPServers  []any    `json:"mcpServers,omitempty"`
-	Background  bool     `json:"background,omitempty"`
+	// MCPServers lists MCP servers for this agent, each by name (a string)
+	// or as inline config (a map[string]McpServerConfig or map[string]any).
+	// Putting an in-process server from [NewSdkMcpServer] here is
+	// deprecated: Claude Code ignores it, the SDK writes a warning to stderr,
+	// and upstream will make it an error in a later release. Put it in
+	// Options.McpServers instead and, if the agent has a Tools list, add
+	// "mcp__<name>" to it. Deprecation per TypeScript SDK v0.3.327.
+	MCPServers []any `json:"mcpServers,omitempty"`
+	Background bool  `json:"background,omitempty"`
 	// OmitClaudeMd runs this agent without the user, project and local
 	// CLAUDE.md instruction files when it runs as a subagent; managed policy
 	// files are kept. For agents that take everything they need from the
@@ -1074,6 +1082,61 @@ func warnCanUseToolPermissionConflicts(opts *Options) {
 			"Warning: CanUseTool is configured alongside PermissionMode "+
 				"PermissionModeBypassPermissions. Tool calls will bypass CanUseTool entirely.")
 	}
+}
+
+// warnAgentSdkMcpServers writes a stderr warning for each in-process SDK MCP
+// server (*McpSdkServerConfig or McpSdkServerConfig) listed in an
+// AgentDefinition's MCPServers, which Claude Code ignores: such a server
+// works only in Options.McpServers. Agents and servers are reported in name
+// order. Port of TypeScript SDK v0.3.327.
+func warnAgentSdkMcpServers(opts *Options) {
+	if len(opts.Agents) == 0 {
+		return
+	}
+	agentNames := make([]string, 0, len(opts.Agents))
+	for name := range opts.Agents {
+		agentNames = append(agentNames, name)
+	}
+	sort.Strings(agentNames)
+	for _, agentName := range agentNames {
+		for _, entry := range opts.Agents[agentName].MCPServers {
+			for _, serverName := range sdkMcpServerNames(entry) {
+				fmt.Fprintf(os.Stderr,
+					"Warning: Agent %q: MCP server %q in its MCPServers was ignored, because an SDK MCP server "+
+						"(NewSdkMcpServer) works only in Options.McpServers. Move it there and, if the agent has a "+
+						"Tools list, add mcp__%s to it. This will be an error in a later release.\n",
+					agentName, serverName, serverName)
+			}
+		}
+	}
+}
+
+// sdkMcpServerNames returns, in sorted order, the keys of an inline
+// AgentDefinition.MCPServers entry whose value is an in-process SDK server.
+func sdkMcpServerNames(entry any) []string {
+	var names []string
+	add := func(name string, config any) {
+		switch config.(type) {
+		case *McpSdkServerConfig, McpSdkServerConfig:
+			names = append(names, name)
+		}
+	}
+	switch m := entry.(type) {
+	case map[string]McpServerConfig:
+		for name, config := range m {
+			add(name, config)
+		}
+	case map[string]any:
+		for name, config := range m {
+			add(name, config)
+		}
+	case map[string]*McpSdkServerConfig:
+		for name, config := range m {
+			add(name, config)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 // mcpServersViaInit returns the McpServers sent in the initialize request
