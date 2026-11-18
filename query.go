@@ -865,11 +865,13 @@ func (q *query) handleCanUseTool(request map[string]any, requestID string) (map[
 			resp["updatedInput"] = originalInput
 		}
 		if len(r.UpdatedPermissions) > 0 {
-			perms := make([]map[string]any, len(r.UpdatedPermissions))
-			for i, p := range r.UpdatedPermissions {
-				perms[i] = p.ToDict()
+			perms, err := permissionUpdatesToWire(r.UpdatedPermissions)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: the CanUseTool callback allowed the tool call, but none of its "+
+					"permission updates were applied, because %v\n", err)
+			} else {
+				resp["updatedPermissions"] = perms
 			}
-			resp["updatedPermissions"] = perms
 		}
 		return resp, nil
 
