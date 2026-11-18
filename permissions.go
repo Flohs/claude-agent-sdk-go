@@ -1,6 +1,9 @@
 package claude
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 // DenialReason is the machine-readable reason why a tool call was denied.
 type DenialReason string
@@ -34,7 +37,9 @@ const (
 
 // PermissionRuleValue represents a permission rule.
 type PermissionRuleValue struct {
-	ToolName    string `json:"toolName"`
+	ToolName string `json:"toolName"`
+	// RuleContent is what the rule matches within the tool, e.g. "npm test"
+	// for Bash. Empty makes a rule that covers every use of the tool.
 	RuleContent string `json:"ruleContent,omitempty"`
 }
 
@@ -52,33 +57,82 @@ const (
 
 // PermissionUpdate represents a permission update configuration.
 type PermissionUpdate struct {
-	Type        PermissionUpdateType        `json:"type"`
-	Rules       []PermissionRuleValue       `json:"rules,omitempty"`
-	Behavior    PermissionBehavior          `json:"behavior,omitempty"`
-	Mode        PermissionMode              `json:"mode,omitempty"`
-	Directories []string                    `json:"directories,omitempty"`
+	Type        PermissionUpdateType  `json:"type"`
+	Rules       []PermissionRuleValue `json:"rules,omitempty"`
+	Behavior    PermissionBehavior    `json:"behavior,omitempty"`
+	Mode        PermissionMode        `json:"mode,omitempty"`
+	Directories []string              `json:"directories,omitempty"`
+	// Destination is where the update applies and is kept:
+	// PermissionUpdateDestSession (in memory until the session ends),
+	// PermissionUpdateDestLocalSettings, PermissionUpdateDestProjectSettings
+	// or PermissionUpdateDestUserSettings. Empty is sent as "session".
 	Destination PermissionUpdateDestination `json:"destination,omitempty"`
 }
 
-// ToDict converts a PermissionUpdate to a map matching the TypeScript control protocol.
-func (p *PermissionUpdate) ToDict() map[string]any {
-	result := map[string]any{
-		"type": string(p.Type),
+// Validate reports whether the update can be sent to Claude Code. Claude
+// Code rejects an update that lacks a field its type needs, and then ignores
+// every update in the same response, so Validate returns an error when:
+//
+//   - Rules is nil or Behavior is empty for PermissionUpdateAddRules,
+//     PermissionUpdateReplaceRules and PermissionUpdateRemoveRules (an empty,
+//     non-nil Rules is allowed);
+//   - Mode is empty for PermissionUpdateSetMode;
+//   - Directories is nil for PermissionUpdateAddDirectories and
+//     PermissionUpdateRemoveDirectories;
+//   - Type is none of those six.
+//
+// Port of Python SDK v0.2.184.
+func (p *PermissionUpdate) Validate() error {
+	switch p.Type {
+	case PermissionUpdateAddRules, PermissionUpdateReplaceRules, PermissionUpdateRemoveRules:
+		if p.Rules == nil {
+			return fmt.Errorf("PermissionUpdate(Type=%q) has no Rules; set Rules to a slice of PermissionRuleValue", p.Type)
+		}
+		if p.Behavior == "" {
+			return fmt.Errorf("PermissionUpdate(Type=%q) has no Behavior; set Behavior to allow, deny or ask", p.Type)
+		}
+	case PermissionUpdateSetMode:
+		if p.Mode == "" {
+			return fmt.Errorf("PermissionUpdate(Type=%q) has no Mode; set Mode to a permission mode such as acceptEdits", p.Type)
+		}
+	case PermissionUpdateAddDirectories, PermissionUpdateRemoveDirectories:
+		if p.Directories == nil {
+			return fmt.Errorf("PermissionUpdate(Type=%q) has no Directories; set Directories to a slice of paths", p.Type)
+		}
+	default:
+		return fmt.Errorf("PermissionUpdate has Type %q, which this version of the SDK cannot send; use one of "+
+			"addRules, replaceRules, removeRules, setMode, addDirectories or removeDirectories, "+
+			"or upgrade the SDK if this update came from Claude Code", p.Type)
 	}
+	return nil
+}
 
-	if p.Destination != "" {
-		result["destination"] = string(p.Destination)
+// ToDict converts a PermissionUpdate to a map matching the control protocol.
+// Destination is sent as "session" when empty, and a rule's ruleContent is
+// left out when RuleContent is empty, which is how Claude Code expects a rule
+// for the whole tool (Python SDK v0.2.184). ToDict does not check the update;
+// call [PermissionUpdate.Validate] for that. Fields the type does not use are
+// left out.
+func (p *PermissionUpdate) ToDict() map[string]any {
+	dest := p.Destination
+	if dest == "" {
+		dest = PermissionUpdateDestSession
+	}
+	result := map[string]any{
+		"type":        string(p.Type),
+		"destination": string(dest),
 	}
 
 	switch p.Type {
 	case PermissionUpdateAddRules, PermissionUpdateReplaceRules, PermissionUpdateRemoveRules:
-		if len(p.Rules) > 0 {
+		if p.Rules != nil {
 			rules := make([]map[string]any, len(p.Rules))
 			for i, rule := range p.Rules {
-				rules[i] = map[string]any{
-					"toolName":    rule.ToolName,
-					"ruleContent": rule.RuleContent,
+				r := map[string]any{"toolName": rule.ToolName}
+				if rule.RuleContent != "" {
+					r["ruleContent"] = rule.RuleContent
 				}
+				rules[i] = r
 			}
 			result["rules"] = rules
 		}
@@ -90,12 +144,28 @@ func (p *PermissionUpdate) ToDict() map[string]any {
 			result["mode"] = string(p.Mode)
 		}
 	case PermissionUpdateAddDirectories, PermissionUpdateRemoveDirectories:
-		if len(p.Directories) > 0 {
+		if p.Directories != nil {
 			result["directories"] = p.Directories
 		}
 	}
 
 	return result
+}
+
+// permissionUpdatesToWire converts the UpdatedPermissions of a
+// PermissionResultAllow. It returns nil, and the reason as an error, if any
+// update fails [PermissionUpdate.Validate]: the updates are sent all
+// together or not at all, because the one that failed may be a restriction
+// the others were meant to come with.
+func permissionUpdatesToWire(updates []PermissionUpdate) ([]map[string]any, error) {
+	wire := make([]map[string]any, len(updates))
+	for i := range updates {
+		if err := updates[i].Validate(); err != nil {
+			return nil, fmt.Errorf("UpdatedPermissions[%d] cannot be sent: %w", i, err)
+		}
+		wire[i] = updates[i].ToDict()
+	}
+	return wire, nil
 }
 
 // PermissionResult is the interface for tool permission callback results.
@@ -105,7 +175,11 @@ type PermissionResult interface {
 
 // PermissionResultAllow allows tool execution.
 type PermissionResultAllow struct {
-	UpdatedInput       map[string]any     `json:"updatedInput,omitempty"`
+	UpdatedInput map[string]any `json:"updatedInput,omitempty"`
+	// UpdatedPermissions are permission updates to apply along with this
+	// allow. If any of them fails [PermissionUpdate.Validate], none are sent
+	// and a warning is written to stderr; the tool call is still allowed
+	// (Python SDK v0.2.184).
 	UpdatedPermissions []PermissionUpdate `json:"updatedPermissions,omitempty"`
 }
 

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `PermissionUpdate.Validate`: reports an update that Claude Code would reject: `Rules` nil or `Behavior` empty for addRules/replaceRules/removeRules, `Mode` empty for setMode, `Directories` nil for addDirectories/removeDirectories, or an unknown `Type`. Claude Code ignores every update in a response when one of them is incomplete, so the `UpdatedPermissions` of a `PermissionResultAllow` returned from `CanUseTool` are now sent all together or not at all: if any fails `Validate`, none are sent and a warning naming its index is written to stderr, while the tool call is still allowed. `PermissionUpdate.ToDict` now sends `destination` as `"session"` when `Destination` is empty (it was left out), and leaves a rule's `ruleContent` out when `RuleContent` is empty (it was sent as `""`), which is how Claude Code expects a rule for the whole tool. Port of Python SDK v0.2.184 (found by diffing the PyPI sdist for v0.2.183 → v0.2.184); TypeScript SDK v0.3.327 has no equivalent. ([#888](https://github.com/Flohs/claude-agent-sdk-go/issues/888))
+
 ## [4.8.0] - 2026-11-17
 
 ### Added
