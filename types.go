@@ -585,6 +585,21 @@ type TaskStartedMessage struct {
 	// when the launcher is the main thread, has no task ID of its own, or is
 	// no longer tracked. Port of TypeScript SDK v0.3.290.
 	ParentTaskID string `json:"parent_task_id,omitempty"`
+	// WorkflowName is meta.name from the workflow script (e.g. "spec").
+	// Set only when TaskType is "local_workflow". Port of TypeScript SDK
+	// v0.3.327.
+	WorkflowName string `json:"workflow_name,omitempty"`
+	// Prompt is text describing what this run was asked. Empty on a subagent
+	// run that Claude Code resumed with text of its own (such as a background
+	// task's notice): keep the Prompt an earlier TaskStartedMessage for the
+	// same TaskID gave. On a run that continues an interrupted turn, it is the
+	// task's description. Port of TypeScript SDK v0.3.327.
+	Prompt string `json:"prompt,omitempty"`
+	// SkipTranscript reports a housekeeping task that consumers should hide
+	// from the inline transcript; it may still appear in a tasks panel. Every
+	// such task is also Ambient. Nil when the CLI does not send the field.
+	// Port of TypeScript SDK v0.3.327.
+	SkipTranscript *bool `json:"skip_transcript,omitempty"`
 }
 
 // TaskProgressMessage is emitted while a task is in progress.
