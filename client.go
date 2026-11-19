@@ -401,6 +401,12 @@ func (c *Client) Interrupt(ctx context.Context) (*InterruptReceipt, error) {
 // StillQueued. Each cancelled uuid is listed under the returned receipt's
 // Cancelled field instead, and StillQueued is empty.
 //
+// Commands without a uuid (task notifications) still in the queue are
+// dequeued too, except a passive notice that a task was stopped or paused,
+// which stays queued; they cannot be listed under Cancelled. One already
+// dequeued for the imminent turn is out of reach of the cancel, but that
+// turn starts aborted.
+//
 // On CLIs advertising the "interrupt_cancel_queued_v1" protocol capability
 // (see [ServerCapabilities.Capabilities]), older CLIs ignore the request and
 // behave exactly like [Client.Interrupt]. Port of TypeScript SDK v0.3.219.

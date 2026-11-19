@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `Client.InterruptCancelQueued` now documents what it does with commands that have no uuid (task notifications): those still queued are dequeued too, except a passive notice that a task was stopped or paused, which stays queued; they can't be listed under `InterruptReceipt.Cancelled`, and one already dequeued for the imminent turn is out of reach, but that turn starts aborted. Documentation only. Port of TypeScript SDK v0.3.328 (found by diffing the npm `sdk.d.ts` for v0.3.327 → v0.3.328); Python SDK v0.2.185 has no equivalent. ([#897](https://github.com/Flohs/claude-agent-sdk-go/issues/897))
+
 ## [4.9.0] - 2026-11-18
 
 ### Added
