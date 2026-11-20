@@ -527,7 +527,9 @@ type SandboxCredentialFileEntry struct {
 // InjectHosts. InjectHosts is only meaningful when Mode is "mask"; it is
 // accepted but ignored for "deny". If InjectHosts is unset, the credential
 // is injected at every host reachable via the sandbox's allowed network
-// domains. Port of TypeScript SDK v0.3.199.
+// domains, except a masked AWS secret key that signs requests, which is
+// never injected without an InjectHosts list (TypeScript SDK v0.3.329).
+// Port of TypeScript SDK v0.3.199.
 type SandboxCredentialEnvVarEntry struct {
 	Name        string   `json:"name"`
 	Mode        string   `json:"mode"`

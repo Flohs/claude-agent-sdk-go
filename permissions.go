@@ -226,10 +226,11 @@ type ToolPermissionContext struct {
 	// MatchedAskRule is set when a user-configured ask rule (permissions.ask)
 	// forced this prompt while the ask still carries the tool's own
 	// DecisionReason. It may also be set, whatever the DecisionReason, when
-	// an ask rule reaches an MCP tool only under another name of its server
-	// (such as a connector's id or its claude.ai name), not under the name
-	// in ToolName, so a host that looks the rule up by ToolName does not find
-	// it (TypeScript SDK v0.3.319). Treat an ask carrying it as rule-forced.
+	// an ask rule reaches an MCP tool only under another name (such as a
+	// connector's id, its claude.ai name, or Artifact for the Artifacts
+	// server's tools), not under the name in ToolName, so a host that looks
+	// the rule up by ToolName does not find it (TypeScript SDK v0.3.319 and
+	// v0.3.329). Treat an ask carrying it as rule-forced.
 	// Nil when no ask rule matched. Port of TypeScript SDK v0.3.214.
 	MatchedAskRule *MatchedAskRule
 	// DefaultToNo is true when the terminal prompt for this ask must default

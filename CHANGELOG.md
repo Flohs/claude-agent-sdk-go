@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `ToolPermissionContext.MatchedAskRule` now documents that an ask rule can also reach an MCP tool under the name `Artifact` for the Artifacts server's tools (besides a connector's id or its claude.ai name), so the rule is not found under `ToolName`. `SandboxCredentialEnvVarEntry` now documents that a masked AWS secret key that signs requests is never injected when `InjectHosts` is unset, instead of being injected at every allowed host. Documentation only. Port of TypeScript SDK v0.3.329 (found by diffing the npm `sdk.d.ts` for v0.3.328 → v0.3.329); Python SDK v0.2.186 has no equivalent. ([#900](https://github.com/Flohs/claude-agent-sdk-go/issues/900))
+
 ## [4.9.1] - 2026-11-19
 
 ### Changed
