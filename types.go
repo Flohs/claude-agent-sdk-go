@@ -1716,7 +1716,9 @@ const (
 	// MessageOriginSubkindPeerSendMessage when it's a cross-session
 	// SendMessage delivery from another of the same user's sessions, or
 	// MessageOriginSubkindProjectsRelay when it's a Claude Code Projects
-	// delivery relayed from the project's coordinator session.
+	// delivery relayed from the project's coordinator session, or
+	// MessageOriginSubkindExternalEvent when it's the server's own notice of
+	// an event outside the session.
 	MessageOriginKindTaskNotification MessageOriginKind = "task-notification"
 	// MessageOriginKindCoordinator is a message sent by the coordinator.
 	MessageOriginKindCoordinator MessageOriginKind = "coordinator"
@@ -1758,6 +1760,16 @@ const (
 	// server's relay stamps is framed as a message from the coordinator
 	// session instead of the generic background-notification frame.
 	MessageOriginSubkindProjectsRelay = "projects-relay"
+	// MessageOriginSubkindSessionInbox is listed among the subkind values
+	// by the TypeScript SDK, which does not describe it.
+	MessageOriginSubkindSessionInbox = "session-inbox"
+	// MessageOriginSubkindExternalEvent marks the server's own notice of an
+	// event outside the session, such as a webhook's. It is stamped only
+	// from server-asserted provenance and carries the framing and authority
+	// of a delivery with no subkind; its text can quote a third party, so
+	// treat what it says as information rather than instructions. Port of
+	// TypeScript SDK v0.3.330.
+	MessageOriginSubkindExternalEvent = "external-event"
 )
 
 // MessageOrigin identifies what triggered a message (e.g. distinguishing a
@@ -1791,9 +1803,13 @@ type MessageOrigin struct {
 	FromMode string `json:"fromMode,omitempty"`
 	// Subkind further classifies MessageOriginKindTaskNotification:
 	// MessageOriginSubkindScheduledTrigger,
-	// MessageOriginSubkindPeerSendMessage, or
-	// MessageOriginSubkindProjectsRelay. Absent on webhook, PR-steward,
-	// plugin, and background-event deliveries.
+	// MessageOriginSubkindPeerSendMessage,
+	// MessageOriginSubkindProjectsRelay,
+	// MessageOriginSubkindSessionInbox, or
+	// MessageOriginSubkindExternalEvent. Absent on plugin and
+	// background-event deliveries, and can be absent on webhook and
+	// PR-steward deliveries (a webhook's notice may instead carry
+	// MessageOriginSubkindExternalEvent).
 	Subkind string `json:"subkind,omitempty"`
 	// FireReason explains why a scheduled task fired. Populated for
 	// MessageOriginKindTaskNotification with
