@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.10.0] - 2026-11-21
+
 ### Added
 
 - `MessageOriginSubkindExternalEvent` (`"external-event"`): a `MessageOrigin.Subkind` for the server's own notice of an event outside the session, such as a webhook's, stamped only from server-asserted provenance and framed with the authority of a delivery with no subkind (its text can quote a third party). Also adds `MessageOriginSubkindSessionInbox` (`"session-inbox"`), which the TypeScript SDK already listed. `MessageOrigin.Subkind` now documents that it is absent on plugin and background-event deliveries and can be absent on webhook and PR-steward deliveries. Port of TypeScript SDK v0.3.330 (found by diffing the npm `sdk.d.ts` for v0.3.329 → v0.3.330); Python SDK v0.2.187 has no equivalent. ([#903](https://github.com/Flohs/claude-agent-sdk-go/issues/903))
