@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.10.1] - 2026-11-24
+
 ### Changed
 
 - `ResultMessage.StartupFailureReason` now documents the new known value `sideload_flags_disabled` (managed settings set `disableSideloadFlags`, and the launch names plugins, agents or MCP servers of its own; a start without them is not refused). `Options.EnableFileCheckpointing` now documents that an administrator's managed `fileCheckpointingEnabled: false` keeps it off, and `RewindFilesResult.SkippedLinks` that the rewind itself fails (`CanRewind` false) when a file fails to restore and none changes. Documentation only. Port of TypeScript SDK v0.3.331 (found by diffing the npm `sdk.d.ts` for v0.3.330 → v0.3.331); Python SDK v0.2.188 has no equivalent. ([#906](https://github.com/Flohs/claude-agent-sdk-go/issues/906))
