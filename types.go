@@ -1916,7 +1916,11 @@ type ResultMessage struct {
 	// --initialize-fields and the settings or disallowedTools fields it
 	// names; also when a named field's own flag, --settings or
 	// --disallowedTools, is passed too. The Go SDK never passes
-	// --initialize-fields itself; TypeScript SDK v0.3.327).
+	// --initialize-fields itself; TypeScript SDK v0.3.327) and
+	// "sideload_flags_disabled" (managed settings set
+	// disableSideloadFlags, and the launch names plugins, agents or MCP
+	// servers of its own; a start without them is not refused; TypeScript
+	// SDK v0.3.331).
 	// Failures that otherwise end with stderr alone produce this result
 	// only when CLAUDE_CODE_STARTUP_FAILURE_RESULTS is set in the CLI's
 	// environment, except "org_config_required_unavailable",
@@ -2933,7 +2937,8 @@ type RewindFilesResult struct {
 	// reflect link-safety refusals. Absent or 0 on a real rewind means no
 	// link-safety refusals occurred; other per-file failures (for example a
 	// missing backup file) are logged and reported in telemetry but are not
-	// counted here.
+	// counted here; when a file fails to restore and none changes, the
+	// rewind itself fails (CanRewind false; TypeScript SDK v0.3.331).
 	SkippedLinks int `json:"skippedLinks,omitempty"`
 }
 
