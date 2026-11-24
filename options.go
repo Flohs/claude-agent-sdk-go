@@ -967,6 +967,8 @@ type Options struct {
 	// preview field. Port of TypeScript SDK v0.2.69.
 	ToolConfig *BuiltinToolConfig
 	// EnableFileCheckpointing enables file change tracking for rewind support.
+	// An administrator's managed fileCheckpointingEnabled: false keeps it off
+	// (TypeScript SDK v0.3.331).
 	EnableFileCheckpointing bool
 	// ClientApp is your app or library identifier (e.g. "my-app/1.0.0"),
 	// sent on requests to the API. When non-empty it sets the
