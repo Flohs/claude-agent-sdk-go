@@ -94,6 +94,11 @@ const (
 	// HookEventPostModelSwitch fires after the session's model changes.
 	// Port of TypeScript SDK v0.3.251.
 	HookEventPostModelSwitch HookEvent = "PostModelSwitch"
+	// HookEventPreSkillShellCommand fires before a shell command written in a
+	// skill's or command's text runs, when the skill or command loads. A hook
+	// can refuse it via [PreSkillShellCommandHookOutput]. Matcher value is the
+	// shell tool (Bash or PowerShell). Port of TypeScript SDK v0.3.332.
+	HookEventPreSkillShellCommand HookEvent = "PreSkillShellCommand"
 )
 
 // HookInput represents the input data for a hook callback.
@@ -924,6 +929,79 @@ func (o PostModelSwitchHookOutput) ToHookJSONOutput() HookJSONOutput {
 	specific := map[string]any{"hookEventName": "PostModelSwitch"}
 	if o.AdditionalContext != "" {
 		specific["additionalContext"] = o.AdditionalContext
+	}
+	return HookJSONOutput{"hookSpecificOutput": specific}
+}
+
+// SkillShellCommandInvokedBy identifies who started the skill or command
+// load behind a [PreSkillShellCommandHookInput]. Port of TypeScript SDK
+// v0.3.332.
+type SkillShellCommandInvokedBy string
+
+const (
+	// SkillShellCommandInvokedByUser is a load the user typed, or one an SDK
+	// host sent.
+	SkillShellCommandInvokedByUser SkillShellCommandInvokedBy = "user"
+	// SkillShellCommandInvokedByClaude is a load by the Skill tool, or by a
+	// turn that Claude scheduled.
+	SkillShellCommandInvokedByClaude SkillShellCommandInvokedBy = "claude"
+	// SkillShellCommandInvokedByOther is anything else, such as a subagent's
+	// preload or a channel message, or a load whose origin is not known.
+	SkillShellCommandInvokedByOther SkillShellCommandInvokedBy = "other"
+)
+
+// PreSkillShellCommandHookInput is the typed input for PreSkillShellCommand
+// hook events. Fires before a shell command written in a skill's or
+// command's text runs. Port of TypeScript SDK v0.3.332.
+type PreSkillShellCommandHookInput struct {
+	BaseHookInput
+	// ToolName is the shell tool that runs the command: "Bash" or "PowerShell".
+	ToolName string `json:"tool_name"`
+	// ToolInput holds the command as it would run, with arguments filled
+	// in, under the key "command" (see [PreSkillShellCommandHookInput.Command]).
+	ToolInput map[string]any `json:"tool_input"`
+	// ToolUseID identifies this command. It names no tool call in the transcript.
+	ToolUseID string `json:"tool_use_id"`
+	// CommandName is the skill or command whose text holds the shell command.
+	CommandName string `json:"command_name"`
+	// CommandSource is where that skill or command is defined, when known.
+	CommandSource string `json:"command_source,omitempty"`
+	// InvokedBy is who started the load: user, claude, or other.
+	InvokedBy SkillShellCommandInvokedBy `json:"invoked_by"`
+}
+
+func (*PreSkillShellCommandHookInput) hookInputMarker() {}
+
+// Command returns the shell command from ToolInput, or "" when absent.
+func (i *PreSkillShellCommandHookInput) Command() string {
+	return stringField(i.ToolInput, "command")
+}
+
+// PreSkillShellCommandHookOutput is the typed output for
+// [HookEventPreSkillShellCommand] callbacks. Port of TypeScript SDK v0.3.332.
+type PreSkillShellCommandHookOutput struct {
+	// PermissionDecision is "allow", "deny", "ask" or "defer". "allow" adds
+	// nothing: the command runs unless a hook refuses it. "deny", "ask" and
+	// "defer" all keep it from running.
+	PermissionDecision string
+	// PermissionDecisionReason is the human-readable reason for the decision.
+	PermissionDecisionReason string
+	// UpdatedInput is never applied: any non-nil value keeps the command
+	// from running.
+	UpdatedInput map[string]any
+}
+
+// ToHookJSONOutput converts the typed struct to a [HookJSONOutput] map.
+func (o PreSkillShellCommandHookOutput) ToHookJSONOutput() HookJSONOutput {
+	specific := map[string]any{"hookEventName": "PreSkillShellCommand"}
+	if o.PermissionDecision != "" {
+		specific["permissionDecision"] = o.PermissionDecision
+	}
+	if o.PermissionDecisionReason != "" {
+		specific["permissionDecisionReason"] = o.PermissionDecisionReason
+	}
+	if o.UpdatedInput != nil {
+		specific["updatedInput"] = o.UpdatedInput
 	}
 	return HookJSONOutput{"hookSpecificOutput": specific}
 }

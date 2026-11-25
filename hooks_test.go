@@ -82,6 +82,36 @@ func TestPreModelSwitchHookOutput_ToHookJSONOutput_AllFields(t *testing.T) {
 	}
 }
 
+func TestPreSkillShellCommandHookOutput_ToHookJSONOutput_Empty(t *testing.T) {
+	got := PreSkillShellCommandHookOutput{}.ToHookJSONOutput()
+	want := HookJSONOutput{
+		"hookSpecificOutput": map[string]any{"hookEventName": "PreSkillShellCommand"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ToHookJSONOutput() = %#v, want %#v", got, want)
+	}
+}
+
+func TestPreSkillShellCommandHookOutput_ToHookJSONOutput_AllFields(t *testing.T) {
+	got := PreSkillShellCommandHookOutput{
+		PermissionDecision:       "deny",
+		PermissionDecisionReason: "network commands are not allowed in skills",
+		UpdatedInput:             map[string]any{"command": "true"},
+	}.ToHookJSONOutput()
+
+	want := HookJSONOutput{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":            "PreSkillShellCommand",
+			"permissionDecision":       "deny",
+			"permissionDecisionReason": "network commands are not allowed in skills",
+			"updatedInput":             map[string]any{"command": "true"},
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ToHookJSONOutput() = %#v, want %#v", got, want)
+	}
+}
+
 func TestPostModelSwitchHookOutput_ToHookJSONOutput_Empty(t *testing.T) {
 	got := PostModelSwitchHookOutput{}.ToHookJSONOutput()
 	want := HookJSONOutput{

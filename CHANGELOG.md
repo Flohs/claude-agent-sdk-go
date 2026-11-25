@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `HookEventPreSkillShellCommand` (`"PreSkillShellCommand"`): a hook event that fires before a shell command written in a skill's or command's text runs. `ParseHookInput` returns it as `PreSkillShellCommandHookInput` with `ToolName` (Bash or PowerShell), `ToolInput` (with `Command()` for the command as it would run), `ToolUseID` (names no tool call in the transcript), `CommandName`, `CommandSource` and `InvokedBy` (`SkillShellCommandInvokedByUser`, `SkillShellCommandInvokedByClaude`, `SkillShellCommandInvokedByOther`). `PreSkillShellCommandHookOutput` sends `permissionDecision` ("allow" adds nothing; "deny", "ask" and "defer" all keep the command from running), `permissionDecisionReason` and `updatedInput` (never applied: any value keeps the command from running). Port of TypeScript SDK v0.3.332 (found by diffing the npm `sdk.d.ts` for v0.3.331 → v0.3.332); Python SDK v0.2.189 has no equivalent. ([#909](https://github.com/Flohs/claude-agent-sdk-go/issues/909))
+
 ## [4.10.1] - 2026-11-24
 
 ### Changed

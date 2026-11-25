@@ -1201,6 +1201,58 @@ func TestParseHookInput_PostModelSwitch(t *testing.T) {
 	}
 }
 
+func TestParseHookInput_PreSkillShellCommand(t *testing.T) {
+	input := merge(base("PreSkillShellCommand"), HookInput{
+		"tool_name":      "Bash",
+		"tool_input":     map[string]any{"command": "git status --short"},
+		"tool_use_id":    "skillsh_1",
+		"command_name":   "commit",
+		"command_source": "project",
+		"invoked_by":     "claude",
+	})
+	result, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*PreSkillShellCommandHookInput)
+	if !ok {
+		t.Fatalf("expected *PreSkillShellCommandHookInput, got %T", result)
+	}
+	assertBase(t, m.BaseHookInput, "PreSkillShellCommand")
+	if m.ToolName != "Bash" {
+		t.Errorf("ToolName: got %q", m.ToolName)
+	}
+	if m.Command() != "git status --short" {
+		t.Errorf("Command(): got %q", m.Command())
+	}
+	if m.ToolUseID != "skillsh_1" {
+		t.Errorf("ToolUseID: got %q", m.ToolUseID)
+	}
+	if m.CommandName != "commit" {
+		t.Errorf("CommandName: got %q", m.CommandName)
+	}
+	if m.CommandSource != "project" {
+		t.Errorf("CommandSource: got %q", m.CommandSource)
+	}
+	if m.InvokedBy != SkillShellCommandInvokedByClaude {
+		t.Errorf("InvokedBy: got %q, want %q", m.InvokedBy, SkillShellCommandInvokedByClaude)
+	}
+}
+
+func TestParseHookInput_PreSkillShellCommand_Minimal(t *testing.T) {
+	result, err := ParseHookInput(base("PreSkillShellCommand"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(*PreSkillShellCommandHookInput)
+	if !ok {
+		t.Fatalf("expected *PreSkillShellCommandHookInput, got %T", result)
+	}
+	if m.Command() != "" || m.CommandSource != "" || m.InvokedBy != "" {
+		t.Errorf("expected zero values, got %+v", m)
+	}
+}
+
 func TestParseHookInput_PostToolBatch(t *testing.T) {
 	input := merge(base("PostToolBatch"), HookInput{
 		"tool_calls": []any{
