@@ -309,6 +309,17 @@ func ParseHookInput(input HookInput) (TypedHookInput, error) {
 			Pricing:                stringField(input, "pricing"),
 		}, nil
 
+	case HookEventPreSkillShellCommand:
+		return &PreSkillShellCommandHookInput{
+			BaseHookInput: base,
+			ToolName:      stringField(input, "tool_name"),
+			ToolInput:     mapField(input, "tool_input"),
+			ToolUseID:     stringField(input, "tool_use_id"),
+			CommandName:   stringField(input, "command_name"),
+			CommandSource: stringField(input, "command_source"),
+			InvokedBy:     SkillShellCommandInvokedBy(stringField(input, "invoked_by")),
+		}, nil
+
 	default:
 		// Forward-compatible: return nil for unrecognized events.
 		return nil, nil
