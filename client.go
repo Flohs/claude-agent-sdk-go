@@ -418,12 +418,29 @@ func (c *Client) InterruptCancelQueued(ctx context.Context) (*InterruptReceipt, 
 }
 
 // SetPermissionMode changes the permission mode during a conversation.
+//
+// The mode now in effect is not always the mode asked for; use
+// [Client.SetPermissionModeWithResult] to learn which mode the CLI applied.
 func (c *Client) SetPermissionMode(ctx context.Context, mode string) error {
+	_, err := c.SetPermissionModeWithResult(ctx, mode)
+	return err
+}
+
+// SetPermissionModeWithResult changes the permission mode during a
+// conversation, like [Client.SetPermissionMode], and returns the permission
+// mode now in effect, which is not always the mode asked for: record
+// [SetPermissionModeResponse.Mode], not the argument. It returns a nil
+// response (and a nil error) when the CLI's answer names no mode, or one
+// outside the known [PermissionMode] values; the argument is then only a
+// best guess. "manual" in the answer is reported as [PermissionModeDefault].
+// It returns an error where the mode is refused. Port of TypeScript SDK
+// v0.3.332.
+func (c *Client) SetPermissionModeWithResult(ctx context.Context, mode string) (*SetPermissionModeResponse, error) {
 	if c.q == nil {
-		return &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
+		return nil, &ConnectionError{SDKError: SDKError{Message: "Not connected. Call Connect() first."}}
 	}
 	if err := validatePermissionMode(PermissionMode(mode)); err != nil {
-		return err
+		return nil, err
 	}
 	return c.q.setPermissionMode(mode)
 }

@@ -44,6 +44,15 @@ const (
 	PermissionModeManual PermissionMode = "manual"
 )
 
+// SetPermissionModeResponse is the success payload answering a
+// set_permission_mode control request, returned by
+// [Client.SetPermissionModeWithResult]. Port of TypeScript SDK v0.3.332.
+type SetPermissionModeResponse struct {
+	// Mode is the permission mode now in effect, which can differ from the
+	// one asked for.
+	Mode PermissionMode `json:"mode,omitempty"`
+}
+
 // validPermissionModes enumerates every value validatePermissionMode accepts,
 // used both for the membership check and to render the error message's list
 // of valid values.

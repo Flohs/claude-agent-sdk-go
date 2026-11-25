@@ -1347,12 +1347,34 @@ func (q *query) interrupt(ctx context.Context, cancelQueued bool) (*InterruptRec
 	}
 }
 
-func (q *query) setPermissionMode(mode string) error {
-	_, err := q.sendControlRequest(map[string]any{
+func (q *query) setPermissionMode(mode string) (*SetPermissionModeResponse, error) {
+	resp, err := q.sendControlRequest(map[string]any{
 		"subtype": "set_permission_mode",
 		"mode":    mode,
 	}, 60*time.Second)
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return parseSetPermissionModeResponse(resp), nil
+}
+
+// parseSetPermissionModeResponse reads the mode a set_permission_mode
+// success payload names. It returns nil when the payload names no mode or
+// one outside the known PermissionMode values, and reports "manual" as
+// "default", as the TypeScript SDK does.
+func parseSetPermissionModeResponse(resp map[string]any) *SetPermissionModeResponse {
+	s, ok := resp["mode"].(string)
+	if !ok {
+		return nil
+	}
+	m := PermissionMode(s)
+	if m == PermissionModeManual {
+		m = PermissionModeDefault
+	}
+	if m == "" || validatePermissionMode(m) != nil {
+		return nil
+	}
+	return &SetPermissionModeResponse{Mode: m}
 }
 
 func (q *query) setModel(model string) error {
